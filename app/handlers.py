@@ -1650,7 +1650,8 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
     # Add action buttons
     if is_pro:
         keyboard = [
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
         ]
     else:
         # Show PRO upgrade button for free users
@@ -1659,7 +1660,8 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
                 "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
         ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -1760,7 +1762,8 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
     # Add action buttons
     if is_pro:
         keyboard = [
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
         ]
     else:
         keyboard = [
@@ -1768,7 +1771,8 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
                 "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
         ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -1808,14 +1812,127 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
 # ==================== RECALCULATE ====================
 
 async def recalculate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle recalculate button"""
+    """Handle recalculate button - offer choice to use saved data or enter new"""
     query = update.callback_query
     await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Check if user has saved financial profile
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if user:
+        profile = await db.get_financial_profile(user["id"])
+        if profile and profile.get("income_self", 0) > 0:
+            # User has saved data - offer choice
+            keyboard = [
+                [InlineKeyboardButton(get_message("btn_use_saved_data", lang), callback_data="recalc_saved")],
+                [InlineKeyboardButton(get_message("btn_new_calculation", lang), callback_data="recalc_new")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.message.reply_text(
+                get_message("recalculate_choice", lang),
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+            return States.MODE
+    
+    # No saved data - go to new calculation
+    return await recalc_new_callback(update, context)
+
+
+async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Recalculate using saved profile data"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return await recalc_new_callback(update, context)
+    
+    profile = await db.get_financial_profile(user["id"])
+    
+    if not profile:
+        return await recalc_new_callback(update, context)
+    
+    # Show calculating message
+    calc_msg = await query.message.reply_text(
+        get_message("calculating_saved", lang)
+    )
+    
+    # Get mode from user settings
+    mode = user.get("mode", "solo")
+    
+    # Build financial input from saved profile
+    from app.engine import FinancialInput
+    
+    financial_input = FinancialInput(
+        mode=mode,
+        income_self=profile.get("income_self", 0),
+        income_partner=profile.get("income_partner", 0),
+        rent=profile.get("rent", 0),
+        kindergarten=profile.get("kindergarten", 0),
+        utilities=profile.get("utilities", 0),
+        loan_payment=profile.get("loan_payment", 0),
+        total_debt=profile.get("total_debt", 0)
+    )
+    
+    # Calculate
+    result = calculate_finances(financial_input)
+    
+    # Check PRO status
+    is_pro = await get_user_subscription_status(telegram_id)
+    
+    # Format result
+    result_message = format_result_message(result, lang, is_pro=is_pro)
+    
+    # Delete calculating message
+    await calc_msg.delete()
+    
+    # Add action buttons
+    if is_pro:
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(
+                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                callback_data="show_pricing"
+            )],
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+        ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        result_message,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return ConversationHandler.END
+
+
+async def recalc_new_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start new calculation from scratch"""
+    query = update.callback_query
+    if query:
+        await query.answer()
     
     lang = context.user_data.get("lang", "uz")
     
     # Clear previous data but keep user info
-    telegram_id = context.user_data.get("telegram_id")
+    telegram_id = context.user_data.get("telegram_id") or update.effective_user.id
     phone = context.user_data.get("phone_number")
     
     context.user_data.clear()
@@ -1832,11 +1949,12 @@ async def recalculate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("select_mode", lang),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
+    if query:
+        await query.message.reply_text(
+            get_message("select_mode", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
     
     return States.MODE
 
@@ -2237,6 +2355,8 @@ def get_conversation_handler() -> ConversationHandler:
         entry_points=[
             CommandHandler("start", start_command),
             CallbackQueryHandler(recalculate_callback, pattern="^recalculate$"),
+            CallbackQueryHandler(recalc_saved_callback, pattern="^recalc_saved$"),
+            CallbackQueryHandler(recalc_new_callback, pattern="^recalc_new$"),
         ],
         states={
             States.LANGUAGE: [
@@ -2245,6 +2365,8 @@ def get_conversation_handler() -> ConversationHandler:
             ],
             States.MODE: [
                 CallbackQueryHandler(mode_callback, pattern="^mode_"),
+                CallbackQueryHandler(recalc_saved_callback, pattern="^recalc_saved$"),
+                CallbackQueryHandler(recalc_new_callback, pattern="^recalc_new$"),
             ],
             States.TRANSACTION_CHOICE: [
                 CallbackQueryHandler(transaction_choice_callback, pattern="^tx_(yes|no)$"),
@@ -2305,6 +2427,15 @@ def get_conversation_handler() -> ConversationHandler:
         per_message=False,
     )
 
-# Register trial handler globally (for dispatcher setup)
-def add_trial_handler_to_app(application):
+# Register additional handlers globally (for dispatcher setup)
+def add_global_handlers_to_app(application):
+    """Add handlers that work outside the conversation flow"""
     application.add_handler(CallbackQueryHandler(start_trial_callback, pattern="^start_trial$"), group=0)
+    application.add_handler(CallbackQueryHandler(show_profile_callback, pattern="^show_profile$"), group=0)
+    application.add_handler(CallbackQueryHandler(edit_profile_field_callback, pattern="^edit_"), group=0)
+    application.add_handler(CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_"), group=0)
+    application.add_handler(CommandHandler("profile", profile_command), group=0)
+
+# Keep old function for backwards compatibility
+def add_trial_handler_to_app(application):
+    add_global_handlers_to_app(application)

@@ -960,6 +960,31 @@ MESSAGES = {
         "ru": "🔄 Пересчитать"
     },
     
+    "btn_profile": {
+        "uz": "👤 Profilim",
+        "ru": "👤 Мой профиль"
+    },
+    
+    "btn_new_calculation": {
+        "uz": "🔄 Yangi hisoblash",
+        "ru": "🔄 Новый расчёт"
+    },
+    
+    "btn_use_saved_data": {
+        "uz": "📊 Saqlangan ma'lumotlar bilan",
+        "ru": "📊 С сохранёнными данными"
+    },
+    
+    "recalculate_choice": {
+        "uz": "🔄 *Qayta hisoblash*\n\nSaqlangan ma'lumotlaringiz bilan hisoblashni xohlaysizmi yoki yangidan kiritasizmi?",
+        "ru": "🔄 *Пересчёт*\n\nИспользовать сохранённые данные или ввести заново?"
+    },
+    
+    "calculating_saved": {
+        "uz": "⏳ Saqlangan ma'lumotlar bilan hisoblanmoqda...",
+        "ru": "⏳ Расчёт с сохранёнными данными..."
+    },
+    
     "btn_share": {
         "uz": "📤 Do'stlarga ulashish",
         "ru": "📤 Поделиться с друзьями"
