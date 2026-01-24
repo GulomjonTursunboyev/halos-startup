@@ -1,52 +1,126 @@
+import os
 from flask import Flask, request, jsonify
 import hmac
 import hashlib
 import logging
-from app.click_payment import CLICK_SECRET_KEY
-from app.database import get_database
-from app.subscription import PRICING_PLANS
+import sqlite3
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-# CLICK Prepare URL (test uchun oddiy javob)
+# Click credentials from environment
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "wgqetRCPLPQV2oYd1I")
+DATABASE_PATH = os.getenv("DATABASE_PATH", "data/solvo.db")
+
+# Pricing plans
+PRICING_PLANS = {
+    "pro_monthly": {"days": 30, "price": 15000},
+    "pro_quarterly": {"days": 90, "price": 40500},
+    "pro_yearly": {"days": 365, "price": 135000},
+}
+
+def get_db_connection():
+    """Get database connection"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def activate_pro(telegram_id: int, plan_id: str):
+    """Activate PRO subscription for user"""
+    plan = PRICING_PLANS.get(plan_id)
+    if not plan:
+        logger.error(f"Unknown plan: {plan_id}")
+        return False
+    
+    expires_at = datetime.now() + timedelta(days=plan["days"])
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users 
+            SET subscription_tier = 'pro', 
+                subscription_expires = ?, 
+                subscription_plan = ?, 
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE telegram_id = ?
+        """, (expires_at.isoformat(), plan_id, telegram_id))
+        conn.commit()
+        conn.close()
+        logger.info(f"PRO activated for user {telegram_id}, plan: {plan_id}, expires: {expires_at}")
+        return True
+    except Exception as e:
+        logger.error(f"Database error activating PRO: {e}")
+        return False
+
+# CLICK Prepare URL
 @app.route('/click/prepare', methods=['POST'])
 def click_prepare():
-    # Click serverdan kelgan so'rovni tekshirish va javob qaytarish
+    """Click Prepare endpoint - validates order before payment"""
     data = request.form.to_dict()
-    # Bu yerda siz order_id va summani tekshirishingiz mumkin
+    logger.info(f"Click Prepare request: {data}")
+    
+    # Validate merchant_trans_id format
+    merchant_trans_id = data.get('merchant_trans_id', '')
+    if not merchant_trans_id.startswith('solvo_'):
+        return jsonify({"error": "-5", "error_note": "Invalid order format"})
+    
     return jsonify({"error": "0", "error_note": "Success"})
 
-# CLICK Complete URL (to'lovdan so'ng chaqiriladi)
+# CLICK Complete URL
 @app.route('/click/complete', methods=['POST'])
 def click_complete():
+    """Click Complete endpoint - called after successful payment"""
     data = request.form.to_dict()
-    # Imzo (signature) ni tekshirish
-    sign_string = f"{data.get('click_trans_id')}{data.get('service_id')}{CLICK_SECRET_KEY}{data.get('merchant_trans_id')}{data.get('amount')}{data.get('action')}{data.get('sign_time')}"
-    sign = hmac.new(CLICK_SECRET_KEY.encode(), sign_string.encode(), hashlib.md5).hexdigest()
-    if data.get('sign_string') and data.get('sign_string') != sign:
+    logger.info(f"Click Complete request: {data}")
+    
+    # Verify signature
+    sign_string = (
+        f"{data.get('click_trans_id')}"
+        f"{data.get('service_id')}"
+        f"{CLICK_SECRET_KEY}"
+        f"{data.get('merchant_trans_id')}"
+        f"{data.get('amount')}"
+        f"{data.get('action')}"
+        f"{data.get('sign_time')}"
+    )
+    expected_sign = hashlib.md5(sign_string.encode()).hexdigest()
+    
+    if data.get('sign_string') and data.get('sign_string') != expected_sign:
+        logger.warning("Invalid signature in Click Complete")
         return jsonify({"error": "-1", "error_note": "Invalid signature"})
-
-    # To'lov muvaffaqiyatli bo'lsa, PRO ni ochamiz
-    if data.get('action') == '1' and data.get('error') == '0':
-        order_id = data.get('merchant_trans_id')
-        # order_id format: solvo_{telegram_id}_{plan_id}
+    
+    # Process successful payment
+    if data.get('error') == '0':
+        order_id = data.get('merchant_trans_id', '')
         try:
-            _, telegram_id, plan_id = order_id.split('_', 2)
-            telegram_id = int(telegram_id)
-            plan = PRICING_PLANS.get(plan_id)
-            if plan:
-                expires_at = datetime.now() + timedelta(days=plan.period.value)
-                db = get_database()
-                db._connection.execute("""
-                    UPDATE users SET subscription_tier = 'pro', subscription_expires = ?, subscription_plan = ?, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
-                """, (expires_at.isoformat(), plan_id, telegram_id))
-                db._connection.commit()
-                logger.info(f"PRO activated for user {telegram_id} via Click payment.")
+            # Parse order_id format: solvo_{telegram_id}_{plan_id}
+            parts = order_id.split('_', 2)
+            if len(parts) >= 3:
+                telegram_id = int(parts[1])
+                plan_id = parts[2]
+                
+                if activate_pro(telegram_id, plan_id):
+                    logger.info(f"Successfully activated PRO for user {telegram_id}")
+                else:
+                    logger.error(f"Failed to activate PRO for user {telegram_id}")
         except Exception as e:
-            logger.error(f"Click complete error: {e}")
+            logger.error(f"Error processing Click Complete: {e}")
+    
     return jsonify({"error": "0", "error_note": "Success"})
 
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check for Render"""
+    return jsonify({"status": "ok", "service": "solvo-click"})
+
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint"""
+    return jsonify({"status": "ok", "service": "SOLVO Click Payment Webhook"})
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)

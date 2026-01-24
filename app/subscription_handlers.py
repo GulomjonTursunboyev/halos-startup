@@ -1,59 +1,6 @@
-
-# ==================== MYUZCARD PAYMENT HANDLER ====================
-
-
-# CLICK PAYMENT INTEGRATION
-from app.click_payment import generate_click_payment_url
-
-from app.subscription import PRICING_PLANS
-
-from telegram.constants import ParseMode
-
-async def myuzcard_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle MyUzcard payment button click and show payment form/instructions"""
-    query = update.callback_query
-    plan_id = query.data.replace("myuzcard_buy_", "")  # pro_monthly, pro_quarterly, pro_yearly
-    lang = context.user_data.get("lang", "uz")
-
-    if plan_id not in PRICING_PLANS:
-        await query.answer("❌ Plan not found", show_alert=True)
-        return
-
-    plan = PRICING_PLANS[plan_id]
-    amount = plan.price_uzs
-    order_id = f"solvo_{update.effective_user.id}_{plan_id}"
-    return_url = "https://t.me/solvo_bot"  # Change to your bot or success page
-    click_url = generate_click_payment_url(amount, order_id, return_url, plan.description_uz)
-
-    if lang == "uz":
-        msg = (
-            f"💳 *Click orqali to'lov*\n\n"
-            f"Tarif: *{plan.description_uz}*\n"
-            f"Narx: *{amount:,} so'm*\n\n"
-            f"👇 Quyidagi tugmani bosing va Click orqali to'lovni amalga oshiring.\n\n"
-            f"To'lovdan so'ng PRO imkoniyatlar darhol ochiladi!"
-        )
-        pay_btn = "💳 Click orqali to'lash"
-    else:
-        msg = (
-            f"💳 *Оплата через Click*\n\n"
-            f"Тариф: *{plan.description_ru}*\n"
-            f"Цена: *{amount:,} сум*\n\n"
-            f"👇 Нажмите кнопку ниже и оплатите через Click.\n\n"
-            f"После оплаты PRO откроется мгновенно!"
-        )
-        pay_btn = "💳 Оплатить через Click"
-
-    keyboard = [
-        [InlineKeyboardButton(pay_btn, url=click_url)],
-        [InlineKeyboardButton("◀️ Orqaga" if lang == "uz" else "◀️ Назад", callback_data="show_pricing")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text(msg, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 """
 SOLVO Subscription Handlers
-P2P card-to-card payment with @CardXabarBot monitoring
+Click Payment Integration
 """
 import logging
 from datetime import datetime, timedelta
@@ -63,17 +10,17 @@ from telegram import (
     InlineKeyboardMarkup,
 )
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 
 from app.database import get_database
 from app.languages import get_message, format_number
 from app.subscription import (
     PRICING_PLANS,
     FEATURE_LIMITS,
-    P2P_CONFIG,
     SubscriptionTier,
     validate_promo_code,
 )
-
+from app.click_payment import generate_click_payment_url
 
 logger = logging.getLogger(__name__)
 
@@ -148,14 +95,13 @@ async def subscription_command(update: Update, context: ContextTypes.DEFAULT_TYP
 # ==================== PRICING DISPLAY ====================
 
 async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show pricing options for P2P payment"""
+    """Show pricing options for Click payment"""
     query = update.callback_query
     if query:
         await query.answer()
     
     lang = context.user_data.get("lang", "uz")
     
-    # This will be replaced with MyUzcard payment UI in the next step
     if lang == "uz":
         msg = (
             "💎 *SOLVO PRO - Premium Tarif*\n\n"
@@ -173,7 +119,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "📅 *3 oylik:* `40,500 so'm` _(10% tejash)_\n"
             "📅 *1 yillik:* `135,000 so'm` _(25% tejash)_\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💳 *To'lov: Karta orqali (MyUzcard)*"
+            "💳 *To'lov: Click orqali*"
         )
     else:
         msg = (
@@ -192,21 +138,22 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "📅 *3 месяца:* `40,500 сум` _(скидка 10%)_\n"
             "📅 *1 год:* `135,000 сум` _(скидка 25%)_\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💳 *Оплата: Картой (MyUzcard)*"
+            "💳 *Оплата: через Click*"
         )
-    # Payment buttons - will be replaced with MyUzcard payment in next step
+    
+    # Click Payment buttons
     keyboard = [
         [InlineKeyboardButton(
             "📅 1 oy - 15,000 so'm" if lang == "uz" else "📅 1 мес - 15,000 сум",
-            callback_data="myuzcard_buy_pro_monthly"
+            callback_data="click_buy_pro_monthly"
         )],
         [InlineKeyboardButton(
             "📅 3 oy - 40,500 so'm (-10%)" if lang == "uz" else "📅 3 мес - 40,500 сум (-10%)",
-            callback_data="myuzcard_buy_pro_quarterly"
+            callback_data="click_buy_pro_quarterly"
         )],
         [InlineKeyboardButton(
             "📅 1 yil - 135,000 so'm (-25%)" if lang == "uz" else "📅 1 год - 135,000 сум (-25%)",
-            callback_data="myuzcard_buy_pro_yearly"
+            callback_data="click_buy_pro_yearly"
         )],
         [InlineKeyboardButton(
             "🎁 Promo-kod" if lang == "uz" else "🎁 Промо-код",
@@ -218,6 +165,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
     if query:
         await query.edit_message_text(
             msg,
@@ -237,7 +185,64 @@ async def pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await show_pricing(update, context)
 
 
+# ==================== CLICK PAYMENT HANDLER ====================
 
+async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Click payment button click - show payment link"""
+    query = update.callback_query
+    await query.answer()
+    
+    plan_id = query.data.replace("click_buy_", "")  # pro_monthly, pro_quarterly, pro_yearly
+    lang = context.user_data.get("lang", "uz")
+
+    if plan_id not in PRICING_PLANS:
+        await query.answer("❌ Plan not found", show_alert=True)
+        return
+
+    plan = PRICING_PLANS[plan_id]
+    amount = plan.price_uzs
+    order_id = f"solvo_{update.effective_user.id}_{plan_id}"
+    return_url = "https://t.me/solvo_bot"  # Redirect back to bot after payment
+    
+    click_url = generate_click_payment_url(
+        amount=amount, 
+        order_id=order_id, 
+        return_url=return_url, 
+        description=plan.description_uz
+    )
+
+    if lang == "uz":
+        msg = (
+            f"💳 *Click orqali to'lov*\n\n"
+            f"📦 Tarif: *{plan.description_uz}*\n"
+            f"💰 Narx: *{amount:,} so'm*\n\n"
+            f"👇 Quyidagi tugmani bosing va Click orqali to'lovni amalga oshiring.\n\n"
+            f"✅ To'lovdan so'ng PRO imkoniyatlar *darhol* ochiladi!"
+        )
+        pay_btn = "💳 Click orqali to'lash"
+        back_btn = "◀️ Orqaga"
+    else:
+        msg = (
+            f"💳 *Оплата через Click*\n\n"
+            f"📦 Тариф: *{plan.description_ru}*\n"
+            f"💰 Цена: *{amount:,} сум*\n\n"
+            f"👇 Нажмите кнопку ниже и оплатите через Click.\n\n"
+            f"✅ После оплаты PRO откроется *мгновенно*!"
+        )
+        pay_btn = "💳 Оплатить через Click"
+        back_btn = "◀️ Назад"
+
+    keyboard = [
+        [InlineKeyboardButton(pay_btn, url=click_url)],
+        [InlineKeyboardButton(back_btn, callback_data="show_pricing")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        msg, 
+        parse_mode=ParseMode.MARKDOWN, 
+        reply_markup=reply_markup
+    )
 
 
 # ==================== PROMO CODE ====================
@@ -316,15 +321,15 @@ async def handle_promo_code_input(update: Update, context: ContextTypes.DEFAULT_
         keyboard = [
             [InlineKeyboardButton(
                 "📅 1 oy" if lang == "uz" else "📅 1 мес",
-                callback_data="p2p_buy_pro_monthly"
+                callback_data="click_buy_pro_monthly"
             )],
             [InlineKeyboardButton(
                 "📅 3 oy" if lang == "uz" else "📅 3 мес",
-                callback_data="p2p_buy_pro_quarterly"
+                callback_data="click_buy_pro_quarterly"
             )],
             [InlineKeyboardButton(
                 "📅 1 yil" if lang == "uz" else "📅 1 год",
-                callback_data="p2p_buy_pro_yearly"
+                callback_data="click_buy_pro_yearly"
             )]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -409,14 +414,9 @@ async def require_pro(update: Update, context: ContextTypes.DEFAULT_TYPE) -> boo
     Returns True if user has PRO, False otherwise.
     """
     telegram_id = update.effective_user.id
-    lang = context.user_data.get("lang", "uz")
     
     if await is_user_pro(telegram_id):
         return True
-    
-    # User doesn't have PRO - show payment required
-    await show_payment_required(update, context)
-    return False
     
     # User doesn't have PRO - show payment required
     await show_payment_required(update, context)
@@ -441,7 +441,7 @@ async def show_payment_required(update: Update, context: ContextTypes.DEFAULT_TY
             "• 1 oy: 15,000 so'm\n"
             "• 3 oy: 40,500 so'm\n"
             "• 1 yil: 135,000 so'm\n\n"
-            "💳 *To'lov: Karta orqali (MyUzcard)*\n\n"
+            "💳 *To'lov: Click orqali*\n\n"
             "👇 Obunani sotib olish uchun tugmani bosing:"
         )
     else:
@@ -458,7 +458,7 @@ async def show_payment_required(update: Update, context: ContextTypes.DEFAULT_TY
             "• 1 месяц: 15,000 сум\n"
             "• 3 месяца: 40,500 сум\n"
             "• 1 год: 135,000 сум\n\n"
-            "💳 *Оплата: Картой (MyUzcard)*\n\n"
+            "💳 *Оплата: через Click*\n\n"
             "👇 Нажмите кнопку для покупки:"
         )
     

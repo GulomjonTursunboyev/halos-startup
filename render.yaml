@@ -1,18 +1,40 @@
 services:
-  - type: worker
-    name: solvo-bot
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
-    envVars:
-      - key: BOT_TOKEN
-        sync: false
+  # Click Payment Webhook Service (Web)
   - type: web
     name: solvo-click
-    env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app.click_webhook:app
+    startCommand: gunicorn app.click_webhook:app --bind 0.0.0.0:$PORT
     plan: free
     envVars:
       - key: PORT
         value: 10000
+      - key: CLICK_SERVICE_ID
+        sync: false
+      - key: CLICK_MERCHANT_ID
+        sync: false
+      - key: CLICK_SECRET_KEY
+        sync: false
+      - key: DATABASE_PATH
+        value: data/solvo.db
+
+  # Telegram Bot Service (Worker)
+  - type: worker
+    name: solvo-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: DATABASE_PATH
+        value: data/solvo.db
+      - key: CLICK_SERVICE_ID
+        sync: false
+      - key: CLICK_MERCHANT_ID
+        sync: false
+      - key: CLICK_SECRET_KEY
+        sync: false
