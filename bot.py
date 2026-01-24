@@ -2,8 +2,10 @@
 SOLVO Telegram Bot
 Main entry point - Click Payment Integration
 """
+import os
 import asyncio
 import logging
+import aiohttp
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -39,12 +41,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Webhook URL for keep-alive ping
+WEBHOOK_URL = os.getenv("WEBHOOK_BASE_URL", "https://solvo-click.onrender.com")
+
+
+async def keep_alive_ping():
+    """Ping webhook service every 10 minutes to prevent Render sleep"""
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{WEBHOOK_URL}/health", timeout=10) as resp:
+                    if resp.status == 200:
+                        logger.info("Keep-alive ping successful")
+                    else:
+                        logger.warning(f"Keep-alive ping status: {resp.status}")
+        except Exception as e:
+            logger.error(f"Keep-alive ping failed: {e}")
+        
+        # Wait 10 minutes before next ping
+        await asyncio.sleep(600)
+
 
 async def post_init(application: Application) -> None:
     """Initialize database after application starts"""
     logger.info("Initializing database...")
     await get_database()
     logger.info("Database initialized successfully")
+    
+    # Start keep-alive ping task
+    application.create_task(keep_alive_ping())
+    logger.info("Keep-alive ping task started")
 
 
 async def post_shutdown(application: Application) -> None:
