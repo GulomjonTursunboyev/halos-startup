@@ -179,6 +179,11 @@ class Database:
     async def _run_migrations(self):
         """Add new columns to existing tables"""
         migrations = [
+            ("users", "subscription_tier", "TEXT DEFAULT 'free'"),
+            ("users", "subscription_plan", "TEXT"),
+            ("users", "subscription_expires", "TIMESTAMP"),
+            ("users", "subscription_auto_renew", "INTEGER DEFAULT 1"),
+            ("users", "trial_used", "INTEGER DEFAULT 0"),
             ("users", "last_active", "TIMESTAMP"),
             ("users", "last_salary_message", "TIMESTAMP"),
             ("users", "last_weekly_message", "TIMESTAMP"),
