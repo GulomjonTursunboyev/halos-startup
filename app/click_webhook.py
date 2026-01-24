@@ -10,7 +10,9 @@ app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
 # Click credentials from environment
-CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "wgqetRCPLPQV2oYd1I")
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "13464")
+CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID", "333605228")
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "31ACF1A3C571667379481B13BEDCCA774AEBA199")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/solvo.db")
 
 # Pricing plans
