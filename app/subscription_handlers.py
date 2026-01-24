@@ -166,7 +166,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "├ ⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
             "├ ⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n\n"
+            "└ 🏆 *1 yil:* `120,000 so'm` (33% tejash)\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
@@ -195,7 +195,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "├ ⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
             "├ ⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n\n"
+            "└ 🏆 *1 год:* `120,000 сум` (скидка 33%)\n\n"
             "💳 *Оплата: через Click*"
         )
     
@@ -305,7 +305,7 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "├ ⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
             "├ ⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n\n"
+            "└ 🏆 *1 yil:* `120,000 so'm` (33% tejash)\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
@@ -334,7 +334,7 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "├ ⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
             "├ ⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n\n"
+            "└ 🏆 *1 год:* `120,000 сум` (скидка 33%)\n\n"
             "💳 *Оплата: через Click*"
         )
     

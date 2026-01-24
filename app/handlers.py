@@ -2021,79 +2021,51 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # ==================== PROFILE MANAGEMENT ====================
 
 async def build_profile_content(user: dict, profile: dict, lang: str, telegram_id: int) -> tuple:
-    """Build profile text and keyboard for display"""
-    from app.engine import FinancialInput, FinancialEngine, format_exit_date
+    """Build profile text and keyboard for display - shows user info and subscription status"""
     from datetime import datetime
-    from dateutil.relativedelta import relativedelta
     
-    # Format profile info
-    mode_text = "👤 Yolg'iz" if user.get("mode") == "solo" else "👨‍👩‍👦 Oila"
-    if lang == "ru":
-        mode_text = "👤 Один" if user.get("mode") == "solo" else "👨‍👩‍👦 Семья"
+    # Get user personal info
+    first_name = user.get("first_name", "")
+    last_name = user.get("last_name", "")
+    full_name = f"{first_name} {last_name}".strip() or ("Noma'lum" if lang == "uz" else "Неизвестно")
+    phone = user.get("phone_number", "")
     
-    lang_text = "🇺🇿 O'zbekcha" if user.get("language") == "uz" else "🇷🇺 Русский"
-    
-    profile_text = get_message("profile_info", lang).format(
-        income_self=format_number(profile.get("income_self", 0)) + " so'm",
-        income_partner=format_number(profile.get("income_partner", 0)) + " so'm",
-        rent=format_number(profile.get("rent", 0)) + " so'm",
-        kindergarten=format_number(profile.get("kindergarten", 0)) + " so'm",
-        utilities=format_number(profile.get("utilities", 0)) + " so'm",
-        loan_payment=format_number(profile.get("loan_payment", 0)) + " so'm",
-        total_debt=format_number(profile.get("total_debt", 0)) + " so'm",
-        mode=mode_text,
-        language=lang_text
-    )
-    
-    # Calculate debt status if user has debt
-    total_debt = profile.get("total_debt", 0)
-    loan_payment = profile.get("loan_payment", 0)
-    
-    debt_text = ""
+    # Get subscription status
     is_pro = await get_user_subscription_status(telegram_id)
+    tier = user.get("subscription_tier", "free")
+    expires = user.get("subscription_expires")
     
-    if total_debt > 0 and loan_payment > 0:
-        # Calculate simple exit
-        simple_exit_months = int(total_debt / loan_payment) + 1
-        simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
-        simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
-        
-        debt_text = get_message("profile_debt_status", lang).format(
-            total_debt=format_number(total_debt) + " so'm",
-            monthly_payment=format_number(loan_payment) + " so'm",
-            simple_exit_date=simple_exit_formatted,
-            simple_exit_months=simple_exit_months
+    if is_pro and expires:
+        if isinstance(expires, str):
+            try:
+                expires_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+                days_left = (expires_dt - datetime.now()).days
+                if lang == "uz":
+                    sub_status = f"💎 PRO ({days_left} kun qoldi)"
+                else:
+                    sub_status = f"💎 PRO ({days_left} дней осталось)"
+            except:
+                sub_status = "💎 PRO" if lang == "uz" else "💎 PRO"
+        else:
+            sub_status = "💎 PRO" if lang == "uz" else "💎 PRO"
+    else:
+        sub_status = "🆓 Bepul" if lang == "uz" else "🆓 Бесплатный"
+    
+    # Build profile header with personal info
+    if lang == "uz":
+        profile_text = (
+            f"👤 *{full_name}*\n"
+            f"📱 {phone}\n"
+            f"📊 Obuna: {sub_status}\n"
         )
-        
-        # If not PRO, add teaser for faster exit
-        if not is_pro:
-            # Calculate PRO exit (70-20-10 method)
-            income = profile.get("income_self", 0) + profile.get("income_partner", 0)
-            mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
-            free_cash = income - mandatory - loan_payment
-            
-            if free_cash > 0:
-                # PRO method: 70% living, 20% accelerated debt, 10% savings
-                extra_debt_payment = free_cash * 0.2
-                monthly_savings = free_cash * 0.1
-                total_debt_payment = loan_payment + extra_debt_payment
-                
-                if total_debt_payment > 0:
-                    pro_exit_months = int(total_debt / total_debt_payment) + 1
-                    months_saved = simple_exit_months - pro_exit_months
-                    savings_at_exit = monthly_savings * pro_exit_months
-                    
-                    if months_saved > 0:
-                        pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
-                        pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
-                        
-                        debt_text += get_message("profile_pro_teaser", lang).format(
-                            pro_exit_date=pro_exit_formatted,
-                            months_saved=months_saved,
-                            savings_at_exit=format_number(savings_at_exit) + " so'm"
-                        )
+    else:
+        profile_text = (
+            f"👤 *{full_name}*\n"
+            f"📱 {phone}\n"
+            f"📊 Подписка: {sub_status}\n"
+        )
     
-    # Create edit buttons
+    # Create keyboard - only edit buttons for financial data
     keyboard = [
         [
             InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
@@ -2113,17 +2085,13 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
         ],
     ]
     
-    # Add action buttons based on user status
-    if total_debt > 0 and not is_pro:
+    # Add upgrade button if not PRO
+    if not is_pro:
         keyboard.append([
-            InlineKeyboardButton(get_message("btn_faster_exit", lang), callback_data="show_pricing")
+            InlineKeyboardButton("💎 PRO olish" if lang == "uz" else "💎 Получить PRO", callback_data="show_pricing")
         ])
     
-    keyboard.append([
-        InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate"),
-    ])
-    
-    full_text = get_message("profile_header", lang) + "\n\n" + profile_text + debt_text
+    full_text = get_message("profile_header", lang) + "\n\n" + profile_text
     
     return full_text, keyboard
 
@@ -2534,7 +2502,7 @@ def add_trial_handler_to_app(application):
 # ==================== MAIN MENU HANDLERS ====================
 
 async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle � Qarzlarim button - show comprehensive debt information"""
+    """Handle 🚀 Qarzdan chiqish button - show income, expenses, and debt exit info"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -2574,6 +2542,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     from app.engine import FinancialInput, format_exit_date
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
+    import math
     
     financial_input = FinancialInput(
         mode=mode,
@@ -2591,12 +2560,20 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     await calc_msg.delete()
     
-    # Build comprehensive debt message
+    # Get financial data
     total_debt = profile.get("total_debt", 0)
     loan_payment = profile.get("loan_payment", 0)
+    income_self = profile.get("income_self", 0)
+    income_partner = profile.get("income_partner", 0)
+    rent = profile.get("rent", 0)
+    kindergarten = profile.get("kindergarten", 0)
+    utilities = profile.get("utilities", 0)
+    
+    total_income = income_self + income_partner
+    total_expenses = rent + kindergarten + utilities + loan_payment
     
     # Calculate exit dates
-    simple_exit_months = int(total_debt / loan_payment) + 1 if loan_payment > 0 else 0
+    simple_exit_months = math.ceil(total_debt / loan_payment) if loan_payment > 0 else 0
     simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
     simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
     
@@ -2605,48 +2582,113 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     exit_date = result.get("exit_date", simple_exit_date.strftime("%Y-%m"))
     exit_date_formatted = format_exit_date(exit_date, lang)
     savings_at_exit = result.get("savings_at_exit", 0)
+    months_saved = simple_exit_months - exit_months
     
-    # Format debt message
-    debt_message = get_message("my_debts_header", lang) + "\n\n"
-    
-    debt_message += get_message("my_debts_info", lang).format(
-        total_debt=format_number(total_debt) + " so'm",
-        monthly_payment=format_number(loan_payment) + " so'm"
-    )
-    
-    if is_pro:
-        # Show full PRO info
-        debt_message += "\n\n" + get_message("my_debts_pro_plan", lang).format(
-            exit_date=exit_date_formatted,
-            exit_months=exit_months,
-            savings_at_exit=format_number(savings_at_exit) + " so'm",
-            monthly_savings=format_number(result.get("monthly_savings", 0)) + " so'm",
-            accelerated_payment=format_number(result.get("accelerated_debt", 0)) + " so'm"
+    # Build message with income/expenses info
+    if lang == "uz":
+        debt_message = (
+            "🚀 *QARZDAN CHIQISH REJASI*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *DAROMADLAR:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Mening daromadim: *{format_number(income_self)} so'm*\n"
+        )
+        if income_partner > 0:
+            debt_message += f"├ Sherik daromadi: *{format_number(income_partner)} so'm*\n"
+        debt_message += f"└ Jami: *{format_number(total_income)} so'm*\n\n"
+        
+        debt_message += (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💸 *HARAJATLAR:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Ijara: *{format_number(rent)} so'm*\n"
+            f"├ Majburiy: *{format_number(kindergarten)} so'm*\n"
+            f"├ Kommunal: *{format_number(utilities)} so'm*\n"
+            f"├ Qarz to'lovi: *{format_number(loan_payment)} so'm*\n"
+            f"└ Jami: *{format_number(total_expenses)} so'm*\n\n"
         )
         
+        debt_message += (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QARZ HOLATI:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📉 Umumiy qarz: *{format_number(total_debt)} so'm*\n\n"
+        )
+        
+        # Show exit info based on PRO status
+        debt_message += (
+            f"📅 Oddiy to'lov: *{simple_exit_months} oy* ({simple_exit_formatted})\n"
+        )
+        
+        if is_pro:
+            debt_message += (
+                f"🚀 PRO bilan: *{exit_months} oy* ({exit_date_formatted})\n"
+                f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
+                f"💰 Jamg'arma: *{format_number(savings_at_exit)} so'm*"
+            )
+        else:
+            if months_saved > 0:
+                debt_message += (
+                    f"\n💎 PRO bilan *{months_saved} oy tezroq* chiqasiz!\n"
+                    f"Aniq sanani bilish uchun PRO oling 👇"
+                )
+    else:
+        debt_message = (
+            "🚀 *ПЛАН ВЫХОДА ИЗ ДОЛГА*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *ДОХОДЫ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Мой доход: *{format_number(income_self)} сум*\n"
+        )
+        if income_partner > 0:
+            debt_message += f"├ Доход партнёра: *{format_number(income_partner)} сум*\n"
+        debt_message += f"└ Итого: *{format_number(total_income)} сум*\n\n"
+        
+        debt_message += (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💸 *РАСХОДЫ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Аренда: *{format_number(rent)} сум*\n"
+            f"├ Обязательные: *{format_number(kindergarten)} сум*\n"
+            f"├ Коммунальные: *{format_number(utilities)} сум*\n"
+            f"├ Платёж по долгу: *{format_number(loan_payment)} сум*\n"
+            f"└ Итого: *{format_number(total_expenses)} сум*\n\n"
+        )
+        
+        debt_message += (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *СОСТОЯНИЕ ДОЛГА:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📉 Общий долг: *{format_number(total_debt)} сум*\n\n"
+        )
+        
+        debt_message += (
+            f"📅 Обычная оплата: *{simple_exit_months} мес* ({simple_exit_formatted})\n"
+        )
+        
+        if is_pro:
+            debt_message += (
+                f"🚀 С PRO: *{exit_months} мес* ({exit_date_formatted})\n"
+                f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
+                f"💰 Накопления: *{format_number(savings_at_exit)} сум*"
+            )
+        else:
+            if months_saved > 0:
+                debt_message += (
+                    f"\n💎 С PRO выйдете на *{months_saved} мес быстрее*!\n"
+                    f"Узнайте точную дату с PRO 👇"
+                )
+    
+    # Keyboard
+    if is_pro:
         keyboard = [
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
-            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+            [InlineKeyboardButton("👤 Profil" if lang == "uz" else "👤 Профиль", callback_data="show_profile")]
         ]
     else:
-        # Show basic + teaser
-        debt_message += "\n\n" + get_message("my_debts_simple", lang).format(
-            simple_exit_date=simple_exit_formatted,
-            simple_exit_months=simple_exit_months
-        )
-        
-        # Add PRO teaser if they could exit faster
-        if exit_months < simple_exit_months:
-            months_saved = simple_exit_months - exit_months
-            debt_message += "\n\n" + get_message("my_debts_pro_teaser", lang).format(
-                pro_exit_date=exit_date_formatted,
-                months_saved=months_saved,
-                savings_at_exit=format_number(savings_at_exit) + " so'm"
-            )
-        
         keyboard = [
             [InlineKeyboardButton(
-                "🚀 Tezroq qutulish" if lang == "uz" else "🚀 Выйти быстрее",
+                "💎 PRO olish - aniq sana" if lang == "uz" else "💎 Получить PRO - точная дата",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
