@@ -9,9 +9,11 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-# Click credentials from environment
-CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "13464")
+# Click credentials (LIVE environment)
+# Format: MERCHANT_USER_ID:LIVE:SERVICE_ID_SECRET_KEY
+# 333605228:LIVE:13464_31ACF1A3C571667379481B13BEDCCA774AEBA199
 CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID", "333605228")
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "13464")
 CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "31ACF1A3C571667379481B13BEDCCA774AEBA199")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/solvo.db")
 
