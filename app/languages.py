@@ -447,25 +447,35 @@ MESSAGES = {
     "input_kindergarten": {
         "uz": (
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QADAM 4/5 — TA'LIM*\n"
+            "📊 *QADAM 4/5 — MAJBURIY TO'LOVLAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "👶 *Bog'cha / Maktab / Kurslar*\n\n"
-            "📝 Oylik to'lov: `500000`\n"
+            "📋 *Boshqa majburiy to'lovlar:*\n\n"
+            "• 👶 Bog'cha / Maktab to'lovi\n"
+            "• 🏥 Sug'urta (avto, uy, hayot)\n"
+            "• 📚 Kurslar, repetitor\n"
+            "• 🚗 Transport (benzin, avtobus)\n"
+            "• 💊 Doimiy dori-darmonlar\n\n"
+            "📝 Jami oylik summa: `500000`\n"
             "❌ Yo'q bo'lsa: `0`"
         ),
         "ru": (
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *ШАГ 4/5 — ОБРАЗОВАНИЕ*\n"
+            "📊 *ШАГ 4/5 — ОБЯЗАТЕЛЬНЫЕ ПЛАТЕЖИ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "👶 *Детсад / Школа / Курсы*\n\n"
-            "📝 Ежемесячная плата: `500000`\n"
+            "📋 *Другие обязательные платежи:*\n\n"
+            "• 👶 Детсад / Школа\n"
+            "• 🏥 Страховка (авто, дом, жизнь)\n"
+            "• 📚 Курсы, репетитор\n"
+            "• 🚗 Транспорт (бензин, автобус)\n"
+            "• 💊 Регулярные лекарства\n\n"
+            "📝 Итого в месяц: `500000`\n"
             "❌ Если нет: `0`"
         )
     },
     
     "btn_no_kids": {
-        "uz": "👶 Farzand yo'q / To'lovlik emas",
-        "ru": "👶 Нет детей / Бесплатно"
+        "uz": "❌ Bunday to'lovlarim yo'q",
+        "ru": "❌ Таких платежей нет"
     },
     
     "input_utilities": {
@@ -1369,7 +1379,7 @@ MESSAGES = {
             "💰 *Daromad (men):* {income_self}\n"
             "💰 *Daromad (sherik):* {income_partner}\n"
             "🏠 *Ijara:* {rent}\n"
-            "👶 *Bog'cha:* {kindergarten}\n"
+            "📋 *Majburiy to'lovlar:* {kindergarten}\n"
             "💡 *Kommunal:* {utilities}\n"
             "💳 *Oylik to'lov:* {loan_payment}\n"
             "📉 *Umumiy qarz:* {total_debt}\n\n"
@@ -1381,7 +1391,7 @@ MESSAGES = {
             "💰 *Доход (я):* {income_self}\n"
             "💰 *Доход (партнёр):* {income_partner}\n"
             "🏠 *Аренда:* {rent}\n"
-            "👶 *Детсад:* {kindergarten}\n"
+            "📋 *Обязательные:* {kindergarten}\n"
             "💡 *Коммунальные:* {utilities}\n"
             "💳 *Ежемесячный платёж:* {loan_payment}\n"
             "📉 *Общий долг:* {total_debt}\n\n"
@@ -1416,8 +1426,8 @@ MESSAGES = {
     },
     
     "btn_edit_kindergarten": {
-        "uz": "👶 Bog'cha",
-        "ru": "👶 Детсад"
+        "uz": "� Majburiy",
+        "ru": "📋 Обязат."
     },
     
     "btn_edit_utilities": {
@@ -1468,6 +1478,60 @@ MESSAGES = {
     "profile_updated_recalculate": {
         "uz": "✅ Ma'lumotlar yangilandi!\n\nYangi natijalarni ko'rish uchun \"Qayta hisoblash\" tugmasini bosing.",
         "ru": "✅ Данные обновлены!\n\nНажмите \"Пересчитать\" для новых результатов."
+    },
+    
+    "profile_debt_status": {
+        "uz": (
+            "\n━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QARZ HOLATI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💳 Umumiy qarz: *{total_debt}*\n"
+            "📅 Oylik to'lov: *{monthly_payment}*\n\n"
+            "🗓 Oddiy usulda: *{simple_exit_date}*\n"
+            "⏱ Qoldi: *{simple_exit_months} oy*"
+        ),
+        "ru": (
+            "\n━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *СТАТУС ДОЛГА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💳 Общий долг: *{total_debt}*\n"
+            "📅 Ежемес. платёж: *{monthly_payment}*\n\n"
+            "🗓 Обычным способом: *{simple_exit_date}*\n"
+            "⏱ Осталось: *{simple_exit_months} мес*"
+        )
+    },
+    
+    "profile_pro_teaser": {
+        "uz": (
+            "\n━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 *TEZROQ CHIQISH MUMKIN!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Maxfiy 70-20-10 usuli bilan:\n\n"
+            "✅ *{pro_exit_date}* da qarzsiz\n"
+            "✅ *{months_saved} oy* tez\n"
+            "✅ *{savings_at_exit}* jamg'arma\n\n"
+            "🔐 _Bu usulni PRO da oching..._"
+        ),
+        "ru": (
+            "\n━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 *МОЖНО БЫСТРЕЕ!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "С секретным методом 70-20-10:\n\n"
+            "✅ Свободны *{pro_exit_date}*\n"
+            "✅ На *{months_saved} мес* быстрее\n"
+            "✅ Накопите *{savings_at_exit}*\n\n"
+            "🔐 _Откройте метод в PRO..._"
+        )
+    },
+    
+    "btn_faster_exit": {
+        "uz": "🚀 Qarzdan tezroq chiqish",
+        "ru": "🚀 Быстрее выйти из долга"
+    },
+    
+    "btn_my_debt_plan": {
+        "uz": "📋 Qarz rejam",
+        "ru": "📋 Мой план долга"
     },
 }
 

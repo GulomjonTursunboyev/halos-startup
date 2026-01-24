@@ -1974,6 +1974,114 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 # ==================== PROFILE MANAGEMENT ====================
 
+async def build_profile_content(user: dict, profile: dict, lang: str, telegram_id: int) -> tuple:
+    """Build profile text and keyboard for display"""
+    from app.engine import FinancialInput, FinancialCalculator, format_exit_date
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    
+    # Format profile info
+    mode_text = "👤 Yolg'iz" if user.get("mode") == "solo" else "👨‍👩‍👦 Oila"
+    if lang == "ru":
+        mode_text = "👤 Один" if user.get("mode") == "solo" else "👨‍👩‍👦 Семья"
+    
+    lang_text = "🇺🇿 O'zbekcha" if user.get("language") == "uz" else "🇷🇺 Русский"
+    
+    profile_text = get_message("profile_info", lang).format(
+        income_self=format_number(profile.get("income_self", 0)) + " so'm",
+        income_partner=format_number(profile.get("income_partner", 0)) + " so'm",
+        rent=format_number(profile.get("rent", 0)) + " so'm",
+        kindergarten=format_number(profile.get("kindergarten", 0)) + " so'm",
+        utilities=format_number(profile.get("utilities", 0)) + " so'm",
+        loan_payment=format_number(profile.get("loan_payment", 0)) + " so'm",
+        total_debt=format_number(profile.get("total_debt", 0)) + " so'm",
+        mode=mode_text,
+        language=lang_text
+    )
+    
+    # Calculate debt status if user has debt
+    total_debt = profile.get("total_debt", 0)
+    loan_payment = profile.get("loan_payment", 0)
+    
+    debt_text = ""
+    is_pro = await get_user_subscription_status(telegram_id)
+    
+    if total_debt > 0 and loan_payment > 0:
+        # Calculate simple exit
+        simple_exit_months = int(total_debt / loan_payment) + 1
+        simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
+        simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
+        
+        debt_text = get_message("profile_debt_status", lang).format(
+            total_debt=format_number(total_debt) + " so'm",
+            monthly_payment=format_number(loan_payment) + " so'm",
+            simple_exit_date=simple_exit_formatted,
+            simple_exit_months=simple_exit_months
+        )
+        
+        # If not PRO, add teaser for faster exit
+        if not is_pro:
+            # Calculate PRO exit (70-20-10 method)
+            income = profile.get("income_self", 0) + profile.get("income_partner", 0)
+            mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
+            free_cash = income - mandatory - loan_payment
+            
+            if free_cash > 0:
+                # PRO method: 70% living, 20% accelerated debt, 10% savings
+                extra_debt_payment = free_cash * 0.2
+                monthly_savings = free_cash * 0.1
+                total_debt_payment = loan_payment + extra_debt_payment
+                
+                if total_debt_payment > 0:
+                    pro_exit_months = int(total_debt / total_debt_payment) + 1
+                    months_saved = simple_exit_months - pro_exit_months
+                    savings_at_exit = monthly_savings * pro_exit_months
+                    
+                    if months_saved > 0:
+                        pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
+                        pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
+                        
+                        debt_text += get_message("profile_pro_teaser", lang).format(
+                            pro_exit_date=pro_exit_formatted,
+                            months_saved=months_saved,
+                            savings_at_exit=format_number(savings_at_exit) + " so'm"
+                        )
+    
+    # Create edit buttons
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
+            InlineKeyboardButton(get_message("btn_edit_income_partner", lang), callback_data="edit_income_partner"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_rent", lang), callback_data="edit_rent"),
+            InlineKeyboardButton(get_message("btn_edit_kindergarten", lang), callback_data="edit_kindergarten"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_utilities", lang), callback_data="edit_utilities"),
+            InlineKeyboardButton(get_message("btn_edit_loan_payment", lang), callback_data="edit_loan_payment"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_total_debt", lang), callback_data="edit_total_debt"),
+            InlineKeyboardButton(get_message("btn_edit_mode", lang), callback_data="edit_mode"),
+        ],
+    ]
+    
+    # Add action buttons based on user status
+    if total_debt > 0 and not is_pro:
+        keyboard.append([
+            InlineKeyboardButton(get_message("btn_faster_exit", lang), callback_data="show_pricing")
+        ])
+    
+    keyboard.append([
+        InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate"),
+    ])
+    
+    full_text = get_message("profile_header", lang) + "\n\n" + profile_text + debt_text
+    
+    return full_text, keyboard
+
+
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /profile command - show user profile with edit options"""
     telegram_id = update.effective_user.id
@@ -1999,51 +2107,12 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return
     
-    # Format profile info
-    mode_text = "👤 Yolg'iz" if user.get("mode") == "solo" else "👨‍👩‍👦 Oila"
-    if lang == "ru":
-        mode_text = "👤 Один" if user.get("mode") == "solo" else "👨‍👩‍👦 Семья"
-    
-    lang_text = "🇺🇿 O'zbekcha" if user.get("language") == "uz" else "🇷🇺 Русский"
-    
-    profile_text = get_message("profile_info", lang).format(
-        income_self=format_number(profile.get("income_self", 0)) + " so'm",
-        income_partner=format_number(profile.get("income_partner", 0)) + " so'm",
-        rent=format_number(profile.get("rent", 0)) + " so'm",
-        kindergarten=format_number(profile.get("kindergarten", 0)) + " so'm",
-        utilities=format_number(profile.get("utilities", 0)) + " so'm",
-        loan_payment=format_number(profile.get("loan_payment", 0)) + " so'm",
-        total_debt=format_number(profile.get("total_debt", 0)) + " so'm",
-        mode=mode_text,
-        language=lang_text
-    )
-    
-    # Create edit buttons
-    keyboard = [
-        [
-            InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
-            InlineKeyboardButton(get_message("btn_edit_income_partner", lang), callback_data="edit_income_partner"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_edit_rent", lang), callback_data="edit_rent"),
-            InlineKeyboardButton(get_message("btn_edit_kindergarten", lang), callback_data="edit_kindergarten"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_edit_utilities", lang), callback_data="edit_utilities"),
-            InlineKeyboardButton(get_message("btn_edit_loan_payment", lang), callback_data="edit_loan_payment"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_edit_total_debt", lang), callback_data="edit_total_debt"),
-            InlineKeyboardButton(get_message("btn_edit_mode", lang), callback_data="edit_mode"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate"),
-        ]
-    ]
+    # Build profile content
+    full_text, keyboard = await build_profile_content(user, profile, lang, telegram_id)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        get_message("profile_header", lang) + "\n\n" + profile_text,
+        full_text,
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -2070,54 +2139,23 @@ async def show_profile_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(get_message("profile_no_data", lang))
         return
     
-    # Format profile info
-    mode_text = "👤 Yolg'iz" if user.get("mode") == "solo" else "👨‍👩‍👦 Oila"
-    if lang == "ru":
-        mode_text = "👤 Один" if user.get("mode") == "solo" else "👨‍👩‍👦 Семья"
-    
-    lang_text = "🇺🇿 O'zbekcha" if user.get("language") == "uz" else "🇷🇺 Русский"
-    
-    profile_text = get_message("profile_info", lang).format(
-        income_self=format_number(profile.get("income_self", 0)) + " so'm",
-        income_partner=format_number(profile.get("income_partner", 0)) + " so'm",
-        rent=format_number(profile.get("rent", 0)) + " so'm",
-        kindergarten=format_number(profile.get("kindergarten", 0)) + " so'm",
-        utilities=format_number(profile.get("utilities", 0)) + " so'm",
-        loan_payment=format_number(profile.get("loan_payment", 0)) + " so'm",
-        total_debt=format_number(profile.get("total_debt", 0)) + " so'm",
-        mode=mode_text,
-        language=lang_text
-    )
-    
-    # Create edit buttons
-    keyboard = [
-        [
-            InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
-            InlineKeyboardButton(get_message("btn_edit_income_partner", lang), callback_data="edit_income_partner"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_edit_rent", lang), callback_data="edit_rent"),
-            InlineKeyboardButton(get_message("btn_edit_kindergarten", lang), callback_data="edit_kindergarten"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_edit_utilities", lang), callback_data="edit_utilities"),
-            InlineKeyboardButton(get_message("btn_edit_loan_payment", lang), callback_data="edit_loan_payment"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_edit_total_debt", lang), callback_data="edit_total_debt"),
-            InlineKeyboardButton(get_message("btn_edit_mode", lang), callback_data="edit_mode"),
-        ],
-        [
-            InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate"),
-        ]
-    ]
+    # Build profile content using shared helper
+    full_text, keyboard = await build_profile_content(user, profile, lang, telegram_id)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(
-        get_message("profile_header", lang) + "\n\n" + profile_text,
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
+    try:
+        await query.edit_message_text(
+            full_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+    except Exception:
+        # If edit fails, send new message
+        await query.message.reply_text(
+            full_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
 
 
 # Field name mappings
@@ -2125,7 +2163,7 @@ PROFILE_FIELDS = {
     "income_self": {"uz": "Daromadim", "ru": "Мой доход"},
     "income_partner": {"uz": "Sherik daromadi", "ru": "Доход партнёра"},
     "rent": {"uz": "Ijara", "ru": "Аренда"},
-    "kindergarten": {"uz": "Bog'cha", "ru": "Детсад"},
+    "kindergarten": {"uz": "Majburiy to'lovlar", "ru": "Обязат. платежи"},
     "utilities": {"uz": "Kommunal", "ru": "Коммунальные"},
     "loan_payment": {"uz": "Oylik to'lov", "ru": "Ежемес. платёж"},
     "total_debt": {"uz": "Umumiy qarz", "ru": "Общий долг"},
