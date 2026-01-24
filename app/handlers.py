@@ -60,7 +60,7 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Get persistent main menu keyboard"""
     if lang == "ru":
         keyboard = [
-            ["� Мои долги", "👤 Профиль"],
+            ["💳 Мои долги", "👤 Профиль"],
             ["💎 Подписка", "🌐 Язык"],
             ["❓ Помощь"]
         ]
