@@ -1729,6 +1729,291 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 
+# ==================== PROFILE MANAGEMENT ====================
+
+async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /profile command - show user profile with edit options"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await update.message.reply_text(
+            get_message("profile_no_data", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    profile = await db.get_financial_profile(user["id"])
+    
+    if not profile:
+        await update.message.reply_text(
+            get_message("profile_no_data", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Format profile info
+    mode_text = "👤 Yolg'iz" if user.get("mode") == "solo" else "👨‍👩‍👦 Oila"
+    if lang == "ru":
+        mode_text = "👤 Один" if user.get("mode") == "solo" else "👨‍👩‍👦 Семья"
+    
+    lang_text = "🇺🇿 O'zbekcha" if user.get("language") == "uz" else "🇷🇺 Русский"
+    
+    profile_text = get_message("profile_info", lang).format(
+        income_self=format_number(profile.get("income_self", 0)) + " so'm",
+        income_partner=format_number(profile.get("income_partner", 0)) + " so'm",
+        rent=format_number(profile.get("rent", 0)) + " so'm",
+        kindergarten=format_number(profile.get("kindergarten", 0)) + " so'm",
+        utilities=format_number(profile.get("utilities", 0)) + " so'm",
+        loan_payment=format_number(profile.get("loan_payment", 0)) + " so'm",
+        total_debt=format_number(profile.get("total_debt", 0)) + " so'm",
+        mode=mode_text,
+        language=lang_text
+    )
+    
+    # Create edit buttons
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
+            InlineKeyboardButton(get_message("btn_edit_income_partner", lang), callback_data="edit_income_partner"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_rent", lang), callback_data="edit_rent"),
+            InlineKeyboardButton(get_message("btn_edit_kindergarten", lang), callback_data="edit_kindergarten"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_utilities", lang), callback_data="edit_utilities"),
+            InlineKeyboardButton(get_message("btn_edit_loan_payment", lang), callback_data="edit_loan_payment"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_total_debt", lang), callback_data="edit_total_debt"),
+            InlineKeyboardButton(get_message("btn_edit_mode", lang), callback_data="edit_mode"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("profile_header", lang) + "\n\n" + profile_text,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
+async def show_profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show profile from callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await query.edit_message_text(get_message("profile_no_data", lang))
+        return
+    
+    profile = await db.get_financial_profile(user["id"])
+    
+    if not profile:
+        await query.edit_message_text(get_message("profile_no_data", lang))
+        return
+    
+    # Format profile info
+    mode_text = "👤 Yolg'iz" if user.get("mode") == "solo" else "👨‍👩‍👦 Oila"
+    if lang == "ru":
+        mode_text = "👤 Один" if user.get("mode") == "solo" else "👨‍👩‍👦 Семья"
+    
+    lang_text = "🇺🇿 O'zbekcha" if user.get("language") == "uz" else "🇷🇺 Русский"
+    
+    profile_text = get_message("profile_info", lang).format(
+        income_self=format_number(profile.get("income_self", 0)) + " so'm",
+        income_partner=format_number(profile.get("income_partner", 0)) + " so'm",
+        rent=format_number(profile.get("rent", 0)) + " so'm",
+        kindergarten=format_number(profile.get("kindergarten", 0)) + " so'm",
+        utilities=format_number(profile.get("utilities", 0)) + " so'm",
+        loan_payment=format_number(profile.get("loan_payment", 0)) + " so'm",
+        total_debt=format_number(profile.get("total_debt", 0)) + " so'm",
+        mode=mode_text,
+        language=lang_text
+    )
+    
+    # Create edit buttons
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
+            InlineKeyboardButton(get_message("btn_edit_income_partner", lang), callback_data="edit_income_partner"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_rent", lang), callback_data="edit_rent"),
+            InlineKeyboardButton(get_message("btn_edit_kindergarten", lang), callback_data="edit_kindergarten"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_utilities", lang), callback_data="edit_utilities"),
+            InlineKeyboardButton(get_message("btn_edit_loan_payment", lang), callback_data="edit_loan_payment"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_edit_total_debt", lang), callback_data="edit_total_debt"),
+            InlineKeyboardButton(get_message("btn_edit_mode", lang), callback_data="edit_mode"),
+        ],
+        [
+            InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        get_message("profile_header", lang) + "\n\n" + profile_text,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
+# Field name mappings
+PROFILE_FIELDS = {
+    "income_self": {"uz": "Daromadim", "ru": "Мой доход"},
+    "income_partner": {"uz": "Sherik daromadi", "ru": "Доход партнёра"},
+    "rent": {"uz": "Ijara", "ru": "Аренда"},
+    "kindergarten": {"uz": "Bog'cha", "ru": "Детсад"},
+    "utilities": {"uz": "Kommunal", "ru": "Коммунальные"},
+    "loan_payment": {"uz": "Oylik to'lov", "ru": "Ежемес. платёж"},
+    "total_debt": {"uz": "Umumiy qarz", "ru": "Общий долг"},
+}
+
+
+async def edit_profile_field_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle edit field button click - ask for new value"""
+    query = update.callback_query
+    await query.answer()
+    
+    field = query.data.replace("edit_", "")  # e.g., "income_self"
+    lang = context.user_data.get("lang", "uz")
+    
+    if field == "mode":
+        # Show mode selection
+        keyboard = [
+            [
+                InlineKeyboardButton(get_message("mode_solo", lang), callback_data="profile_mode_solo"),
+                InlineKeyboardButton(get_message("mode_family", lang), callback_data="profile_mode_family")
+            ],
+            [InlineKeyboardButton(get_message("btn_back_to_profile", lang), callback_data="show_profile")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            get_message("select_mode", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return
+    
+    # Store which field we're editing
+    context.user_data["editing_field"] = field
+    
+    field_name = PROFILE_FIELDS.get(field, {}).get(lang, field)
+    
+    keyboard = [[InlineKeyboardButton(get_message("btn_back_to_profile", lang), callback_data="show_profile")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        get_message("edit_enter_new_value", lang).format(field=field_name),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
+async def handle_profile_edit_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle text input for profile field editing"""
+    editing_field = context.user_data.get("editing_field")
+    
+    if not editing_field:
+        return  # Not editing anything
+    
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    # Parse the number
+    value = parse_number(update.message.text)
+    
+    if value < 0:
+        await update.message.reply_text(
+            get_message("edit_invalid_number", lang)
+        )
+        return
+    
+    # Update in database
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    profile = await db.get_financial_profile(user["id"])
+    
+    if profile:
+        # Update existing profile
+        await db.update_financial_profile(profile["id"], **{editing_field: value})
+    else:
+        # Create new profile with this field
+        await db.create_financial_profile(user["id"], **{editing_field: value})
+    
+    # Clear editing state
+    field_name = PROFILE_FIELDS.get(editing_field, {}).get(lang, editing_field)
+    context.user_data["editing_field"] = None
+    
+    # Show success message with recalculate button
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+        [InlineKeyboardButton(get_message("btn_back_to_profile", lang), callback_data="show_profile")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("edit_success", lang).format(field=field_name) + "\n\n" + 
+        get_message("profile_updated_recalculate", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
+async def profile_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle mode change from profile"""
+    query = update.callback_query
+    await query.answer()
+    
+    mode = query.data.replace("profile_mode_", "")  # "solo" or "family"
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    # Update in database
+    db = await get_database()
+    await db.update_user(telegram_id, mode=mode)
+    
+    # Show success and return to profile
+    mode_name = get_message("mode_solo", lang) if mode == "solo" else get_message("mode_family", lang)
+    
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
+        [InlineKeyboardButton(get_message("btn_back_to_profile", lang), callback_data="show_profile")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        get_message("edit_success", lang).format(field=mode_name) + "\n\n" +
+        get_message("profile_updated_recalculate", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /status command - show last calculation"""
     telegram_id = update.effective_user.id

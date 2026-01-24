@@ -23,6 +23,11 @@ from app.handlers import (
     change_language_callback,
     error_handler,
     add_trial_handler_to_app,
+    profile_command,
+    show_profile_callback,
+    edit_profile_field_callback,
+    handle_profile_edit_input,
+    profile_mode_callback,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -85,10 +90,28 @@ def main() -> None:
     application.add_handler(CommandHandler("language", language_command))
     application.add_handler(CommandHandler("subscription", subscription_command))
     application.add_handler(CommandHandler("pro", pro_command))
+    application.add_handler(CommandHandler("profile", profile_command))
     
     # Add callback handlers for language change
     application.add_handler(
         CallbackQueryHandler(change_language_callback, pattern="^change_lang_")
+    )
+    
+    # Profile edit handlers
+    application.add_handler(
+        CallbackQueryHandler(show_profile_callback, pattern="^show_profile$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(edit_profile_field_callback, pattern="^edit_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_")
+    )
+    
+    # Profile edit text input handler (must be before other message handlers)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_profile_edit_input),
+        group=1
     )
     
     # Add subscription/payment handlers

@@ -1234,6 +1234,119 @@ MESSAGES = {
             "• Друг получит: *3 дня PRO бесплатно*"
         )
     },
+    
+    # ==================== PROFILE ====================
+    "profile_header": {
+        "uz": "👤 *MENING PROFILIM*",
+        "ru": "👤 *МОЙ ПРОФИЛЬ*"
+    },
+    
+    "profile_info": {
+        "uz": (
+            "📊 *Moliyaviy ma'lumotlarim:*\n\n"
+            "💰 *Daromad (men):* {income_self}\n"
+            "💰 *Daromad (sherik):* {income_partner}\n"
+            "🏠 *Ijara:* {rent}\n"
+            "👶 *Bog'cha:* {kindergarten}\n"
+            "💡 *Kommunal:* {utilities}\n"
+            "💳 *Oylik to'lov:* {loan_payment}\n"
+            "📉 *Umumiy qarz:* {total_debt}\n\n"
+            "📅 *Rejim:* {mode}\n"
+            "🌐 *Til:* {language}"
+        ),
+        "ru": (
+            "📊 *Мои финансовые данные:*\n\n"
+            "💰 *Доход (я):* {income_self}\n"
+            "💰 *Доход (партнёр):* {income_partner}\n"
+            "🏠 *Аренда:* {rent}\n"
+            "👶 *Детсад:* {kindergarten}\n"
+            "💡 *Коммунальные:* {utilities}\n"
+            "💳 *Ежемесячный платёж:* {loan_payment}\n"
+            "📉 *Общий долг:* {total_debt}\n\n"
+            "📅 *Режим:* {mode}\n"
+            "🌐 *Язык:* {language}"
+        )
+    },
+    
+    "profile_no_data": {
+        "uz": "📊 Hali moliyaviy ma'lumotlar kiritilmagan.\n\n/start buyrug'ini bosing va ma'lumotlaringizni kiriting.",
+        "ru": "📊 Финансовые данные ещё не введены.\n\nНажмите /start и введите свои данные."
+    },
+    
+    "profile_edit_menu": {
+        "uz": "✏️ *Qaysi ma'lumotni o'zgartirmoqchisiz?*",
+        "ru": "✏️ *Что хотите изменить?*"
+    },
+    
+    "btn_edit_income_self": {
+        "uz": "💰 Daromadim",
+        "ru": "💰 Мой доход"
+    },
+    
+    "btn_edit_income_partner": {
+        "uz": "💰 Sherik daromadi",
+        "ru": "💰 Доход партнёра"
+    },
+    
+    "btn_edit_rent": {
+        "uz": "🏠 Ijara",
+        "ru": "🏠 Аренда"
+    },
+    
+    "btn_edit_kindergarten": {
+        "uz": "👶 Bog'cha",
+        "ru": "👶 Детсад"
+    },
+    
+    "btn_edit_utilities": {
+        "uz": "💡 Kommunal",
+        "ru": "💡 Коммунальные"
+    },
+    
+    "btn_edit_loan_payment": {
+        "uz": "💳 Oylik to'lov",
+        "ru": "💳 Ежемес. платёж"
+    },
+    
+    "btn_edit_total_debt": {
+        "uz": "📉 Umumiy qarz",
+        "ru": "📉 Общий долг"
+    },
+    
+    "btn_edit_mode": {
+        "uz": "📅 Rejim",
+        "ru": "📅 Режим"
+    },
+    
+    "btn_back_to_profile": {
+        "uz": "◀️ Profilga qaytish",
+        "ru": "◀️ Назад к профилю"
+    },
+    
+    "edit_enter_new_value": {
+        "uz": "✏️ *{field}* uchun yangi qiymatni kiriting (so'm):",
+        "ru": "✏️ Введите новое значение для *{field}* (сум):"
+    },
+    
+    "edit_success": {
+        "uz": "✅ *{field}* muvaffaqiyatli yangilandi!",
+        "ru": "✅ *{field}* успешно обновлено!"
+    },
+    
+    "edit_invalid_number": {
+        "uz": "❌ Noto'g'ri raqam. Iltimos, faqat son kiriting.",
+        "ru": "❌ Неверное число. Пожалуйста, введите только цифры."
+    },
+    
+    "btn_recalculate": {
+        "uz": "🔄 Qayta hisoblash",
+        "ru": "🔄 Пересчитать"
+    },
+    
+    "profile_updated_recalculate": {
+        "uz": "✅ Ma'lumotlar yangilandi!\n\nYangi natijalarni ko'rish uchun \"Qayta hisoblash\" tugmasini bosing.",
+        "ru": "✅ Данные обновлены!\n\nНажмите \"Пересчитать\" для новых результатов."
+    },
 }
 
 
