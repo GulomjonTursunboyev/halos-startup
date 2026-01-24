@@ -2522,33 +2522,13 @@ def get_conversation_handler() -> ConversationHandler:
 # Register additional handlers globally (for dispatcher setup)
 def add_global_handlers_to_app(application):
     """Add handlers that work outside the conversation flow"""
+    # Only add trial handler here - other handlers are added in bot.py
     application.add_handler(CallbackQueryHandler(start_trial_callback, pattern="^start_trial$"), group=0)
-    application.add_handler(CallbackQueryHandler(show_profile_callback, pattern="^show_profile$"), group=0)
-    application.add_handler(CallbackQueryHandler(edit_profile_field_callback, pattern="^edit_"), group=0)
-    application.add_handler(CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_"), group=0)
-    application.add_handler(CommandHandler("profile", profile_command), group=0)
-    
-    # Main menu button handlers
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^(📊 Qarz rejam|📊 Мой план)$"),
-        menu_plan_handler
-    ), group=1)
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"),
-        menu_profile_handler
-    ), group=1)
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^(💎 Obuna|💎 Подписка)$"),
-        menu_subscription_handler
-    ), group=1)
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^(🌐 Til|🌐 Язык)$"),
-        menu_language_handler
-    ), group=1)
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"),
-        menu_help_handler
-    ), group=1)
+
+
+# Keep old function for backwards compatibility
+def add_trial_handler_to_app(application):
+    add_global_handlers_to_app(application)
 
 
 # ==================== MAIN MENU HANDLERS ====================
