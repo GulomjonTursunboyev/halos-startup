@@ -2024,10 +2024,11 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     """Build profile text and keyboard for display - shows user info and subscription status"""
     from datetime import datetime
     
-    # Get user personal info
-    first_name = user.get("first_name", "")
-    last_name = user.get("last_name", "")
-    full_name = f"{first_name} {last_name}".strip() or ("Noma'lum" if lang == "uz" else "Неизвестно")
+    # Get user personal info - only first name, ignore last name
+    first_name = user.get("first_name") or ""
+    # Clean up - remove None and empty strings
+    first_name = first_name if first_name and first_name != "None" else ""
+    display_name = first_name.strip() or ("Foydalanuvchi" if lang == "uz" else "Пользователь")
     phone = user.get("phone_number", "")
     
     # Get subscription status
@@ -2054,13 +2055,13 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     # Build profile header with personal info
     if lang == "uz":
         profile_text = (
-            f"👤 *{full_name}*\n"
+            f"👤 *{display_name}*\n"
             f"📱 {phone}\n"
             f"📊 Obuna: {sub_status}\n"
         )
     else:
         profile_text = (
-            f"👤 *{full_name}*\n"
+            f"👤 *{display_name}*\n"
             f"📱 {phone}\n"
             f"📊 Подписка: {sub_status}\n"
         )
@@ -2624,7 +2625,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             debt_message += (
                 f"🚀 PRO bilan: *{exit_months} oy* ({exit_date_formatted})\n"
                 f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
-                f"💰 Jamg'arma: *{format_number(savings_at_exit)} so'm*"
+                f"💰 Boylik: *{format_number(savings_at_exit)} so'm*"
             )
         else:
             if months_saved > 0:
@@ -2670,7 +2671,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             debt_message += (
                 f"🚀 С PRO: *{exit_months} мес* ({exit_date_formatted})\n"
                 f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
-                f"💰 Накопления: *{format_number(savings_at_exit)} сум*"
+                f"💰 Богатство: *{format_number(savings_at_exit)} сум*"
             )
         else:
             if months_saved > 0:
@@ -2711,7 +2712,7 @@ async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 💎 Obuna button"""
+    """Handle 💎 PRO button - show PRO features menu for PRO users, pricing for others"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -2720,21 +2721,13 @@ async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAUL
     db = await get_database()
     await db.update_user_activity(telegram_id)
     
-    # Show subscription status and options
-    user = await db.get_user(telegram_id)
-    is_pro = await get_user_subscription_status(telegram_id)
+    # Check if user has PRO
+    is_pro = await is_user_pro(telegram_id)
     
-    if is_pro and user:
-        # Show PRO status
-        expires = user.get("subscription_expires", "")
-        status_text = get_message("subscription_active", lang).format(
-            expires=expires[:10] if expires else "∞"
-        )
-        await update.message.reply_text(
-            status_text,
-            parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(lang)
-        )
+    if is_pro:
+        # Show PRO features menu
+        from app.pro_features import show_pro_menu
+        await show_pro_menu(update, context)
     else:
         # Show pricing
         await show_pricing_new_message(update, context)

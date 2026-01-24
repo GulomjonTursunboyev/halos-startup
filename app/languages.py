@@ -16,9 +16,9 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📊 *SOLVO sizga yordam beradi:*\n\n"
             "💰 Qarzlardan *qachon* xalos bo'lishni ko'rsatadi\n"
-            "📈 Oylik *qancha* jamg'ara olishingizni hisoblaydi\n"
+            "📈 Oylik *qancha* boylik ortira olishingizni hisoblaydi\n"
             "🎯 Moliyaviy *erkinlik* rejasini tuzadi\n"
-            "🤖 AI asosida *shaxsiy maslahatlar* beradi\n"
+            "📊 Statistika va *Excel hisobotlar*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "✅ *Ro'yxatdan o'tish uchun* telefon raqamingizni ulashing 👇"
         ),
@@ -28,9 +28,9 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📊 *SOLVO поможет вам:*\n\n"
             "💰 Показать *когда* вы избавитесь от долгов\n"
-            "📈 Рассчитать *сколько* сможете откладывать\n"
+            "📈 Рассчитать *сколько* богатства сможете накопить\n"
             "🎯 Построить план *финансовой свободы*\n"
-            "🤖 Дать *персональные советы* на основе AI\n"
+            "📊 Статистика и *Excel отчёты*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "✅ *Для регистрации* поделитесь номером телефона 👇"
         )
@@ -786,7 +786,7 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "✅ *{pro_exit_date}* da qarzsiz bo'lardingiz\n"
             "✅ *{months_saved} oy* tezroq qutulardingiz\n"
-            "✅ *{savings_at_exit}* so'm jamg'argan bo'lardingiz\n\n"
+            "✅ *{savings_at_exit}* so'm boylik ortirasiz\n\n"
             "👇 _PRO ga o'ting va tezroq erkinlikka chiqing_"
         ),
         "ru": (
@@ -807,7 +807,7 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "✅ Стали бы свободны *{pro_exit_date}*\n"
             "✅ На *{months_saved} мес* быстрее\n"
-            "✅ Накопили бы *{savings_at_exit}* сум\n\n"
+            "✅ Накопите *{savings_at_exit}* сум богатства\n\n"
             "👇 _Перейдите на PRO и выйдите из долга быстрее_"
         )
     },

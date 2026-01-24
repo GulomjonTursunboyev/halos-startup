@@ -146,7 +146,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
                 f"💎 *SOLVO PRO*\n\n"
                 f"Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
                 f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
-                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* jamg'arasiz.\n\n"
+                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* boylik ortirasiz.\n\n"
             )
         else:
             header = "💎 *SOLVO PRO*\n\n"
@@ -156,17 +156,19 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🎯 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Aniq sana* — qachon qarzsiz bo'lishingizni bilasiz\n"
-            "✅ *Tezkor chiqish* — bir necha oy oldin erkinlikka\n"
-            "✅ *Jamg'arma* — qarz to'layotganda ham pul yig'asiz\n"
-            "✅ *Oylik reja* — qancha sarflash, qancha yig'ish\n"
-            "✅ *12 oylik prognoz* — kelajakni ko'rasiz\n\n"
+            "✅ *Aniq sana* — qachon qarzsiz bo'lishingiz\n"
+            "✅ *Tezkor chiqish* — bir necha oy oldin\n"
+            "✅ *Boylik* — qarz to'lab ham pul yig'asiz\n\n"
+            "📊 *Statistika* — haftalik/oylik/yillik\n"
+            "🔔 *Eslatmalar* — to'lov eslatmalari\n"
+            "📋 *Qarz nazorati* — monitoring\n"
+            "📥 *Excel hisobot* — yuklab olish\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
-            "├ ⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `120,000 so'm` (33% tejash)\n\n"
+            "├ ⚡ *1 hafta:* `4,990 so'm` — sinab ko'ring\n"
+            "├ ⭐ *1 oy:* `14,990 so'm` — tavsiya etiladi\n"
+            "└ 🏆 *1 yil:* `119,990 so'm` (33% tejash)\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
@@ -185,17 +187,19 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Точная дата* — знаете когда станете свободны\n"
-            "✅ *Быстрый выход* — на несколько месяцев раньше\n"
-            "✅ *Накопления* — копите даже выплачивая долг\n"
-            "✅ *Месячный план* — сколько тратить, сколько копить\n"
-            "✅ *Прогноз на 12 мес* — видите будущее\n\n"
+            "✅ *Точная дата* — когда станете свободны\n"
+            "✅ *Быстрый выход* — на несколько мес раньше\n"
+            "✅ *Богатство* — копите выплачивая долг\n\n"
+            "📊 *Статистика* — еженед/ежемес/ежегод\n"
+            "🔔 *Напоминания* — об оплате\n"
+            "📋 *Контроль долгов* — мониторинг\n"
+            "📥 *Excel отчёт* — скачать\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
-            "├ ⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `120,000 сум` (скидка 33%)\n\n"
+            "├ ⚡ *1 неделя:* `4,990 сум` — попробуйте\n"
+            "├ ⭐ *1 месяц:* `14,990 сум` — рекомендуем\n"
+            "└ 🏆 *1 год:* `119,990 сум` (скидка 33%)\n\n"
             "💳 *Оплата: через Click*"
         )
     
@@ -285,7 +289,7 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
                 f"💎 *SOLVO PRO*\n\n"
                 f"Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
                 f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
-                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* jamg'arasiz.\n\n"
+                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* boylik ortirasiz.\n\n"
             )
         else:
             header = "💎 *SOLVO PRO*\n\n"
@@ -295,17 +299,19 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🎯 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Aniq sana* — qachon qarzsiz bo'lishingizni bilasiz\n"
-            "✅ *Tezkor chiqish* — bir necha oy oldin erkinlikka\n"
-            "✅ *Jamg'arma* — qarz to'layotganda ham pul yig'asiz\n"
-            "✅ *Oylik reja* — qancha sarflash, qancha yig'ish\n"
-            "✅ *12 oylik prognoz* — kelajakni ko'rasiz\n\n"
+            "✅ *Aniq sana* — qachon qarzsiz bo'lishingiz\n"
+            "✅ *Tezkor chiqish* — bir necha oy oldin\n"
+            "✅ *Boylik* — qarz to'lab ham pul yig'asiz\n\n"
+            "📊 *Statistika* — haftalik/oylik/yillik\n"
+            "🔔 *Eslatmalar* — to'lov eslatmalari\n"
+            "📋 *Qarz nazorati* — monitoring\n"
+            "📥 *Excel hisobot* — yuklab olish\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
-            "├ ⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `120,000 so'm` (33% tejash)\n\n"
+            "├ ⚡ *1 hafta:* `4,990 so'm` — sinab ko'ring\n"
+            "├ ⭐ *1 oy:* `14,990 so'm` — tavsiya etiladi\n"
+            "└ 🏆 *1 yil:* `119,990 so'm` (33% tejash)\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
@@ -314,7 +320,7 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
                 f"💎 *SOLVO PRO*\n\n"
                 f"Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
                 f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
-                f"Плюс накопите *{format_number(int(savings_at_exit))} сум*.\n\n"
+                f"Плюс *{format_number(int(savings_at_exit))} сум* богатства.\n\n"
             )
         else:
             header = "💎 *SOLVO PRO*\n\n"
@@ -324,32 +330,34 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Точная дата* — знаете когда станете свободны\n"
-            "✅ *Быстрый выход* — на несколько месяцев раньше\n"
-            "✅ *Накопления* — копите даже выплачивая долг\n"
-            "✅ *Месячный план* — сколько тратить, сколько копить\n"
-            "✅ *Прогноз на 12 мес* — видите будущее\n\n"
+            "✅ *Точная дата* — когда станете свободны\n"
+            "✅ *Быстрый выход* — на несколько мес раньше\n"
+            "✅ *Богатство* — копите выплачивая долг\n\n"
+            "📊 *Статистика* — еженед/ежемес/ежегод\n"
+            "🔔 *Напоминания* — об оплате\n"
+            "📋 *Контроль долгов* — мониторинг\n"
+            "📥 *Excel отчёт* — скачать\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
-            "├ ⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `120,000 сум` (скидка 33%)\n\n"
+            "├ ⚡ *1 неделя:* `4,990 сум` — попробуйте\n"
+            "├ ⭐ *1 месяц:* `14,990 сум` — рекомендуем\n"
+            "└ 🏆 *1 год:* `119,990 сум` (скидка 33%)\n\n"
             "💳 *Оплата: через Click*"
         )
     
     # Click Payment buttons
     keyboard = [
         [InlineKeyboardButton(
-            "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+            "⚡ 1 hafta - 4,990 so'm" if lang == "uz" else "⚡ 1 нед - 4,990 сум",
             callback_data="click_buy_pro_weekly"
         )],
         [InlineKeyboardButton(
-            "⭐ 1 oy - 15,000 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 15,000 сум (реком.)",
+            "⭐ 1 oy - 14,990 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 14,990 сум (реком.)",
             callback_data="click_buy_pro_monthly"
         )],
         [InlineKeyboardButton(
-            "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+            "🏆 1 yil - 119,990 so'm (-33%)" if lang == "uz" else "🏆 1 год - 119,990 сум (-33%)",
             callback_data="click_buy_pro_yearly"
         )],
         [InlineKeyboardButton(

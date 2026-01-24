@@ -44,6 +44,15 @@ from app.subscription_handlers import (
     cancel_promo_callback,
     click_buy_callback,
 )
+from app.pro_features import (
+    show_pro_menu,
+    pro_statistics_callback,
+    pro_reminders_callback,
+    pro_debt_monitor_callback,
+    pro_export_excel_callback,
+    pro_menu_callback,
+    toggle_reminders_callback,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -166,6 +175,26 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(cancel_promo_callback, pattern="^cancel_promo$")
+    )
+    
+    # PRO Features handlers
+    application.add_handler(
+        CallbackQueryHandler(pro_menu_callback, pattern="^pro_menu$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(pro_statistics_callback, pattern="^pro_statistics$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(pro_reminders_callback, pattern="^pro_reminders$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(pro_debt_monitor_callback, pattern="^pro_debt_monitor$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(pro_export_excel_callback, pattern="^pro_export_excel$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(toggle_reminders_callback, pattern="^toggle_reminders_")
     )
     
     # Add error handler

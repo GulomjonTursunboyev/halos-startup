@@ -44,7 +44,7 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         id="pro_weekly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.WEEKLY,
-        price_uzs=5000,
+        price_uzs=4990,
         description_uz="SOLVO PRO - 1 haftalik",
         description_ru="SOLVO PRO - 1 неделя",
         is_recommended=False,
@@ -53,7 +53,7 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         id="pro_monthly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.MONTHLY,
-        price_uzs=15000,
+        price_uzs=14990,
         description_uz="SOLVO PRO - 1 oylik",
         description_ru="SOLVO PRO - 1 месяц",
         is_recommended=True,
@@ -62,7 +62,7 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         id="pro_yearly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.YEARLY,
-        price_uzs=120000,  # 33% discount (vs 180,000 if monthly)
+        price_uzs=119990,  # 33% discount
         description_uz="SOLVO PRO - 1 yillik (33% tejash)",
         description_ru="SOLVO PRO - 1 год (скидка 33%)",
         is_recommended=False,
@@ -98,6 +98,13 @@ FEATURE_LIMITS = {
 # ==================== PROMO CODES ====================
 
 PROMO_CODES = {
+    "SOLVOWEEK": {
+        "type": "free_days",
+        "value": 7,  # 7 days free (1 week PRO)
+        "max_uses": -1,  # Unlimited
+        "current_uses": 0,
+        "expires": "2027-12-31",
+    },
     "SOLVO2024": {
         "type": "free_days",
         "value": 7,
