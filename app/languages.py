@@ -782,13 +782,12 @@ MESSAGES = {
             "❌ Tezlashtirish: *yo'q*\n"
             "❌ Optimizatsiya: *yo'q*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "� *SOLVO PRO BILAN*\n"
+            "💎 *SOLVO PRO BILAN*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Maxfiy usul bilan siz:\n\n"
-            "✅ *{pro_exit_date}* da qarzsiz\n"
-            "✅ *{months_saved} oy* tezroq\n"
-            "✅ *{savings_at_exit}* so'm jamg'arma\n\n"
-            "🤔 _Qanday qilib? PRO da bilib oling..._"
+            "✅ *{pro_exit_date}* da qarzsiz bo'lardingiz\n"
+            "✅ *{months_saved} oy* tezroq qutulardingiz\n"
+            "✅ *{savings_at_exit}* so'm jamg'argan bo'lardingiz\n\n"
+            "👇 _PRO ga o'ting va tezroq erkinlikka chiqing_"
         ),
         "ru": (
             "⚠️ *ВАШ ДОЛГОВОЙ СТАТУС*\n\n"
@@ -804,13 +803,12 @@ MESSAGES = {
             "❌ Ускорение: *нет*\n"
             "❌ Оптимизация: *нет*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "� *С SOLVO PRO*\n"
+            "💎 *С SOLVO PRO*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "С секретным методом вы:\n\n"
-            "✅ Свободны *{pro_exit_date}*\n"
+            "✅ Стали бы свободны *{pro_exit_date}*\n"
             "✅ На *{months_saved} мес* быстрее\n"
-            "✅ Накопите *{savings_at_exit}* сум\n\n"
-            "🤔 _Как это возможно? Узнайте в PRO..._"
+            "✅ Накопили бы *{savings_at_exit}* сум\n\n"
+            "👇 _Перейдите на PRO и выйдите из долга быстрее_"
         )
     },
     
@@ -1096,7 +1094,7 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🔓 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Maxfiy usul* - tezlashtirilgan qarz to'lash\n"
+            "✅ Qarzdan *tezroq* chiqish\n"
             "✅ *Aniq sana* - qachon qarzsiz bo'lishingizni bilib oling\n"
             "✅ *Jamg'arma rejasi* - qarz to'layotganda ham pul yig'ing\n"
             "✅ *Oylik nazorat* - qancha sarflash, qancha yig'ish\n"
@@ -1111,7 +1109,7 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n"
             "🔓 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Секретный метод* - ускоренное погашение долга\n"
+            "✅ Выйти из долга *быстрее*\n"
             "✅ *Точная дата* - узнайте когда станете свободны\n"
             "✅ *План накоплений* - копите даже выплачивая долг\n"
             "✅ *Ежемесячный контроль* - сколько тратить, сколько копить\n"
@@ -1444,7 +1442,7 @@ MESSAGES = {
     "my_debts_pro_plan": {
         "uz": (
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🚀 *TEZLASHTIRILGAN REJA (70-20-10):*\n"
+            "🚀 *SIZNING SHAXSIY REJA:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🗓 Qarzdan chiqish: *{exit_date}*\n"
             "⏱ Qoldi: *{exit_months} oy*\n\n"
@@ -1454,7 +1452,7 @@ MESSAGES = {
         ),
         "ru": (
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🚀 *УСКОРЕННЫЙ ПЛАН (70-20-10):*\n"
+            "🚀 *ВАШ ПЕРСОНАЛЬНЫЙ ПЛАН:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🗓 Выход из долга: *{exit_date}*\n"
             "⏱ Осталось: *{exit_months} мес*\n\n"
@@ -1472,7 +1470,7 @@ MESSAGES = {
             "✅ *{pro_exit_date}* da qarzsiz\n"
             "✅ *{months_saved} oy* tez\n"
             "✅ *{savings_at_exit}* jamg'arma\n\n"
-            "🔐 _Maxfiy usulni PRO da oching..._"
+            "� _PRO ga o'ting va tezroq qutiling_"
         ),
         "ru": (
             "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1481,7 +1479,7 @@ MESSAGES = {
             "✅ Свободны *{pro_exit_date}*\n"
             "✅ На *{months_saved} мес* быстрее\n"
             "✅ Накопите *{savings_at_exit}*\n\n"
-            "🔐 _Откройте секретный метод в PRO..._"
+            "� _Перейдите на PRO и освободитесь быстрее_"
         )
     },
     
@@ -1650,21 +1648,21 @@ MESSAGES = {
             "\n━━━━━━━━━━━━━━━━━━━━\n"
             "🚀 *TEZROQ CHIQISH MUMKIN!*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Maxfiy SOLVO usuli bilan:\n\n"
+            "PRO obuna bilan siz:\n\n"
             "✅ *{pro_exit_date}* da qarzsiz\n"
             "✅ *{months_saved} oy* tez\n"
             "✅ *{savings_at_exit}* jamg'arma\n\n"
-            "🔐 _Bu usulni PRO da oching..._"
+            "💎 _PRO ga o'ting va tezroq qutiling_"
         ),
         "ru": (
             "\n━━━━━━━━━━━━━━━━━━━━\n"
             "🚀 *МОЖНО БЫСТРЕЕ!*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "С секретным методом SOLVO:\n\n"
+            "С PRO подпиской вы:\n\n"
             "✅ Свободны *{pro_exit_date}*\n"
             "✅ На *{months_saved} мес* быстрее\n"
             "✅ Накопите *{savings_at_exit}*\n\n"
-            "🔐 _Откройте метод в PRO..._"
+            "💎 _Перейдите на PRO и освободитесь быстрее_"
         )
     },
     
