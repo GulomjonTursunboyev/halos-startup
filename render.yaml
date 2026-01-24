@@ -1,10 +1,10 @@
 services:
-  # Telegram Bot Worker Service
-  - type: worker
+  # Telegram Bot Web Service (Webhook mode)
+  - type: web
     name: solvo-bot
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    startCommand: gunicorn bot_webhook:flask_app --bind 0.0.0.0:$PORT --worker-class gthread --threads 4
     plan: free
     envVars:
       - key: BOT_TOKEN
