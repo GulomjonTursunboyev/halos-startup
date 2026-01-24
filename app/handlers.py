@@ -1625,8 +1625,10 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
     loan_payment = context.user_data.get("loan_payment", 0)
     total_debt = context.user_data.get("total_debt", 0)
     
-    # Calculate
-    result = calculate_finances(
+    # Build financial input
+    from app.engine import FinancialInput
+    financial_input = FinancialInput(
+        mode=context.user_data.get("mode", "solo"),
         income_self=income_self,
         income_partner=income_partner,
         rent=rent,
@@ -1635,6 +1637,9 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         loan_payment=loan_payment,
         total_debt=total_debt
     )
+    
+    # Calculate
+    result = calculate_finances(financial_input)
     
     # Save to database
     db = await get_database()
@@ -1740,8 +1745,10 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
     loan_payment = context.user_data.get("loan_payment", 0)
     total_debt = context.user_data.get("total_debt", 0)
     
-    # Calculate
-    result = calculate_finances(
+    # Build financial input
+    from app.engine import FinancialInput
+    financial_input = FinancialInput(
+        mode=context.user_data.get("mode", "solo"),
         income_self=income_self,
         income_partner=income_partner,
         rent=rent,
@@ -1750,6 +1757,9 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
         loan_payment=loan_payment,
         total_debt=total_debt
     )
+    
+    # Calculate
+    result = calculate_finances(financial_input)
     
     # Save to database
     db = await get_database()
@@ -2009,7 +2019,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def build_profile_content(user: dict, profile: dict, lang: str, telegram_id: int) -> tuple:
     """Build profile text and keyboard for display"""
-    from app.engine import FinancialInput, FinancialCalculator, format_exit_date
+    from app.engine import FinancialInput, FinancialEngine, format_exit_date
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
     

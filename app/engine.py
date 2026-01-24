@@ -21,6 +21,7 @@ from app.languages import get_month_name, format_number
 @dataclass
 class FinancialInput:
     """Input data for financial calculations"""
+    mode: str = "solo"
     income_self: float = 0
     income_partner: float = 0
     rent: float = 0
@@ -321,39 +322,15 @@ def format_result_message(result: Dict[str, Any], lang: str = "uz", is_pro: bool
     return get_message("error_generic", lang)
 
 
-def calculate_finances(
-    income_self: float,
-    income_partner: float = 0,
-    rent: float = 0,
-    kindergarten: float = 0,
-    utilities: float = 0,
-    loan_payment: float = 0,
-    total_debt: float = 0
-) -> Dict[str, Any]:
+def calculate_finances(input_data: FinancialInput) -> Dict[str, Any]:
     """
     Convenience function for financial calculation
     
     Args:
-        income_self: User's monthly income
-        income_partner: Partner's monthly income (for family mode)
-        rent: Monthly rent payment
-        kindergarten: Monthly childcare/education cost
-        utilities: Monthly utilities cost
-        loan_payment: Total monthly loan payments
-        total_debt: Total remaining debt
+        input_data: FinancialInput object with all financial data
     
     Returns:
         Dictionary with calculation results
     """
-    input_data = FinancialInput(
-        income_self=income_self,
-        income_partner=income_partner,
-        rent=rent,
-        kindergarten=kindergarten,
-        utilities=utilities,
-        loan_payment=loan_payment,
-        total_debt=total_debt
-    )
-    
     engine = FinancialEngine(input_data)
     return engine.calculate()
