@@ -328,3 +328,156 @@ def parse_katm_pdf(pdf_path: str) -> KATMParseResult:
     """
     parser = KATMPDFParser(pdf_path)
     return parser.parse()
+
+
+def parse_katm_html(html_path: str) -> KATMParseResult:
+    """
+    Parse KATM credit history from HTML file
+    
+    Args:
+        html_path: Path to the HTML file
+        
+    Returns:
+        KATMParseResult with parsed loan data
+    """
+    try:
+        from bs4 import BeautifulSoup
+        
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        loans = []
+        total_debt = 0
+        total_monthly = 0
+        
+        # Common bank names
+        bank_names = [
+            "XALQ BANKI", "AGROBANK", "ASAKA BANK", "IPOTEKA BANK", 
+            "HAMKORBANK", "KAPITALBANK", "UZPROMSTROYBANK", "ALOQABANK",
+            "INFINBANK", "TURKISTON BANK", "ANOR BANK", "IPAK YO'LI",
+            "НАРОДНЫЙ БАНК", "АГРОБАНК", "ИПОТЕКА БАНК"
+        ]
+        
+        # Try to find tables with loan data
+        tables = soup.find_all('table')
+        
+        for table in tables:
+            rows = table.find_all('tr')
+            
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                row_text = ' '.join(cell.get_text(strip=True) for cell in cells).upper()
+                
+                # Check if this row contains bank info
+                bank_found = None
+                for bank in bank_names:
+                    if bank.upper() in row_text:
+                        bank_found = bank
+                        break
+                
+                if bank_found:
+                    # Try to extract amounts from this row
+                    amounts = []
+                    for cell in cells:
+                        cell_text = cell.get_text(strip=True)
+                        # Look for numeric values
+                        amount_match = re.findall(r'[\d\s,\.]+', cell_text)
+                        for match in amount_match:
+                            cleaned = re.sub(r'[^\d]', '', match)
+                            if cleaned and len(cleaned) >= 4:  # At least 1000
+                                try:
+                                    amounts.append(float(cleaned))
+                                except:
+                                    pass
+                    
+                    if amounts:
+                        loan = ParsedLoan(
+                            bank_name=bank_found,
+                            remaining_balance=max(amounts),
+                            status="active"
+                        )
+                        
+                        # Try to estimate monthly payment (assume 3% of balance)
+                        loan.monthly_payment = loan.remaining_balance * 0.03
+                        
+                        loans.append(loan)
+                        total_debt += loan.remaining_balance
+                        total_monthly += loan.monthly_payment
+        
+        # If no tables, try to parse raw text
+        if not loans:
+            text = soup.get_text()
+            
+            # Find bank mentions and nearby amounts
+            for bank in bank_names:
+                if bank.upper() in text.upper():
+                    # Find amounts near bank name
+                    pattern = rf'{re.escape(bank)}[^0-9]*?([\d\s,\.]+)'
+                    matches = re.findall(pattern, text, re.IGNORECASE)
+                    
+                    for match in matches:
+                        cleaned = re.sub(r'[^\d]', '', match)
+                        if cleaned and len(cleaned) >= 6:  # At least 100,000
+                            try:
+                                balance = float(cleaned)
+                                loan = ParsedLoan(
+                                    bank_name=bank,
+                                    remaining_balance=balance,
+                                    monthly_payment=balance * 0.03,
+                                    status="active"
+                                )
+                                loans.append(loan)
+                                total_debt += balance
+                                total_monthly += loan.monthly_payment
+                                break  # One loan per bank mention
+                            except:
+                                pass
+        
+        if loans:
+            return KATMParseResult(
+                success=True,
+                loans=loans,
+                total_remaining_debt=total_debt,
+                total_monthly_payment=total_monthly,
+                raw_text=soup.get_text()[:1000]
+            )
+        else:
+            return KATMParseResult(
+                success=False,
+                loans=[],
+                error_message="No loan data found in HTML file"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error parsing KATM HTML: {e}")
+        return KATMParseResult(
+            success=False,
+            loans=[],
+            error_message=str(e)
+        )
+
+
+def parse_katm_file(file_path: str) -> KATMParseResult:
+    """
+    Parse KATM file - automatically detect format (PDF or HTML)
+    
+    Args:
+        file_path: Path to the file (PDF or HTML)
+        
+    Returns:
+        KATMParseResult with parsed loan data
+    """
+    file_ext = Path(file_path).suffix.lower()
+    
+    if file_ext == '.pdf':
+        return parse_katm_pdf(file_path)
+    elif file_ext in ['.html', '.htm']:
+        return parse_katm_html(file_path)
+    else:
+        return KATMParseResult(
+            success=False,
+            loans=[],
+            error_message=f"Unsupported file format: {file_ext}"
+        )

@@ -119,6 +119,20 @@ PROMO_CODES = {
         "current_uses": 0,
         "expires": None,
     },
+    "FREEWEEK": {
+        "type": "free_days",
+        "value": 7,  # 7 days free (100% 1 week)
+        "max_uses": -1,  # Unlimited
+        "current_uses": 0,
+        "expires": "2027-12-31",
+    },
+    "SOLVO100": {
+        "type": "free_days",
+        "value": 7,  # 7 days free (100% 1 week)
+        "max_uses": 500,
+        "current_uses": 0,
+        "expires": "2027-12-31",
+    },
 }
 
 

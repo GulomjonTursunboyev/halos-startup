@@ -367,27 +367,45 @@ MESSAGES = {
     # ==================== INCOME INPUT ====================
     "input_income_self": {
         "uz": (
-            "� *O'zingizning oylik maoshingiz*\n\n"
-            "Oylik daromadingizni kiriting (so'mda).\n\n"
-            "Masalan: `5 000 000`"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QADAM 1/5 — DAROMAD*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💵 *O'zingizning oylik maoshingiz*\n\n"
+            "Raqam yozing yoki karta tarixi faylini yuboring.\n"
+            "Bot avtomatik aniqlaydi.\n\n"
+            "📝 Masalan: `5000000` yoki `5 mln`\n"
+            "📎 Yoki: PDF, HTML, Excel fayl"
         ),
         "ru": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *ШАГ 1/5 — ДОХОД*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💵 *Ваша ежемесячная зарплата*\n\n"
-            "Введите вашу зарплату (в сумах).\n\n"
-            "Например: `5 000 000`"
+            "Напишите число или отправьте файл истории карты.\n"
+            "Бот определит автоматически.\n\n"
+            "📝 Например: `5000000` или `5 млн`\n"
+            "📎 Или: PDF, HTML, Excel файл"
         )
     },
     
     "input_income_partner": {
         "uz": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QADAM 2/5 — JUFT DAROMADI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💵 *Turmush o'rtog'ingizning oylik maoshi*\n\n"
-            "Juftingizning oylik daromadini kiriting (so'mda).\n\n"
-            "Agar ishlamasa — pastdagi tugmani bosing."
+            "Raqam yozing yoki fayl yuboring.\n\n"
+            "📝 Masalan: `3000000`\n"
+            "📎 Yoki: PDF, HTML, Excel fayl"
         ),
         "ru": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *ШАГ 2/5 — ДОХОД ПАРТНЁРА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💵 *Зарплата вашего супруга/супруги*\n\n"
-            "Введите ежемесячный доход партнёра (в сумах).\n\n"
-            "Если не работает — нажмите кнопку ниже."
+            "Напишите число или отправьте файл.\n\n"
+            "📝 Например: `3000000`\n"
+            "📎 Или: PDF, HTML, Excel файл"
         )
     },
     
@@ -404,14 +422,20 @@ MESSAGES = {
     # ==================== MANDATORY LIVING COSTS ====================
     "input_rent": {
         "uz": (
-            "🏠 *Uy ijarasi*\n\n"
-            "Oylik ijara haqini kiriting (so'mda).\n\n"
-            "O'z uyingiz bo'lsa — pastdagi tugmani bosing."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QADAM 3/5 — UY IJARASI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏠 *Oylik ijara haqi*\n\n"
+            "📝 Raqam yozing: `2000000`\n"
+            "🏡 O'z uyingiz bo'lsa: `0`"
         ),
         "ru": (
-            "🏠 *Аренда жилья*\n\n"
-            "Введите ежемесячную арендную плату (в сумах).\n\n"
-            "Если живёте в своём жилье — нажмите кнопку ниже."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *ШАГ 3/5 — АРЕНДА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏠 *Ежемесячная аренда*\n\n"
+            "📝 Напишите число: `2000000`\n"
+            "🏡 Если своё жильё: `0`"
         )
     },
     
@@ -422,14 +446,20 @@ MESSAGES = {
     
     "input_kindergarten": {
         "uz": (
-            "👶 *Bog'cha / Ta'lim xarajatlari*\n\n"
-            "Bog'cha, maktab yoki kurslar uchun oylik to'lov (so'mda).\n\n"
-            "Farzandingiz yo'q yoki to'lovlik emas — pastdagi tugmani bosing."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QADAM 4/5 — TA'LIM*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "👶 *Bog'cha / Maktab / Kurslar*\n\n"
+            "📝 Oylik to'lov: `500000`\n"
+            "❌ Yo'q bo'lsa: `0`"
         ),
         "ru": (
-            "👶 *Детский сад / Образование*\n\n"
-            "Ежемесячная плата за детсад, школу или курсы (в сумах).\n\n"
-            "Нет детей или бесплатно — нажмите кнопку ниже."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *ШАГ 4/5 — ОБРАЗОВАНИЕ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "👶 *Детсад / Школа / Курсы*\n\n"
+            "📝 Ежемесячная плата: `500000`\n"
+            "❌ Если нет: `0`"
         )
     },
     
@@ -440,14 +470,20 @@ MESSAGES = {
     
     "input_utilities": {
         "uz": (
-            "💡 *Kommunal to'lovlar*\n\n"
-            "Elektr, gaz, suv, internet — barchasini kiriting (so'mda).\n\n"
-            "Taxminan: 300 000 - 800 000 so'm"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QADAM 5/5 — KOMMUNAL*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 *Elektr, gaz, suv, internet*\n\n"
+            "📝 Jami oylik: `400000`\n"
+            "💡 O'rtacha: 300K - 800K so'm"
         ),
         "ru": (
-            "💡 *Коммунальные платежи*\n\n"
-            "Электричество, газ, вода, интернет — введите общую сумму (в сумах).\n\n"
-            "Примерно: 300 000 - 800 000 сум"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *ШАГ 5/5 — КОММУНАЛКА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 *Электр, газ, вода, интернет*\n\n"
+            "📝 Всего в месяц: `400000`\n"
+            "💡 Обычно: 300K - 800K сум"
         )
     },
     
@@ -474,25 +510,33 @@ MESSAGES = {
     # ==================== KATM PDF UPLOAD ====================
     "katm_choice": {
         "uz": (
-            "📄 *Kredit tarixingizni yuklaysizmi?*\n\n"
-            "KATM (infokredit.uz) dan rasmiy kredit tarixingizni PDF formatda yuklashingiz mumkin.\n\n"
-            "Bu sizning barcha kreditlaringizni avtomatik aniqlaydi."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *KREDIT TARIXI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📄 *KATM kredit tarixingizni yuklang*\n\n"
+            "infokredit.uz dan olingan faylni yuboring.\n"
+            "PDF yoki HTML format qabul qilinadi.\n\n"
+            "🔄 Yoki qo'lda kredit ma'lumotlarini kiriting."
         ),
         "ru": (
-            "📄 *Загрузить кредитную историю?*\n\n"
-            "Вы можете загрузить официальную кредитную историю из KATM (infokredit.uz) в формате PDF.\n\n"
-            "Это автоматически определит все ваши кредиты."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *КРЕДИТНАЯ ИСТОРИЯ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📄 *Загрузите историю из KATM*\n\n"
+            "Отправьте файл с infokredit.uz.\n"
+            "Принимается PDF или HTML формат.\n\n"
+            "🔄 Или введите данные о кредитах вручную."
         )
     },
     
     "katm_yes": {
-        "uz": "📤 Ha, PDF yuklash",
-        "ru": "📤 Да, загрузить PDF"
+        "uz": "📤 Fayl yuklash (PDF/HTML)",
+        "ru": "📤 Загрузить файл (PDF/HTML)"
     },
     
     "katm_no": {
-        "uz": "✍️ Yo'q, qo'lda kiritaman",
-        "ru": "✍️ Нет, введу вручную"
+        "uz": "✍️ Qo'lda kiritaman",
+        "ru": "✍️ Введу вручную"
     },
     
     "katm_instructions": {
@@ -501,24 +545,24 @@ MESSAGES = {
             "1️⃣ infokredit.uz saytiga kiring\n"
             "2️⃣ OneID orqali tizimga kiring\n"
             "3️⃣ \"Kredit tarixi\" → \"Yuklab olish\"\n"
-            "4️⃣ PDF faylni yuklab oling\n"
+            "4️⃣ *PDF yoki HTML* faylni yuklab oling\n"
             "5️⃣ *Shu yerga yuboring* 👇\n\n"
-            "⏳ PDF faylni kutayapman..."
+            "📎 PDF yoki HTML faylni kutayapman..."
         ),
         "ru": (
             "📋 *Как получить кредитную историю из KATM:*\n\n"
             "1️⃣ Зайдите на infokredit.uz\n"
             "2️⃣ Войдите через OneID\n"
             "3️⃣ «Кредитная история» → «Скачать»\n"
-            "4️⃣ Скачайте PDF файл\n"
+            "4️⃣ Скачайте *PDF или HTML* файл\n"
             "5️⃣ *Отправьте его сюда* 👇\n\n"
-            "⏳ Жду PDF файл..."
+            "📎 Жду PDF или HTML файл..."
         )
     },
     
     "katm_processing": {
-        "uz": "⏳ PDF fayl qayta ishlanmoqda...",
-        "ru": "⏳ Обрабатываю PDF файл..."
+        "uz": "⏳ Fayl qayta ishlanmoqda...",
+        "ru": "⏳ Обрабатываю файл..."
     },
     
     "katm_success": {
@@ -559,8 +603,8 @@ MESSAGES = {
     },
     
     "katm_not_pdf": {
-        "uz": "❌ Iltimos, faqat PDF fayl yuboring.",
-        "ru": "❌ Пожалуйста, отправьте только PDF файл."
+        "uz": "❌ Iltimos, PDF yoki HTML fayl yuboring.",
+        "ru": "❌ Пожалуйста, отправьте PDF или HTML файл."
     },
     
     "katm_confirm": {

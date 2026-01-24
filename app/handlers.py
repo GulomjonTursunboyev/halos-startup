@@ -28,7 +28,7 @@ import asyncio
 from app.languages import get_message, format_number
 from app.subscription_handlers import require_pro, is_user_pro, show_pricing, show_pricing_new_message, show_subscription_expiring_warning
 from app.engine import calculate_finances, format_result_message
-from app.pdf_parser import parse_katm_pdf
+from app.pdf_parser import parse_katm_pdf, parse_katm_file
 from app.transaction_parser import parse_transactions, calculate_monthly_averages
 
 logger = logging.getLogger(__name__)
@@ -265,27 +265,18 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     else:
         mode_msg = await query.edit_message_text(get_message("mode_set_family", lang))
     try:
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(1)
         await mode_msg.delete()
     except:
         pass
     
-    # Ask about transaction history upload
-    keyboard = [
-        [
-            InlineKeyboardButton(get_message("transaction_yes", lang), callback_data="tx_yes"),
-            InlineKeyboardButton(get_message("transaction_no", lang), callback_data="tx_no")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
+    # Go directly to income input - user can send file or number
     await query.message.reply_text(
-        get_message("transaction_choice", lang),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
     )
     
-    return States.TRANSACTION_CHOICE
+    return States.INCOME_SELF
 
 
 # ==================== TRANSACTION HISTORY UPLOAD (MULTI-CARD) ====================
@@ -848,10 +839,75 @@ async def transaction_skip_handler(update: Update, context: ContextTypes.DEFAULT
 # ==================== INCOME INPUT ====================
 
 async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle user's income input"""
+    """Handle user's income input - accepts text number or file"""
     lang = context.user_data.get("lang", "uz")
-    text = update.message.text
+    telegram_id = update.effective_user.id
     
+    # Check if user sent a file
+    if update.message.document:
+        document = update.message.document
+        file_ext = Path(document.file_name).suffix.lower()
+        
+        if file_ext in TRANSACTION_EXTENSIONS:
+            # Process transaction file
+            processing_msg = await update.message.reply_text(
+                get_message("transaction_processing", lang)
+            )
+            
+            try:
+                TRANSACTION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+                file = await document.get_file()
+                file_name = f"{telegram_id}_{document.file_name}"
+                file_path = TRANSACTION_UPLOAD_DIR / file_name
+                await file.download_to_drive(str(file_path))
+                
+                result = parse_transactions(str(file_path))
+                await processing_msg.delete()
+                
+                if result.success and result.monthly_income > 0:
+                    context.user_data["income_self"] = result.monthly_income
+                    
+                    await update.message.reply_text(
+                        f"✅ *Fayl o'qildi!*\n\n"
+                        f"💰 Oylik daromad: *{format_number(result.monthly_income)}* so'm\n"
+                        f"📊 {result.income_count} ta kirim topildi",
+                        parse_mode="Markdown"
+                    )
+                    
+                    # Continue to next step
+                    if context.user_data.get("mode") == "family":
+                        keyboard = [
+                            [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0")]
+                        ]
+                        await update.message.reply_text(
+                            get_message("input_income_partner", lang),
+                            parse_mode="Markdown",
+                            reply_markup=InlineKeyboardMarkup(keyboard)
+                        )
+                        return States.INCOME_PARTNER
+                    else:
+                        context.user_data["income_partner"] = 0
+                        await update.message.reply_text(
+                            get_message("input_rent", lang),
+                            parse_mode="Markdown"
+                        )
+                        return States.RENT
+                else:
+                    await update.message.reply_text(
+                        "❌ Fayldan daromad topilmadi. Raqam kiriting.",
+                        parse_mode="Markdown"
+                    )
+                    return States.INCOME_SELF
+            except Exception as e:
+                await processing_msg.delete()
+                await update.message.reply_text(
+                    f"❌ Xatolik. Raqam kiriting.",
+                    parse_mode="Markdown"
+                )
+                return States.INCOME_SELF
+    
+    # Process text input
+    text = update.message.text
     amount = parse_number(text)
     
     if amount < 0:
@@ -889,16 +945,9 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return States.INCOME_PARTNER
     else:
         context.user_data["income_partner"] = 0
-        # Add quick button for own home
-        keyboard = [
-            [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
         await update.message.reply_text(
             get_message("input_rent", lang),
-            parse_mode="Markdown",
-            reply_markup=reply_markup
+            parse_mode="Markdown"
         )
         return States.RENT
 
@@ -1210,24 +1259,26 @@ async def katm_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle PDF file upload"""
+    """Handle PDF or HTML file upload for KATM"""
     lang = context.user_data.get("lang", "uz")
     telegram_id = update.effective_user.id
-    # PRO tekshiruv
-    if not await require_pro(update, context):
-        return ConversationHandler.END
-    # Check if document is PDF
+    
+    # Check if document exists
     document = update.message.document
     if not document:
         await update.message.reply_text(
             get_message("katm_not_pdf", lang)
         )
         return States.KATM_UPLOAD
-    if not document.file_name.lower().endswith('.pdf'):
+    
+    # Check file extension - accept PDF and HTML
+    file_ext = Path(document.file_name).suffix.lower()
+    if file_ext not in ['.pdf', '.html', '.htm']:
         await update.message.reply_text(
             get_message("katm_not_pdf", lang)
         )
         return States.KATM_UPLOAD
+    
     # Show processing message
     processing_msg = await update.message.reply_text(
         get_message("katm_processing", lang)
@@ -1237,15 +1288,16 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # Create upload directory
         PDF_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         
-        # Download PDF
+        # Download file
         file = await document.get_file()
-        pdf_filename = f"{telegram_id}_{document.file_name}"
-        pdf_path = PDF_UPLOAD_DIR / pdf_filename
+        file_name = f"{telegram_id}_{document.file_name}"
+        file_path = PDF_UPLOAD_DIR / file_name
         
-        await file.download_to_drive(str(pdf_path))
+        await file.download_to_drive(str(file_path))
         
-        # Parse PDF
-        result = parse_katm_pdf(str(pdf_path))
+        # Parse file (auto-detect format)
+        from app.pdf_parser import parse_katm_file
+        result = parse_katm_file(str(file_path))
         
         # Delete processing message
         await processing_msg.delete()
@@ -1255,7 +1307,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             context.user_data["loan_payment"] = result.total_monthly_payment
             context.user_data["total_debt"] = result.total_remaining_debt
             context.user_data["katm_loans"] = result.loans
-            context.user_data["katm_pdf"] = pdf_filename
+            context.user_data["katm_pdf"] = file_name
             
             # Save to database
             db = await get_database()
@@ -1265,7 +1317,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 await db.save_katm_loans(
                     user_id=user["id"],
                     loans=result.loans,
-                    pdf_filename=pdf_filename
+                    pdf_filename=file_name
                 )
             
             # Format loans list
@@ -2207,9 +2259,11 @@ def get_conversation_handler() -> ConversationHandler:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, transaction_extra_income_handler),
             ],
             States.INCOME_SELF: [
+                MessageHandler(filters.Document.ALL, income_self_handler),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, income_self_handler),
             ],
             States.INCOME_PARTNER: [
+                MessageHandler(filters.Document.ALL, income_partner_handler),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, income_partner_handler),
                 CallbackQueryHandler(quick_partner_income_callback, pattern="^quick_partner_0$"),
             ],
