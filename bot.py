@@ -130,7 +130,7 @@ def main() -> None:
     
     # Main menu button handlers
     application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(� Qarzlarim|💳 Мои долги)$"), menu_plan_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^(💳 Qarzlarim|💳 Мои долги)$"), menu_plan_handler),
         group=2
     )
     application.add_handler(
