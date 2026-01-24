@@ -757,6 +757,49 @@ MESSAGES = {
         )
     },
     
+    "result_debt_mode_free": {
+        "uz": (
+            "📊 *SIZNING MOLIYAVIY TAHLIL*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *QARZ TUGASH SANASI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Hozirgi to'lov bilan:\n"
+            "🗓 *{simple_exit_date}* gacha to'laysiz\n"
+            "⏱ Bu *{simple_exit_months} oy* davom etadi\n"
+            "💳 Oyiga *{monthly_payment}* so'm\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 *TEZROQ CHIQISH MUMKIN!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "❓ *Bilasizmi?*\n\n"
+            "Maxsus usul bilan siz:\n\n"
+            "✅ *{pro_exit_date}* da qarzsiz bo'lardingiz\n"
+            "✅ *{months_saved} oy* tez qutulardingiz\n"
+            "✅ *{savings_at_exit}* so'm jamg'argan bo'lardingiz\n\n"
+            "🤔 _Qanday qilib?_\n\n"
+            "🔐 *Maxfiy usulni PRO da ochish...*"
+        ),
+        "ru": (
+            "📊 *ВАШ ФИНАНСОВЫЙ АНАЛИЗ*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *ДАТА ПОГАШЕНИЯ ДОЛГА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "При текущих платежах:\n"
+            "🗓 Выплатите до *{simple_exit_date}*\n"
+            "⏱ Это займёт *{simple_exit_months} мес*\n"
+            "💳 По *{monthly_payment}* сум/мес\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 *МОЖНО БЫСТРЕЕ!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "❓ *Знаете ли вы?*\n\n"
+            "Со специальным методом вы бы:\n\n"
+            "✅ Стали свободны *{pro_exit_date}*\n"
+            "✅ Освободились на *{months_saved} мес* раньше\n"
+            "✅ Накопили *{savings_at_exit}* сум\n\n"
+            "🤔 _Как это возможно?_\n\n"
+            "🔐 *Откройте секретный метод в PRO...*"
+        )
+    },
+    
     "result_wealth_mode": {
         "uz": (
             "� *TABRIKLAYMIZ!*\n\n"

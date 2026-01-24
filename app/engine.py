@@ -119,33 +119,41 @@ class FinancialEngine:
         """
         Calculate debt freedom plan
         
-        Formula:
-        - Savings = FreeCash × 10%
-        - AcceleratedDebt = FreeCash × 20%
-        - Living = FreeCash × 70%
-        - TotalDebtPayment = MandatoryDebt + AcceleratedDebt
-        - ExitMonths = TotalRemainingDebt / TotalDebtPayment
+        FREE: Simple debt payoff (just monthly payments)
+        PRO: Accelerated payoff with 70-20-10 method + savings
         """
-        # Monthly allocations
-        monthly_savings = self.free_cash * DEBT_MODE_SAVINGS_RATE
-        accelerated_debt = self.free_cash * DEBT_MODE_ACCELERATED_RATE
-        monthly_living = self.free_cash * DEBT_MODE_LIVING_RATE
+        # === FREE VERSION: Simple debt payoff calculation ===
+        # Just paying monthly payment without acceleration
+        if self.mandatory_debt > 0:
+            simple_exit_months = int(self.input.total_debt / self.mandatory_debt) + 1
+        else:
+            simple_exit_months = 0
+        simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
         
-        # Total monthly debt payment
+        # === PRO VERSION: Accelerated 70-20-10 method ===
+        # Monthly allocations from free cash
+        monthly_savings = self.free_cash * DEBT_MODE_SAVINGS_RATE  # 10%
+        accelerated_debt = self.free_cash * DEBT_MODE_ACCELERATED_RATE  # 20%
+        monthly_living = self.free_cash * DEBT_MODE_LIVING_RATE  # 70%
+        
+        # Total monthly debt payment (mandatory + accelerated)
         total_debt_payment = self.mandatory_debt + accelerated_debt
         
-        # Calculate exit timeline
+        # Calculate PRO exit timeline (faster!)
         if total_debt_payment > 0:
-            exit_months = int(self.input.total_debt / total_debt_payment) + 1
+            pro_exit_months = int(self.input.total_debt / total_debt_payment) + 1
         else:
-            exit_months = 0
+            pro_exit_months = 0
         
-        # Calculate exit date
-        exit_date = datetime.now() + relativedelta(months=exit_months)
+        # Calculate PRO exit date
+        pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
         
         # Calculate savings projections
         savings_12_months = monthly_savings * 12
-        savings_at_exit = monthly_savings * exit_months
+        savings_at_exit = monthly_savings * pro_exit_months
+        
+        # Calculate months saved with PRO method
+        months_saved = simple_exit_months - pro_exit_months
         
         return {
             "mode": "debt",
@@ -158,9 +166,15 @@ class FinancialEngine:
             "accelerated_debt": accelerated_debt,
             "monthly_living": monthly_living,
             "monthly_invest": 0,
-            "exit_months": exit_months,
-            "exit_date": exit_date.strftime("%Y-%m"),
-            "exit_date_obj": exit_date,
+            # Simple (FREE) calculations
+            "simple_exit_months": simple_exit_months,
+            "simple_exit_date": simple_exit_date.strftime("%Y-%m"),
+            "simple_exit_date_obj": simple_exit_date,
+            # PRO calculations
+            "exit_months": pro_exit_months,
+            "exit_date": pro_exit_date.strftime("%Y-%m"),
+            "exit_date_obj": pro_exit_date,
+            "months_saved": months_saved,
             "savings_12_months": savings_12_months,
             "savings_at_exit": savings_at_exit,
         }
@@ -252,13 +266,20 @@ def format_result_message(result: Dict[str, Any], lang: str = "uz", is_pro: bool
         )
     
     elif mode == "debt":
-        exit_date_formatted = format_exit_date(result["exit_date"], lang)
+        # Simple exit date (normal payment schedule) - shown to everyone
+        simple_exit_formatted = format_exit_date(result.get("simple_exit_date", result["exit_date"]), lang)
+        simple_exit_months = result.get("simple_exit_months", result["exit_months"])
+        
+        # PRO exit date (accelerated) - only for PRO users
+        pro_exit_formatted = format_exit_date(result["exit_date"], lang)
+        pro_exit_months = result["exit_months"]
+        months_saved = result.get("months_saved", 0)
         
         if is_pro:
             # Full results for PRO users
             return get_message("result_debt_mode", lang).format(
-                exit_date=exit_date_formatted,
-                exit_months=result["exit_months"],
+                exit_date=pro_exit_formatted,
+                exit_months=pro_exit_months,
                 debt_payment=format_number(result["monthly_debt_payment"]),
                 savings=format_number(result["monthly_savings"]),
                 living=format_number(result["monthly_living"]),
@@ -266,12 +287,17 @@ def format_result_message(result: Dict[str, Any], lang: str = "uz", is_pro: bool
                 savings_exit=format_number(result["savings_at_exit"])
             )
         else:
-            # Partial results for FREE users - hide key numbers
-            return get_message("result_debt_mode_partial", lang).format(
-                debt_payment=format_number(result["monthly_debt_payment"]),
-                savings=format_number(result["monthly_savings"]),
-                living=format_number(result["monthly_living"])
-            ) + get_message("partial_results_notice", lang)
+            # FREE users - show simple exit date + PRO teaser
+            return get_message("result_debt_mode_free", lang).format(
+                simple_exit_date=simple_exit_formatted,
+                simple_exit_months=simple_exit_months,
+                monthly_payment=format_number(result["mandatory_debt"]),
+                total_debt=format_number(result.get("mandatory_debt", 0) * simple_exit_months),
+                pro_exit_date=pro_exit_formatted,
+                pro_exit_months=pro_exit_months,
+                months_saved=months_saved,
+                savings_at_exit=format_number(result["savings_at_exit"])
+            )
     
     elif mode == "wealth":
         if is_pro:
