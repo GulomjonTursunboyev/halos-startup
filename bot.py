@@ -28,6 +28,12 @@ from app.handlers import (
     edit_profile_field_callback,
     handle_profile_edit_input,
     profile_mode_callback,
+    get_main_menu_keyboard,
+    menu_plan_handler,
+    menu_profile_handler,
+    menu_subscription_handler,
+    menu_language_handler,
+    menu_help_handler,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -112,6 +118,28 @@ def main() -> None:
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_profile_edit_input),
         group=1
+    )
+    
+    # Main menu button handlers
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Qarz rejam|📊 Мой план)$"), menu_plan_handler),
+        group=2
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"), menu_profile_handler),
+        group=2
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💎 Obuna|💎 Подписка)$"), menu_subscription_handler),
+        group=2
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(🌐 Til|🌐 Язык)$"), menu_language_handler),
+        group=2
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
+        group=2
     )
     
     # Add subscription/payment handlers
