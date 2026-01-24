@@ -202,6 +202,98 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
         )
 
 
+async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT_TYPE, is_required: bool = False) -> None:
+    """Show pricing options as a NEW message (not editing existing)
+    
+    Use this when you can't edit the previous message (e.g., after deleting it)
+    """
+    lang = context.user_data.get("lang", "uz")
+    
+    if lang == "uz":
+        if is_required:
+            header = (
+                "🔐 *SOLVO dan foydalanish uchun obuna talab qilinadi*\n\n"
+                "SOLVO — sizning moliyaviy erkinligingiz yo'lidagi yordamchi.\n"
+                "Davom etish uchun obunani faollashtiring.\n\n"
+            )
+        else:
+            header = "💎 *SOLVO PRO - Premium Tarif*\n\n"
+        
+        msg = (
+            f"{header}"
+            "✅ *Cheksiz moliyaviy hisob-kitoblar*\n"
+            "✅ *Qachon qarzsiz bo'lishingizni ko'rsatadi*\n"
+            "✅ *Qancha jamg'arishingizni hisoblaydi*\n"
+            "✅ *KATM kredit tarixini tahlil*\n"
+            "✅ *Karta tarixi import qilish*\n"
+            "✅ *AI maslahatlar*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *Narxlar:*\n\n"
+            "⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
+            "⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
+            "🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💳 *To'lov: Click orqali*"
+        )
+    else:
+        if is_required:
+            header = (
+                "🔐 *Для использования SOLVO требуется подписка*\n\n"
+                "SOLVO — ваш помощник на пути к финансовой свободе.\n"
+                "Активируйте подписку, чтобы продолжить.\n\n"
+            )
+        else:
+            header = "💎 *SOLVO PRO - Премиум Тариф*\n\n"
+        
+        msg = (
+            f"{header}"
+            "✅ *Безлимитные финансовые расчёты*\n"
+            "✅ *Показывает, когда станете без долгов*\n"
+            "✅ *Рассчитывает ваши накопления*\n"
+            "✅ *Анализ кредитной истории КАТМ*\n"
+            "✅ *Импорт истории карты*\n"
+            "✅ *AI рекомендации*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *Цены:*\n\n"
+            "⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
+            "⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
+            "🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💳 *Оплата: через Click*"
+        )
+    
+    # Click Payment buttons
+    keyboard = [
+        [InlineKeyboardButton(
+            "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+            callback_data="click_buy_pro_weekly"
+        )],
+        [InlineKeyboardButton(
+            "⭐ 1 oy - 15,000 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 15,000 сум (реком.)",
+            callback_data="click_buy_pro_monthly"
+        )],
+        [InlineKeyboardButton(
+            "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+            callback_data="click_buy_pro_yearly"
+        )],
+        [InlineKeyboardButton(
+            "🎁 Promo-kod" if lang == "uz" else "🎁 Промо-код",
+            callback_data="enter_promo"
+        )],
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Always send as new message
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=msg,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
 async def pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /pro command - show pricing"""
     await show_pricing(update, context)

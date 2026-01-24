@@ -26,7 +26,7 @@ from app.config import States, PDF_UPLOAD_DIR, TRANSACTION_UPLOAD_DIR, TRANSACTI
 from app.database import get_database
 import asyncio
 from app.languages import get_message, format_number
-from app.subscription_handlers import require_pro, is_user_pro, show_pricing, show_subscription_expiring_warning
+from app.subscription_handlers import require_pro, is_user_pro, show_pricing, show_pricing_new_message, show_subscription_expiring_warning
 from app.engine import calculate_finances, format_result_message
 from app.pdf_parser import parse_katm_pdf
 from app.transaction_parser import parse_transactions, calculate_monthly_averages
@@ -59,18 +59,52 @@ def parse_number(text: str) -> float:
 # ==================== START COMMAND ====================
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle /start command - request phone number"""
+    """Handle /start command - check if registered, if not request phone number"""
     user = update.effective_user
     telegram_id = user.id
     
-    # Check if user already registered
+    # Check if user already registered in database
     db = await get_database()
     existing_user = await db.get_user(telegram_id)
     
-    if existing_user:
+    if existing_user and existing_user.get("phone_number"):
+        # User already registered - skip contact sharing
         lang = existing_user.get("language", "uz")
-    else:
-        lang = "uz"  # Default for new users
+        context.user_data["telegram_id"] = telegram_id
+        context.user_data["first_name"] = existing_user.get("first_name") or user.first_name
+        context.user_data["last_name"] = existing_user.get("last_name") or user.last_name
+        context.user_data["username"] = existing_user.get("username") or user.username
+        context.user_data["phone_number"] = existing_user.get("phone_number")
+        context.user_data["lang"] = lang
+        
+        # Check subscription
+        if not await is_user_pro(telegram_id):
+            # User has no subscription - show pricing
+            await show_pricing(update, context, is_required=True)
+            return ConversationHandler.END
+        
+        # User has subscription - check if expiring soon
+        await show_subscription_expiring_warning(update, context)
+        
+        # Go directly to mode selection
+        keyboard = [
+            [
+                InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
+                InlineKeyboardButton(get_message("mode_family", lang), callback_data="mode_family")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("select_mode", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        
+        return States.MODE
+    
+    # New user - request phone number for registration
+    lang = "uz"  # Default for new users
     
     # Store user info in context
     context.user_data["telegram_id"] = telegram_id
@@ -104,9 +138,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 # ==================== CONTACT HANDLER ====================
 
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle shared contact"""
+    """Handle shared contact - save to database immediately"""
     contact = update.message.contact
     telegram_id = update.effective_user.id
+    user = update.effective_user
     lang = context.user_data.get("lang", "uz")
     
     # Verify it's the user's own contact
@@ -117,8 +152,33 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return States.LANGUAGE
     
-    # Store phone number
+    # Store phone number in context
     context.user_data["phone_number"] = contact.phone_number
+    
+    # IMMEDIATELY save user to database
+    db = await get_database()
+    existing_user = await db.get_user(telegram_id)
+    
+    if not existing_user:
+        # Create new user in database with phone, name, and telegram_id
+        await db.create_user(
+            telegram_id=telegram_id,
+            phone_number=contact.phone_number,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+            language=lang
+        )
+        logger.info(f"New user registered: {telegram_id} - {contact.phone_number} - {user.first_name}")
+    else:
+        # Update existing user's phone if needed
+        await db.update_user(
+            telegram_id,
+            phone_number=contact.phone_number,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username
+        )
     
     # Send confirmation
     msg = await update.message.reply_text(
@@ -162,36 +222,19 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     telegram_id = update.effective_user.id
     db = await get_database()
     
-    # Create or update user
-    existing_user = await db.get_user(telegram_id)
+    # User is already created in contact_handler, just update language
+    await db.update_user(telegram_id, language=lang)
     
-    if existing_user:
-        await db.update_user(telegram_id, language=lang)
-    else:
-        # Create new user
-        await db.create_user(
-            telegram_id=telegram_id,
-            phone_number=context.user_data.get("phone_number", ""),
-            first_name=context.user_data.get("first_name"),
-            last_name=context.user_data.get("last_name"),
-            username=context.user_data.get("username"),
-            language=lang
-        )
-    
-    # Confirm language
-    lang_msg = await query.edit_message_text(
-        get_message("language_set", lang)
-    )
+    # Delete the language selection message
     try:
-        await asyncio.sleep(1.5)
-        await lang_msg.delete()
+        await query.message.delete()
     except:
         pass
     
     # CHECK SUBSCRIPTION - bot requires active subscription to use
     if not await is_user_pro(telegram_id):
-        # User has no subscription - show pricing and stop here
-        await show_pricing(update, context, is_required=True)
+        # User has no subscription - show pricing with new message
+        await show_pricing_new_message(update, context, is_required=True)
         return ConversationHandler.END
     
     # User has active subscription - check if expiring soon
