@@ -12,21 +12,27 @@ MESSAGES = {
     "welcome": {
         "uz": (
             "🌟 *SOLVO* ga xush kelibsiz!\n\n"
-            "Men sizning moliyaviy yo'lboshchingizman.\n\n"
-            "🎯 *SOLVO nima qiladi:*\n"
-            "• Qachon qarzsiz bo'lishingizni ko'rsatadi\n"
-            "• Qancha jamg'arishingizni hisoblaydi\n"
-            "• Erkinlik va boylik yo'lini yaratadi\n\n"
-            "Davom etish uchun telefon raqamingizni ulashing 👇"
+            "Men sizning shaxsiy *moliyaviy maslahatchingizman*.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *SOLVO sizga yordam beradi:*\n\n"
+            "💰 Qarzlardan *qachon* xalos bo'lishni ko'rsatadi\n"
+            "📈 Oylik *qancha* jamg'ara olishingizni hisoblaydi\n"
+            "🎯 Moliyaviy *erkinlik* rejasini tuzadi\n"
+            "🤖 AI asosida *shaxsiy maslahatlar* beradi\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *Ro'yxatdan o'tish uchun* telefon raqamingizni ulashing 👇"
         ),
         "ru": (
             "🌟 Добро пожаловать в *SOLVO*!\n\n"
-            "Я ваш финансовый наставник.\n\n"
-            "🎯 *Что делает SOLVO:*\n"
-            "• Показывает, когда вы станете свободны от долгов\n"
-            "• Рассчитывает ваши накопления\n"
-            "• Строит путь к свободе и богатству\n\n"
-            "Чтобы продолжить, поделитесь номером телефона 👇"
+            "Я ваш персональный *финансовый консультант*.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *SOLVO поможет вам:*\n\n"
+            "💰 Показать *когда* вы избавитесь от долгов\n"
+            "📈 Рассчитать *сколько* сможете откладывать\n"
+            "🎯 Построить план *финансовой свободы*\n"
+            "🤖 Дать *персональные советы* на основе AI\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *Для регистрации* поделитесь номером телефона 👇"
         )
     },
     
@@ -1160,24 +1166,28 @@ MESSAGES = {
     
     "offer_after_first_calc": {
         "uz": (
-            "🎯 *Birinchi hisob-kitobingiz tayyor!*\n\n"
-            "Siz allaqachon birinchi qadamni qo'ydingiz! 👏\n\n"
-            "Endi *PRO* bilan:\n"
-            "• 📈 Batafsil qarz to'lash rejasi oling\n"
-            "• 💰 12 oylik jamg'arma prognozini ko'ring\n"
-            "• 🎯 Aniq qarzdan chiqish sanasini bilib oling\n\n"
-            "⏰ *Faqat 24 soat:* *30% chegirma!*\n"
-            "Kod: `FIRST30`"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎯 *Ajoyib! Birinchi qadamni qo'ydingiz!* 👏\n\n"
+            "Natijangiz tayyor. Endi keyingi bosqichga o'ting:\n\n"
+            "🔓 *PRO bilan qo'shimcha imkoniyatlar:*\n"
+            "├ 📅 Qarzdan *aniq qachon* chiqishingiz\n"
+            "├ 💰 12 oylik *jamg'arma rejasi*\n"
+            "├ 📊 Batafsil *moliyaviy tahlil*\n"
+            "└ 🤖 *AI maslahatlar* sizga moslashtirilgan\n\n"
+            "💡 _Har kuni ishlatib, moliyaviy erkinlikka erishing!_\n"
+            "━━━━━━━━━━━━━━━━━━━━"
         ),
         "ru": (
-            "🎯 *Ваш первый расчёт готов!*\n\n"
-            "Вы уже сделали первый шаг! 👏\n\n"
-            "Теперь с *PRO*:\n"
-            "• 📈 Получите детальный план погашения долга\n"
-            "• 💰 Увидьте прогноз накоплений на 12 месяцев\n"
-            "• 🎯 Узнайте точную дату выхода из долгов\n\n"
-            "⏰ *Только 24 часа:* *скидка 30%!*\n"
-            "Код: `FIRST30`"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎯 *Отлично! Вы сделали первый шаг!* 👏\n\n"
+            "Ваш результат готов. Переходите к следующему этапу:\n\n"
+            "🔓 *Дополнительные возможности с PRO:*\n"
+            "├ 📅 *Точная дата* выхода из долгов\n"
+            "├ 💰 *План накоплений* на 12 месяцев\n"
+            "├ 📊 Детальный *финансовый анализ*\n"
+            "└ 🤖 *AI советы*, адаптированные для вас\n\n"
+            "💡 _Используйте ежедневно для достижения финансовой свободы!_\n"
+            "━━━━━━━━━━━━━━━━━━━━"
         )
     },
     

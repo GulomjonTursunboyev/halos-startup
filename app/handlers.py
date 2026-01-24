@@ -77,16 +77,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data["phone_number"] = existing_user.get("phone_number")
         context.user_data["lang"] = lang
         
-        # Check subscription
-        if not await is_user_pro(telegram_id):
-            # User has no subscription - show pricing
-            await show_pricing(update, context, is_required=True)
-            return ConversationHandler.END
-        
-        # User has subscription - check if expiring soon
-        await show_subscription_expiring_warning(update, context)
-        
-        # Go directly to mode selection
+        # Go directly to mode selection - no subscription check here
         keyboard = [
             [
                 InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
@@ -231,15 +222,7 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except:
         pass
     
-    # CHECK SUBSCRIPTION - bot requires active subscription to use
-    if not await is_user_pro(telegram_id):
-        # User has no subscription - show pricing with new message
-        await show_pricing_new_message(update, context, is_required=True)
-        return ConversationHandler.END
-    
-    # User has active subscription - check if expiring soon
-    await show_subscription_expiring_warning(update, context)
-    
+    # Go directly to mode selection - subscription check will be after results
     # Ask for mode
     keyboard = [
         [
@@ -249,8 +232,10 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("select_mode", lang),
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("select_mode", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -1616,10 +1601,12 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     else:
-        # Show PRO upgrade and trial buttons for free users
+        # Show PRO upgrade button for free users
         keyboard = [
-            [InlineKeyboardButton(get_message("btn_try_free", lang), callback_data="start_trial")],
-            [InlineKeyboardButton(get_message("btn_upgrade_pro", lang), callback_data="show_pricing")],
+            [InlineKeyboardButton(
+                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                callback_data="show_pricing"
+            )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1630,11 +1617,28 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         reply_markup=reply_markup
     )
     
-    # Show first calculation offer for free users
+    # Show subscription offer for free users
     if not is_pro:
+        offer_keyboard = [
+            [InlineKeyboardButton(
+                "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                "⭐ 1 oy - 15,000 so'm" if lang == "uz" else "⭐ 1 мес - 15,000 сум",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+                callback_data="click_buy_pro_yearly"
+            )],
+        ]
+        offer_markup = InlineKeyboardMarkup(offer_keyboard)
+        
         await update.message.reply_text(
             get_message("offer_after_first_calc", lang),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=offer_markup
         )
     
     return ConversationHandler.END
@@ -1708,8 +1712,10 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
         ]
     else:
         keyboard = [
-            [InlineKeyboardButton(get_message("btn_try_free", lang), callback_data="start_trial")],
-            [InlineKeyboardButton(get_message("btn_upgrade_pro", lang), callback_data="show_pricing")],
+            [InlineKeyboardButton(
+                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                callback_data="show_pricing"
+            )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1719,6 +1725,30 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
+    
+    # Show subscription offer for free users
+    if not is_pro:
+        offer_keyboard = [
+            [InlineKeyboardButton(
+                "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                "⭐ 1 oy - 15,000 so'm" if lang == "uz" else "⭐ 1 мес - 15,000 сум",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+                callback_data="click_buy_pro_yearly"
+            )],
+        ]
+        offer_markup = InlineKeyboardMarkup(offer_keyboard)
+        
+        await query.message.reply_text(
+            get_message("offer_after_first_calc", lang),
+            parse_mode="Markdown",
+            reply_markup=offer_markup
+        )
     
     return ConversationHandler.END
 
