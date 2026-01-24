@@ -60,13 +60,13 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Get persistent main menu keyboard"""
     if lang == "ru":
         keyboard = [
-            ["📊 Мой план", "👤 Профиль"],
+            ["� Мои долги", "👤 Профиль"],
             ["💎 Подписка", "🌐 Язык"],
             ["❓ Помощь"]
         ]
     else:
         keyboard = [
-            ["📊 Qarz rejam", "👤 Profil"],
+            ["💳 Qarzlarim", "👤 Profil"],
             ["💎 Obuna", "🌐 Til"],
             ["❓ Yordam"]
         ]
@@ -75,7 +75,7 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
 
 # Main menu button texts for matching
 MENU_BUTTONS = {
-    "plan": ["📊 Qarz rejam", "📊 Мой план"],
+    "plan": ["💳 Qarzlarim", "💳 Мои долги"],
     "profile": ["👤 Profil", "👤 Профиль"],
     "subscription": ["💎 Obuna", "💎 Подписка"],
     "language": ["🌐 Til", "🌐 Язык"],
@@ -2534,7 +2534,7 @@ def add_trial_handler_to_app(application):
 # ==================== MAIN MENU HANDLERS ====================
 
 async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 📊 Qarz rejam button"""
+    """Handle � Qarzlarim button - show comprehensive debt information"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -2547,7 +2547,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     if not user:
         await update.message.reply_text(
-            get_message("profile_no_data", lang),
+            get_message("debt_no_data", lang),
             parse_mode="Markdown",
             reply_markup=get_main_menu_keyboard(lang)
         )
@@ -2555,22 +2555,26 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     profile = await db.get_financial_profile(user["id"])
     
-    if not profile or profile.get("income_self", 0) == 0:
+    if not profile or profile.get("total_debt", 0) == 0:
+        # No debt - show congratulations
         await update.message.reply_text(
-            get_message("profile_no_data", lang),
+            get_message("debt_free_message", lang),
             parse_mode="Markdown",
             reply_markup=get_main_menu_keyboard(lang)
         )
         return
     
-    # Calculate and show results
+    # Calculate and show debt results
     calc_msg = await update.message.reply_text(
         get_message("calculating_saved", lang)
     )
     
     mode = user.get("mode", "solo")
     
-    from app.engine import FinancialInput
+    from app.engine import FinancialInput, format_exit_date
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    
     financial_input = FinancialInput(
         mode=mode,
         income_self=profile.get("income_self", 0),
@@ -2584,26 +2588,72 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     result = calculate_finances(financial_input)
     is_pro = await get_user_subscription_status(telegram_id)
-    result_message = format_result_message(result, lang, is_pro=is_pro)
     
     await calc_msg.delete()
     
-    # Add inline buttons
+    # Build comprehensive debt message
+    total_debt = profile.get("total_debt", 0)
+    loan_payment = profile.get("loan_payment", 0)
+    
+    # Calculate exit dates
+    simple_exit_months = int(total_debt / loan_payment) + 1 if loan_payment > 0 else 0
+    simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
+    simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
+    
+    # Get PRO calculation data
+    exit_months = result.get("exit_months", simple_exit_months)
+    exit_date = result.get("exit_date", simple_exit_date.strftime("%Y-%m"))
+    exit_date_formatted = format_exit_date(exit_date, lang)
+    savings_at_exit = result.get("savings_at_exit", 0)
+    
+    # Format debt message
+    debt_message = get_message("my_debts_header", lang) + "\n\n"
+    
+    debt_message += get_message("my_debts_info", lang).format(
+        total_debt=format_number(total_debt) + " so'm",
+        monthly_payment=format_number(loan_payment) + " so'm"
+    )
+    
     if is_pro:
+        # Show full PRO info
+        debt_message += "\n\n" + get_message("my_debts_pro_plan", lang).format(
+            exit_date=exit_date_formatted,
+            exit_months=exit_months,
+            savings_at_exit=format_number(savings_at_exit) + " so'm",
+            monthly_savings=format_number(result.get("monthly_savings", 0)) + " so'm",
+            accelerated_payment=format_number(result.get("accelerated_debt", 0)) + " so'm"
+        )
+        
         keyboard = [
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
             [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
         ]
     else:
+        # Show basic + teaser
+        debt_message += "\n\n" + get_message("my_debts_simple", lang).format(
+            simple_exit_date=simple_exit_formatted,
+            simple_exit_months=simple_exit_months
+        )
+        
+        # Add PRO teaser if they could exit faster
+        if exit_months < simple_exit_months:
+            months_saved = simple_exit_months - exit_months
+            debt_message += "\n\n" + get_message("my_debts_pro_teaser", lang).format(
+                pro_exit_date=exit_date_formatted,
+                months_saved=months_saved,
+                savings_at_exit=format_number(savings_at_exit) + " so'm"
+            )
+        
         keyboard = [
             [InlineKeyboardButton(
-                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                "🚀 Tezroq qutulish" if lang == "uz" else "🚀 Выйти быстрее",
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     
     await update.message.reply_text(
-        result_message,
+        debt_message,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )

@@ -1382,6 +1382,106 @@ MESSAGES = {
         )
     },
     
+    # ==================== MY DEBTS (QARZLARIM) ====================
+    "my_debts_header": {
+        "uz": "💳 *MENING QARZLARIM*",
+        "ru": "💳 *МОИ ДОЛГИ*"
+    },
+    
+    "my_debts_info": {
+        "uz": (
+            "📊 *Qarz holati:*\n\n"
+            "💰 Umumiy qarz: *{total_debt}*\n"
+            "📅 Oylik to'lov: *{monthly_payment}*"
+        ),
+        "ru": (
+            "📊 *Статус долга:*\n\n"
+            "💰 Общий долг: *{total_debt}*\n"
+            "📅 Ежемес. платёж: *{monthly_payment}*"
+        )
+    },
+    
+    "my_debts_simple": {
+        "uz": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *ODDIY USULDA:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🗓 Qarzdan chiqish: *{simple_exit_date}*\n"
+            "⏱ Qoldi: *{simple_exit_months} oy*"
+        ),
+        "ru": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *ОБЫЧНЫМ СПОСОБОМ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🗓 Выход из долга: *{simple_exit_date}*\n"
+            "⏱ Осталось: *{simple_exit_months} мес*"
+        )
+    },
+    
+    "my_debts_pro_plan": {
+        "uz": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 *TEZLASHTIRILGAN REJA (70-20-10):*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🗓 Qarzdan chiqish: *{exit_date}*\n"
+            "⏱ Qoldi: *{exit_months} oy*\n\n"
+            "💰 Chiqishdagi jamg'arma: *{savings_at_exit}*\n"
+            "📈 Oylik jamg'arma: *{monthly_savings}*\n"
+            "⚡ Qo'shimcha to'lov: *{accelerated_payment}*"
+        ),
+        "ru": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 *УСКОРЕННЫЙ ПЛАН (70-20-10):*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🗓 Выход из долга: *{exit_date}*\n"
+            "⏱ Осталось: *{exit_months} мес*\n\n"
+            "💰 Накопления к выходу: *{savings_at_exit}*\n"
+            "📈 Ежемес. накопления: *{monthly_savings}*\n"
+            "⚡ Доп. платёж: *{accelerated_payment}*"
+        )
+    },
+    
+    "my_debts_pro_teaser": {
+        "uz": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔒 *PRO BILAN TEZROQ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *{pro_exit_date}* da qarzsiz\n"
+            "✅ *{months_saved} oy* tez\n"
+            "✅ *{savings_at_exit}* jamg'arma\n\n"
+            "🔐 _70-20-10 usulini PRO da oching..._"
+        ),
+        "ru": (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔒 *С PRO БЫСТРЕЕ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ Свободны *{pro_exit_date}*\n"
+            "✅ На *{months_saved} мес* быстрее\n"
+            "✅ Накопите *{savings_at_exit}*\n\n"
+            "🔐 _Откройте метод 70-20-10 в PRO..._"
+        )
+    },
+    
+    "debt_no_data": {
+        "uz": "💳 Qarz ma'lumotlari topilmadi.\n\n/start buyrug'ini bosing va ma'lumotlaringizni kiriting.",
+        "ru": "💳 Данные о долгах не найдены.\n\nНажмите /start и введите свои данные."
+    },
+    
+    "debt_free_message": {
+        "uz": (
+            "🎉 *TABRIKLAYMIZ!*\n\n"
+            "Sizda qarz yo'q!\n\n"
+            "Endi boylik rejimiga o'tish vaqti.\n"
+            "Jamg'arish va investitsiya qilishni boshlang! 🚀"
+        ),
+        "ru": (
+            "🎉 *ПОЗДРАВЛЯЕМ!*\n\n"
+            "У вас нет долгов!\n\n"
+            "Пора переходить в режим богатства.\n"
+            "Начните копить и инвестировать! 🚀"
+        )
+    },
+    
     # ==================== PROFILE ====================
     "profile_header": {
         "uz": "👤 *MENING PROFILIM*",
@@ -1390,34 +1490,40 @@ MESSAGES = {
     
     "profile_info": {
         "uz": (
-            "📊 *Moliyaviy ma'lumotlarim:*\n\n"
-            "💰 *Daromad (men):* {income_self}\n"
-            "💰 *Daromad (sherik):* {income_partner}\n"
+            "👤 *Shaxsiy ma'lumotlar:*\n\n"
+            "📅 *Rejim:* {mode}\n"
+            "🌐 *Til:* {language}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *Moliyaviy ma'lumotlar:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💵 *Daromad (men):* {income_self}\n"
+            "💵 *Daromad (sherik):* {income_partner}\n\n"
             "🏠 *Ijara:* {rent}\n"
             "📋 *Majburiy to'lovlar:* {kindergarten}\n"
-            "💡 *Kommunal:* {utilities}\n"
+            "💡 *Kommunal:* {utilities}\n\n"
             "💳 *Oylik to'lov:* {loan_payment}\n"
-            "📉 *Umumiy qarz:* {total_debt}\n\n"
-            "📅 *Rejim:* {mode}\n"
-            "🌐 *Til:* {language}"
+            "📉 *Umumiy qarz:* {total_debt}"
         ),
         "ru": (
-            "📊 *Мои финансовые данные:*\n\n"
-            "💰 *Доход (я):* {income_self}\n"
-            "💰 *Доход (партнёр):* {income_partner}\n"
+            "👤 *Личные данные:*\n\n"
+            "📅 *Режим:* {mode}\n"
+            "🌐 *Язык:* {language}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *Финансовые данные:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💵 *Доход (я):* {income_self}\n"
+            "💵 *Доход (партнёр):* {income_partner}\n\n"
             "🏠 *Аренда:* {rent}\n"
             "📋 *Обязательные:* {kindergarten}\n"
-            "💡 *Коммунальные:* {utilities}\n"
+            "💡 *Коммунальные:* {utilities}\n\n"
             "💳 *Ежемесячный платёж:* {loan_payment}\n"
-            "📉 *Общий долг:* {total_debt}\n\n"
-            "📅 *Режим:* {mode}\n"
-            "🌐 *Язык:* {language}"
+            "📉 *Общий долг:* {total_debt}"
         )
     },
     
     "profile_no_data": {
-        "uz": "📊 Hali moliyaviy ma'lumotlar kiritilmagan.\n\n/start buyrug'ini bosing va ma'lumotlaringizni kiriting.",
-        "ru": "📊 Финансовые данные ещё не введены.\n\nНажмите /start и введите свои данные."
+        "uz": "👤 Ma'lumotlar topilmadi.\n\n/start buyrug'ini bosing va ma'lumotlaringizni kiriting.",
+        "ru": "👤 Данные не найдены.\n\nНажмите /start и введите свои данные."
     },
     
     "profile_edit_menu": {
