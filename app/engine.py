@@ -289,7 +289,7 @@ def format_result_message(result: Dict[str, Any], lang: str = "uz", is_pro: bool
             )
         else:
             # FREE users - show simple exit date + PRO teaser
-            return get_message("result_debt_mode_free", lang).format(
+            free_result = get_message("result_debt_mode_free", lang).format(
                 simple_exit_date=simple_exit_formatted,
                 simple_exit_months=simple_exit_months,
                 monthly_payment=format_number(result["mandatory_debt"]),
@@ -299,6 +299,9 @@ def format_result_message(result: Dict[str, Any], lang: str = "uz", is_pro: bool
                 months_saved=months_saved,
                 savings_at_exit=format_number(result["savings_at_exit"])
             )
+            # Add upgrade CTA
+            free_result += get_message("upgrade_cta_after_free", lang)
+            return free_result
     
     elif mode == "wealth":
         if is_pro:
