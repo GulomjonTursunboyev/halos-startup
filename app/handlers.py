@@ -1812,7 +1812,7 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
 # ==================== RECALCULATE ====================
 
 async def recalculate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle recalculate button - offer choice to use saved data or enter new"""
+    """Handle recalculate button - directly show result if saved data exists"""
     query = update.callback_query
     await query.answer()
     
@@ -1826,19 +1826,8 @@ async def recalculate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if user:
         profile = await db.get_financial_profile(user["id"])
         if profile and profile.get("income_self", 0) > 0:
-            # User has saved data - offer choice
-            keyboard = [
-                [InlineKeyboardButton(get_message("btn_use_saved_data", lang), callback_data="recalc_saved")],
-                [InlineKeyboardButton(get_message("btn_new_calculation", lang), callback_data="recalc_new")],
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.message.reply_text(
-                get_message("recalculate_choice", lang),
-                parse_mode="Markdown",
-                reply_markup=reply_markup
-            )
-            return States.MODE
+            # User has saved data - calculate directly
+            return await recalc_saved_callback(update, context)
     
     # No saved data - go to new calculation
     return await recalc_new_callback(update, context)
@@ -1847,7 +1836,11 @@ async def recalculate_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Recalculate using saved profile data"""
     query = update.callback_query
-    await query.answer()
+    if query and not query.data.startswith("recalc"):
+        # Already answered in recalculate_callback
+        pass
+    elif query:
+        await query.answer()
     
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
