@@ -2,6 +2,7 @@
 SOLVO Financial Engine
 Core calculation logic for debt freedom and wealth building
 """
+import math
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, Optional
@@ -124,11 +125,13 @@ class FinancialEngine:
         PRO: Accelerated payoff with 70-20-10 method + savings
         """
         # === FREE VERSION: Simple debt payoff calculation ===
-        # Just paying monthly payment without acceleration
+        # Total debt / Monthly payment = Exit months
+        # Using ceil to round up (e.g., 20.4 months -> 21 months)
         if self.mandatory_debt > 0:
-            simple_exit_months = int(self.input.total_debt / self.mandatory_debt) + 1
+            simple_exit_months = math.ceil(self.input.total_debt / self.mandatory_debt)
         else:
             simple_exit_months = 0
+        # Current date + exit months = Exit date
         simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
         
         # === PRO VERSION: Accelerated 70-20-10 method ===
@@ -142,7 +145,7 @@ class FinancialEngine:
         
         # Calculate PRO exit timeline (faster!)
         if total_debt_payment > 0:
-            pro_exit_months = int(self.input.total_debt / total_debt_payment) + 1
+            pro_exit_months = math.ceil(self.input.total_debt / total_debt_payment)
         else:
             pro_exit_months = 0
         
