@@ -13,8 +13,8 @@ CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "13464")
 CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "31ACF1A3C571667379481B13BEDCCA774AEBA199")
 CLICK_API_URL = "https://my.click.uz/services/pay"
 
-# Webhook URL (Render serverda ishlaganda)
-WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "https://solvo-click.onrender.com")
+# Webhook URL (Render serverda ishlaganda - avtomatik o'rnatiladi)
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://solvo-bot.onrender.com")
 
 def generate_click_payment_url(amount: int, order_id: str, return_url: str, description: str = "SOLVO PRO") -> str:
     """

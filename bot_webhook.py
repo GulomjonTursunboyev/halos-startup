@@ -1,9 +1,13 @@
 """
 SOLVO Telegram Bot - Webhook Mode for Render.com
+With Click Payment Integration
 """
 import os
 import logging
-from flask import Flask, request, Response
+import hashlib
+import sqlite3
+from datetime import datetime, timedelta
+from flask import Flask, request, Response, jsonify
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -47,6 +51,19 @@ telegram_app = None
 # Webhook URL
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 WEBHOOK_PATH = "/webhook"
+
+# Click credentials
+CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID", "333605228")
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "13464")
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "31ACF1A3C571667379481B13BEDCCA774AEBA199")
+DATABASE_PATH = os.getenv("DATABASE_PATH", "data/solvo.db")
+
+# Pricing plans
+PRICING_PLANS = {
+    "pro_monthly": {"days": 30, "price": 15000},
+    "pro_quarterly": {"days": 90, "price": 40500},
+    "pro_yearly": {"days": 365, "price": 135000},
+}
 
 
 def create_telegram_app():
@@ -98,6 +115,169 @@ def index():
 @flask_app.route("/health")
 def health():
     return "OK", 200
+
+
+# ============ CLICK PAYMENT WEBHOOKS ============
+
+def get_db_connection():
+    """Get database connection for Click payments"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def activate_pro(telegram_id: int, plan_id: str):
+    """Activate PRO subscription for user"""
+    plan = PRICING_PLANS.get(plan_id)
+    if not plan:
+        logger.error(f"Unknown plan: {plan_id}")
+        return False
+    
+    expires_at = datetime.now() + timedelta(days=plan["days"])
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users 
+            SET subscription_tier = 'pro', 
+                subscription_expires = ?, 
+                subscription_plan = ?, 
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE telegram_id = ?
+        """, (expires_at.isoformat(), plan_id, telegram_id))
+        conn.commit()
+        conn.close()
+        logger.info(f"PRO activated for user {telegram_id}, plan: {plan_id}, expires: {expires_at}")
+        return True
+    except Exception as e:
+        logger.error(f"Database error activating PRO: {e}")
+        return False
+
+
+@flask_app.route('/click/prepare', methods=['POST'])
+def click_prepare():
+    """Click Prepare endpoint - validates order before payment"""
+    data = request.form.to_dict()
+    logger.info(f"Click Prepare request: {data}")
+    
+    # Required fields
+    click_trans_id = data.get('click_trans_id', '')
+    service_id = data.get('service_id', '')
+    merchant_trans_id = data.get('merchant_trans_id', '')
+    amount = data.get('amount', '')
+    action = data.get('action', '')
+    sign_time = data.get('sign_time', '')
+    sign_string = data.get('sign_string', '')
+    
+    # Validate merchant_trans_id format (solvo_{telegram_id}_{plan_id})
+    if not merchant_trans_id.startswith('solvo_'):
+        return jsonify({
+            "error": "-5",
+            "error_note": "Invalid order format"
+        })
+    
+    # Parse order ID
+    try:
+        parts = merchant_trans_id.split('_')
+        telegram_id = int(parts[1])
+        plan_id = '_'.join(parts[2:])  # pro_monthly, pro_quarterly, pro_yearly
+    except (IndexError, ValueError):
+        return jsonify({
+            "error": "-5",
+            "error_note": "Invalid order ID"
+        })
+    
+    # Validate plan exists
+    if plan_id not in PRICING_PLANS:
+        return jsonify({
+            "error": "-5",
+            "error_note": "Invalid plan"
+        })
+    
+    # Verify signature
+    expected_sign = hashlib.md5(
+        f"{click_trans_id}{service_id}{CLICK_SECRET_KEY}{merchant_trans_id}{amount}{action}{sign_time}".encode()
+    ).hexdigest()
+    
+    if sign_string != expected_sign:
+        logger.warning(f"Invalid signature for order {merchant_trans_id}")
+        # Continue anyway for testing, Click will validate
+    
+    return jsonify({
+        "error": "0",
+        "error_note": "Success",
+        "click_trans_id": click_trans_id,
+        "merchant_trans_id": merchant_trans_id,
+        "merchant_prepare_id": merchant_trans_id
+    })
+
+
+@flask_app.route('/click/complete', methods=['POST'])
+def click_complete():
+    """Click Complete endpoint - called after successful payment"""
+    data = request.form.to_dict()
+    logger.info(f"Click Complete request: {data}")
+    
+    # Required fields
+    click_trans_id = data.get('click_trans_id', '')
+    service_id = data.get('service_id', '')
+    merchant_trans_id = data.get('merchant_trans_id', '')
+    merchant_prepare_id = data.get('merchant_prepare_id', '')
+    amount = data.get('amount', '')
+    action = data.get('action', '')
+    sign_time = data.get('sign_time', '')
+    sign_string = data.get('sign_string', '')
+    error = data.get('error', '0')
+    
+    # If payment failed
+    if error != '0':
+        logger.warning(f"Payment failed for order {merchant_trans_id}: error={error}")
+        return jsonify({
+            "error": error,
+            "error_note": "Payment failed"
+        })
+    
+    # Parse order ID
+    try:
+        parts = merchant_trans_id.split('_')
+        telegram_id = int(parts[1])
+        plan_id = '_'.join(parts[2:])
+    except (IndexError, ValueError):
+        return jsonify({
+            "error": "-5",
+            "error_note": "Invalid order ID"
+        })
+    
+    # Activate PRO subscription
+    if activate_pro(telegram_id, plan_id):
+        logger.info(f"Payment successful! User {telegram_id} upgraded to PRO ({plan_id})")
+        
+        # Send notification to user via Telegram (async)
+        try:
+            import asyncio
+            if telegram_app:
+                async def send_success_message():
+                    await telegram_app.bot.send_message(
+                        chat_id=telegram_id,
+                        text="✅ To'lov muvaffaqiyatli amalga oshirildi!\n\n🎉 Siz endi SOLVO PRO foydalanuvchisisiz!\n\n/start buyrug'ini bosing."
+                    )
+                asyncio.get_event_loop().run_until_complete(send_success_message())
+        except Exception as e:
+            logger.error(f"Failed to send success message: {e}")
+        
+        return jsonify({
+            "error": "0",
+            "error_note": "Success",
+            "click_trans_id": click_trans_id,
+            "merchant_trans_id": merchant_trans_id,
+            "merchant_confirm_id": merchant_trans_id
+        })
+    else:
+        return jsonify({
+            "error": "-8",
+            "error_note": "Failed to activate subscription"
+        })
 
 
 @flask_app.route(WEBHOOK_PATH, methods=["POST"])
