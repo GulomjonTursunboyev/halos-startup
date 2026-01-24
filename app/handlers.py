@@ -60,24 +60,24 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Get persistent main menu keyboard"""
     if lang == "ru":
         keyboard = [
-            ["💳 Мои долги", "👤 Профиль"],
-            ["💎 Подписка", "🌐 Язык"],
-            ["❓ Помощь"]
+            ["� Выйти из долга"],
+            ["👤 Профиль", "💎 PRO"],
+            ["🌐 Язык", "❓ Помощь"]
         ]
     else:
         keyboard = [
-            ["💳 Qarzlarim", "👤 Profil"],
-            ["💎 Obuna", "🌐 Til"],
-            ["❓ Yordam"]
+            ["🚀 Qarzdan chiqish"],
+            ["👤 Profil", "💎 PRO"],
+            ["🌐 Til", "❓ Yordam"]
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 # Main menu button texts for matching
 MENU_BUTTONS = {
-    "plan": ["💳 Qarzlarim", "💳 Мои долги"],
+    "plan": ["� Qarzdan chiqish", "🚀 Выйти из долга"],
     "profile": ["👤 Profil", "👤 Профиль"],
-    "subscription": ["💎 Obuna", "💎 Подписка"],
+    "subscription": ["💎 PRO", "💎 PRO"],
     "language": ["🌐 Til", "🌐 Язык"],
     "help": ["❓ Yordam", "❓ Помощь"],
 }
