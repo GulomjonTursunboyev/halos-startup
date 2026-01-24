@@ -104,20 +104,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data["phone_number"] = existing_user.get("phone_number")
         context.user_data["lang"] = lang
         
-        # Go directly to mode selection - no subscription check here
-        keyboard = [
-            [
-                InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
-                InlineKeyboardButton(get_message("mode_family", lang), callback_data="mode_family")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Show main menu for registered users
+        welcome_back = "👋 Xush kelibsiz!\n\nQuyidagi menyudan foydalaning:" if lang == "uz" else "👋 Добро пожаловать!\n\nИспользуйте меню ниже:"
         
         await update.message.reply_text(
-            get_message("select_mode", lang),
-            parse_mode="Markdown",
-            reply_markup=reply_markup
+            welcome_back,
+            reply_markup=get_main_menu_keyboard(lang)
         )
+        
+        return ConversationHandler.END
         
         return States.MODE
     
