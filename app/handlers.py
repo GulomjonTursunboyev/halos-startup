@@ -56,6 +56,33 @@ def parse_number(text: str) -> float:
         return -1
 
 
+def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
+    """Get persistent main menu keyboard"""
+    if lang == "ru":
+        keyboard = [
+            ["📊 Мой план", "👤 Профиль"],
+            ["💎 Подписка", "🌐 Язык"],
+            ["❓ Помощь"]
+        ]
+    else:
+        keyboard = [
+            ["📊 Qarz rejam", "👤 Profil"],
+            ["💎 Obuna", "🌐 Til"],
+            ["❓ Yordam"]
+        ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+# Main menu button texts for matching
+MENU_BUTTONS = {
+    "plan": ["📊 Qarz rejam", "📊 Мой план"],
+    "profile": ["👤 Profil", "👤 Профиль"],
+    "subscription": ["💎 Obuna", "💎 Подписка"],
+    "language": ["🌐 Til", "🌐 Язык"],
+    "help": ["❓ Yordam", "❓ Помощь"],
+}
+
+
 # ==================== START COMMAND ====================
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1695,6 +1722,12 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
             reply_markup=offer_markup
         )
     
+    # Show main menu keyboard
+    await update.message.reply_text(
+        "⬇️" if lang == "uz" else "⬇️",
+        reply_markup=get_main_menu_keyboard(lang)
+    )
+    
     return ConversationHandler.END
 
 
@@ -1806,6 +1839,12 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
             reply_markup=offer_markup
         )
     
+    # Show main menu keyboard
+    await query.message.reply_text(
+        "⬇️",
+        reply_markup=get_main_menu_keyboard(lang)
+    )
+    
     return ConversationHandler.END
 
 
@@ -1911,6 +1950,12 @@ async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TY
         result_message,
         parse_mode="Markdown",
         reply_markup=reply_markup
+    )
+    
+    # Show main menu keyboard
+    await query.message.reply_text(
+        "⬇️",
+        reply_markup=get_main_menu_keyboard(lang)
     )
     
     return ConversationHandler.END
@@ -2351,6 +2396,12 @@ async def change_language_callback(update: Update, context: ContextTypes.DEFAULT
     await query.edit_message_text(
         get_message("language_set", lang)
     )
+    
+    # Update main menu with new language
+    await query.message.reply_text(
+        "✅",
+        reply_markup=get_main_menu_keyboard(lang)
+    )
 
 
 async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -2359,7 +2410,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     await update.message.reply_text(
         get_message("restart", lang),
-        reply_markup=ReplyKeyboardRemove()
+        reply_markup=get_main_menu_keyboard(lang)
     )
     
     return ConversationHandler.END
@@ -2466,7 +2517,166 @@ def add_global_handlers_to_app(application):
     application.add_handler(CallbackQueryHandler(edit_profile_field_callback, pattern="^edit_"), group=0)
     application.add_handler(CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_"), group=0)
     application.add_handler(CommandHandler("profile", profile_command), group=0)
+    
+    # Main menu button handlers
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^(📊 Qarz rejam|📊 Мой план)$"),
+        menu_plan_handler
+    ), group=1)
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"),
+        menu_profile_handler
+    ), group=1)
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^(💎 Obuna|💎 Подписка)$"),
+        menu_subscription_handler
+    ), group=1)
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^(🌐 Til|🌐 Язык)$"),
+        menu_language_handler
+    ), group=1)
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"),
+        menu_help_handler
+    ), group=1)
+
+
+# ==================== MAIN MENU HANDLERS ====================
+
+async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle 📊 Qarz rejam button"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await update.message.reply_text(
+            get_message("profile_no_data", lang),
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+        return
+    
+    profile = await db.get_financial_profile(user["id"])
+    
+    if not profile or profile.get("income_self", 0) == 0:
+        await update.message.reply_text(
+            get_message("profile_no_data", lang),
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+        return
+    
+    # Calculate and show results
+    calc_msg = await update.message.reply_text(
+        get_message("calculating_saved", lang)
+    )
+    
+    mode = user.get("mode", "solo")
+    
+    from app.engine import FinancialInput
+    financial_input = FinancialInput(
+        mode=mode,
+        income_self=profile.get("income_self", 0),
+        income_partner=profile.get("income_partner", 0),
+        rent=profile.get("rent", 0),
+        kindergarten=profile.get("kindergarten", 0),
+        utilities=profile.get("utilities", 0),
+        loan_payment=profile.get("loan_payment", 0),
+        total_debt=profile.get("total_debt", 0)
+    )
+    
+    result = calculate_finances(financial_input)
+    is_pro = await get_user_subscription_status(telegram_id)
+    result_message = format_result_message(result, lang, is_pro=is_pro)
+    
+    await calc_msg.delete()
+    
+    # Add inline buttons
+    if is_pro:
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(
+                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                callback_data="show_pricing"
+            )],
+            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+        ]
+    
+    await update.message.reply_text(
+        result_message,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle 👤 Profil button"""
+    await profile_command(update, context)
+
+
+async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle 💎 Obuna button"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    # Show subscription status and options
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    is_pro = await get_user_subscription_status(telegram_id)
+    
+    if is_pro and user:
+        # Show PRO status
+        expires = user.get("subscription_expires", "")
+        status_text = get_message("subscription_active", lang).format(
+            expires=expires[:10] if expires else "∞"
+        )
+        await update.message.reply_text(
+            status_text,
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+    else:
+        # Show pricing
+        await show_pricing_new_message(update, context)
+
+
+async def menu_language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle 🌐 Til button"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🇺🇿 O'zbekcha", callback_data="change_lang_uz"),
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="change_lang_ru")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "🌐 Tilni tanlang / Выберите язык:",
+        reply_markup=reply_markup
+    )
+
+
+async def menu_help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle ❓ Yordam button"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    
+    await update.message.reply_text(
+        get_message("help", lang),
+        parse_mode="Markdown",
+        reply_markup=get_main_menu_keyboard(lang)
+    )
+
 
 # Keep old function for backwards compatibility
 def add_trial_handler_to_app(application):
     add_global_handlers_to_app(application)
+

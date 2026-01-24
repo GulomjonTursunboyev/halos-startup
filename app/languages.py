@@ -1011,6 +1011,21 @@ MESSAGES = {
         "ru": "🎁 3 дня БЕСПЛАТНО"
     },
     
+    "subscription_active": {
+        "uz": (
+            "💎 *PRO OBUNA FAOL*\n\n"
+            "✅ Sizda PRO obuna mavjud!\n\n"
+            "📅 Amal qilish muddati: *{expires}*\n\n"
+            "🎉 Barcha imkoniyatlardan foydalanishingiz mumkin."
+        ),
+        "ru": (
+            "💎 *PRO ПОДПИСКА АКТИВНА*\n\n"
+            "✅ У вас есть PRO подписка!\n\n"
+            "📅 Действует до: *{expires}*\n\n"
+            "🎉 Вам доступны все возможности."
+        )
+    },
+    
     "subscription_status": {
         "uz": (
             "📊 *Obuna holati*\n\n"
