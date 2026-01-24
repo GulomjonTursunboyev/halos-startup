@@ -2503,7 +2503,7 @@ def add_trial_handler_to_app(application):
 # ==================== MAIN MENU HANDLERS ====================
 
 async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 🚀 Qarzdan chiqish button - show income, expenses, and debt exit info"""
+    """Handle 🚀 Qarzdan chiqish button - show FREE vs PRO debt exit options"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -2533,170 +2533,125 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
     
-    # Calculate and show debt results
-    calc_msg = await update.message.reply_text(
-        get_message("calculating_saved", lang)
-    )
+    # Check PRO status
+    is_pro = await is_user_pro(telegram_id)
     
-    mode = user.get("mode", "solo")
-    
-    from app.engine import FinancialInput, format_exit_date
-    from datetime import datetime
-    from dateutil.relativedelta import relativedelta
-    import math
-    
-    financial_input = FinancialInput(
-        mode=mode,
-        income_self=profile.get("income_self", 0),
-        income_partner=profile.get("income_partner", 0),
-        rent=profile.get("rent", 0),
-        kindergarten=profile.get("kindergarten", 0),
-        utilities=profile.get("utilities", 0),
-        loan_payment=profile.get("loan_payment", 0),
-        total_debt=profile.get("total_debt", 0)
-    )
-    
-    result = calculate_finances(financial_input)
-    is_pro = await get_user_subscription_status(telegram_id)
-    
-    await calc_msg.delete()
-    
-    # Get financial data
+    # Get debt info for preview
     total_debt = profile.get("total_debt", 0)
     loan_payment = profile.get("loan_payment", 0)
-    income_self = profile.get("income_self", 0)
-    income_partner = profile.get("income_partner", 0)
-    rent = profile.get("rent", 0)
-    kindergarten = profile.get("kindergarten", 0)
-    utilities = profile.get("utilities", 0)
     
-    total_income = income_self + income_partner
-    total_expenses = rent + kindergarten + utilities + loan_payment
+    import math
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    from app.engine import FinancialInput, format_exit_date
     
-    # Calculate exit dates
+    # Calculate simple exit (FREE)
     simple_exit_months = math.ceil(total_debt / loan_payment) if loan_payment > 0 else 0
     simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
-    simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
     
-    # Get PRO calculation data
-    exit_months = result.get("exit_months", simple_exit_months)
-    exit_date = result.get("exit_date", simple_exit_date.strftime("%Y-%m"))
-    exit_date_formatted = format_exit_date(exit_date, lang)
-    savings_at_exit = result.get("savings_at_exit", 0)
-    months_saved = simple_exit_months - exit_months
+    # Calculate PRO exit
+    income = profile.get("income_self", 0) + profile.get("income_partner", 0)
+    mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
+    free_cash = income - mandatory - loan_payment
     
-    # Build message with income/expenses info
-    if lang == "uz":
-        debt_message = (
-            "🚀 *QARZDAN CHIQISH REJASI*\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💰 *DAROMADLAR:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"├ Mening daromadim: *{format_number(income_self)} so'm*\n"
-        )
-        if income_partner > 0:
-            debt_message += f"├ Sherik daromadi: *{format_number(income_partner)} so'm*\n"
-        debt_message += f"└ Jami: *{format_number(total_income)} so'm*\n\n"
-        
-        debt_message += (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💸 *HARAJATLAR:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"├ Ijara: *{format_number(rent)} so'm*\n"
-            f"├ Majburiy: *{format_number(kindergarten)} so'm*\n"
-            f"├ Kommunal: *{format_number(utilities)} so'm*\n"
-            f"├ Qarz to'lovi: *{format_number(loan_payment)} so'm*\n"
-            f"└ Jami: *{format_number(total_expenses)} so'm*\n\n"
-        )
-        
-        debt_message += (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QARZ HOLATI:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📉 Umumiy qarz: *{format_number(total_debt)} so'm*\n\n"
-        )
-        
-        # Show exit info based on PRO status
-        debt_message += (
-            f"📅 Oddiy to'lov: *{simple_exit_months} oy* ({simple_exit_formatted})\n"
-        )
-        
-        if is_pro:
-            debt_message += (
-                f"🚀 PRO bilan: *{exit_months} oy* ({exit_date_formatted})\n"
-                f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
-                f"💰 Boylik: *{format_number(savings_at_exit)} so'm*"
-            )
-        else:
-            if months_saved > 0:
-                debt_message += (
-                    f"\n💎 PRO bilan *{months_saved} oy tezroq* chiqasiz!\n"
-                    f"Aniq sanani bilish uchun PRO oling 👇"
-                )
+    if free_cash > 0:
+        extra_debt = free_cash * 0.2
+        total_payment = loan_payment + extra_debt
+        pro_exit_months = math.ceil(total_debt / total_payment)
+        savings_monthly = free_cash * 0.1
+        savings_at_exit = savings_monthly * pro_exit_months
     else:
-        debt_message = (
-            "🚀 *ПЛАН ВЫХОДА ИЗ ДОЛГА*\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💰 *ДОХОДЫ:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"├ Мой доход: *{format_number(income_self)} сум*\n"
-        )
-        if income_partner > 0:
-            debt_message += f"├ Доход партнёра: *{format_number(income_partner)} сум*\n"
-        debt_message += f"└ Итого: *{format_number(total_income)} сум*\n\n"
-        
-        debt_message += (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💸 *РАСХОДЫ:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"├ Аренда: *{format_number(rent)} сум*\n"
-            f"├ Обязательные: *{format_number(kindergarten)} сум*\n"
-            f"├ Коммунальные: *{format_number(utilities)} сум*\n"
-            f"├ Платёж по долгу: *{format_number(loan_payment)} сум*\n"
-            f"└ Итого: *{format_number(total_expenses)} сум*\n\n"
-        )
-        
-        debt_message += (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *СОСТОЯНИЕ ДОЛГА:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📉 Общий долг: *{format_number(total_debt)} сум*\n\n"
-        )
-        
-        debt_message += (
-            f"📅 Обычная оплата: *{simple_exit_months} мес* ({simple_exit_formatted})\n"
-        )
-        
-        if is_pro:
-            debt_message += (
-                f"🚀 С PRO: *{exit_months} мес* ({exit_date_formatted})\n"
-                f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
-                f"💰 Богатство: *{format_number(savings_at_exit)} сум*"
-            )
-        else:
-            if months_saved > 0:
-                debt_message += (
-                    f"\n💎 С PRO выйдете на *{months_saved} мес быстрее*!\n"
-                    f"Узнайте точную дату с PRO 👇"
-                )
+        pro_exit_months = simple_exit_months
+        savings_at_exit = 0
     
-    # Keyboard
+    months_saved = simple_exit_months - pro_exit_months
+    pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
+    
+    # Format dates
+    simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
+    pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
+    
+    if lang == "uz":
+        msg = (
+            "🚀 *QARZDAN CHIQISH USULLARINI TANLANG*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💳 Sizning qarzingiz: *{format_number(total_debt)} so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🆓 *BEPUL USUL:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Chiqish muddati: *{simple_exit_months} oy*\n"
+            f"📆 Sana: *{simple_exit_formatted}*\n"
+            "💰 Boylik: *0 so'm* (yig'ilmaydi)\n"
+            "📊 Usul: Faqat minimal to'lov\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💎 *PRO USUL (Tavsiya):*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Chiqish muddati: *{pro_exit_months} oy*\n"
+            f"📆 Sana: *{pro_exit_formatted}*\n"
+            f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
+            f"💰 Boylik: *{format_number(int(savings_at_exit))} so'm*\n"
+            "📊 Usul: Aqlli taqsimlash\n"
+            "📋 Qarz nazorati, statistika, Excel\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👇 *Qaysi usulni tanlaysiz?*"
+        )
+    else:
+        msg = (
+            "🚀 *ВЫБЕРИТЕ СПОСОБ ВЫХОДА ИЗ ДОЛГА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💳 Ваш долг: *{format_number(total_debt)} сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🆓 *БЕСПЛАТНЫЙ СПОСОБ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Срок выхода: *{simple_exit_months} мес*\n"
+            f"📆 Дата: *{simple_exit_formatted}*\n"
+            "💰 Богатство: *0 сум* (не копится)\n"
+            "📊 Метод: Только минимальный платёж\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💎 *PRO СПОСОБ (Рекомендуем):*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Срок выхода: *{pro_exit_months} мес*\n"
+            f"📆 Дата: *{pro_exit_formatted}*\n"
+            f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
+            f"💰 Богатство: *{format_number(int(savings_at_exit))} сум*\n"
+            "📊 Метод: Умное распределение\n"
+            "📋 Контроль долгов, статистика, Excel\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👇 *Какой способ выберете?*"
+        )
+    
+    # Buttons
     if is_pro:
         keyboard = [
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
-            [InlineKeyboardButton("👤 Profil" if lang == "uz" else "👤 Профиль", callback_data="show_profile")]
+            [InlineKeyboardButton(
+                "🆓 Bepul usul" if lang == "uz" else "🆓 Бесплатный",
+                callback_data="debt_plan_free"
+            )],
+            [InlineKeyboardButton(
+                "💎 PRO usul (Tavsiya)" if lang == "uz" else "💎 PRO способ (Реком.)",
+                callback_data="debt_plan_pro"
+            )],
         ]
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "💎 PRO olish - aniq sana" if lang == "uz" else "💎 Получить PRO - точная дата",
+                "🆓 Bepul usul" if lang == "uz" else "🆓 Бесплатный",
+                callback_data="debt_plan_free"
+            )],
+            [InlineKeyboardButton(
+                "💎 PRO olish - " + (f"{months_saved} oy tezroq" if lang == "uz" else f"{months_saved} мес быстрее"),
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     
     await update.message.reply_text(
-        debt_message,
+        msg,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -2766,6 +2721,283 @@ async def menu_help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         get_message("help", lang),
         parse_mode="Markdown",
         reply_markup=get_main_menu_keyboard(lang)
+    )
+
+
+# ==================== DEBT PLAN HANDLERS ====================
+
+async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show FREE debt exit plan details"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    profile = await db.get_financial_profile(user["id"]) if user else None
+    
+    if not profile:
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
+        return
+    
+    import math
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    from app.engine import format_exit_date
+    
+    total_debt = profile.get("total_debt", 0)
+    loan_payment = profile.get("loan_payment", 0)
+    income_self = profile.get("income_self", 0)
+    income_partner = profile.get("income_partner", 0)
+    rent = profile.get("rent", 0)
+    kindergarten = profile.get("kindergarten", 0)
+    utilities = profile.get("utilities", 0)
+    
+    total_income = income_self + income_partner
+    total_expenses = rent + kindergarten + utilities + loan_payment
+    free_cash = total_income - total_expenses
+    
+    simple_exit_months = math.ceil(total_debt / loan_payment) if loan_payment > 0 else 0
+    simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
+    simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
+    
+    if lang == "uz":
+        msg = (
+            "🆓 *BEPUL QARZDAN CHIQISH REJASI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "📋 *USUL:* Faqat minimal to'lov\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *MOLIYAVIY HOLAT:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Daromad: *{format_number(total_income)} so'm*\n"
+            f"├ Xarajatlar: *{format_number(total_expenses)} so'm*\n"
+            f"└ Bo'sh pul: *{format_number(free_cash)} so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *QARZ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Umumiy qarz: *{format_number(total_debt)} so'm*\n"
+            f"└ Oylik to'lov: *{format_number(loan_payment)} so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *NATIJA:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱ Chiqish muddati: *{simple_exit_months} oy*\n"
+            f"📆 Sana: *{simple_exit_formatted}*\n"
+            f"💰 Yig'ilgan boylik: *0 so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ *Eslatma:* Bu usulda faqat qarz to'lanadi.\n"
+            "Boylik yig'ilmaydi. PRO bilan tezroq chiqasiz\n"
+            "va boylik ham ortirasiz!"
+        )
+    else:
+        msg = (
+            "🆓 *БЕСПЛАТНЫЙ ПЛАН ВЫХОДА ИЗ ДОЛГА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "📋 *МЕТОД:* Только минимальный платёж\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *ФИНАНСОВОЕ СОСТОЯНИЕ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Доход: *{format_number(total_income)} сум*\n"
+            f"├ Расходы: *{format_number(total_expenses)} сум*\n"
+            f"└ Свободные: *{format_number(free_cash)} сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *ДОЛГ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Общий долг: *{format_number(total_debt)} сум*\n"
+            f"└ Ежемесячно: *{format_number(loan_payment)} сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *РЕЗУЛЬТАТ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱ Срок выхода: *{simple_exit_months} мес*\n"
+            f"📆 Дата: *{simple_exit_formatted}*\n"
+            f"💰 Накопленное богатство: *0 сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ *Примечание:* Этот способ только погашает долг.\n"
+            "Богатство не копится. С PRO выйдете быстрее\n"
+            "и накопите богатство!"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
+            callback_data="show_pricing"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show PRO debt exit plan details (for PRO users)"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Check PRO status
+    is_pro = await is_user_pro(telegram_id)
+    if not is_pro:
+        await show_pricing(update, context)
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    profile = await db.get_financial_profile(user["id"]) if user else None
+    
+    if not profile:
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
+        return
+    
+    import math
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    from app.engine import format_exit_date
+    
+    total_debt = profile.get("total_debt", 0)
+    loan_payment = profile.get("loan_payment", 0)
+    income_self = profile.get("income_self", 0)
+    income_partner = profile.get("income_partner", 0)
+    rent = profile.get("rent", 0)
+    kindergarten = profile.get("kindergarten", 0)
+    utilities = profile.get("utilities", 0)
+    
+    total_income = income_self + income_partner
+    mandatory = rent + kindergarten + utilities
+    free_cash = total_income - mandatory - loan_payment
+    
+    # Calculate PRO plan
+    if free_cash > 0:
+        savings = free_cash * 0.1  # 10% boylik
+        extra_debt = free_cash * 0.2  # 20% qo'shimcha qarz
+        living = free_cash * 0.7  # 70% yashash
+        total_payment = loan_payment + extra_debt
+        pro_exit_months = math.ceil(total_debt / total_payment)
+        savings_at_exit = savings * pro_exit_months
+    else:
+        savings = extra_debt = living = 0
+        total_payment = loan_payment
+        pro_exit_months = math.ceil(total_debt / loan_payment) if loan_payment > 0 else 0
+        savings_at_exit = 0
+    
+    pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
+    pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
+    
+    # Simple comparison
+    simple_exit_months = math.ceil(total_debt / loan_payment) if loan_payment > 0 else 0
+    months_saved = simple_exit_months - pro_exit_months
+    
+    if lang == "uz":
+        msg = (
+            "💎 *PRO QARZDAN CHIQISH REJASI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "📋 *USUL:* Aqlli taqsimlash\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *MOLIYAVIY HOLAT:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Daromad: *{format_number(total_income)} so'm*\n"
+            f"├ Majburiy: *{format_number(mandatory)} so'm*\n"
+            f"├ Qarz to'lovi: *{format_number(loan_payment)} so'm*\n"
+            f"└ Bo'sh pul: *{format_number(free_cash)} so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *AQLLI TAQSIMLASH:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ 🏦 Boylik (10%): *{format_number(int(savings))} so'm*\n"
+            f"├ ⚡ Qo'shimcha (20%): *{format_number(int(extra_debt))} so'm*\n"
+            f"└ 🏠 Yashash (70%): *{format_number(int(living))} so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *NATIJA:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱ Chiqish muddati: *{pro_exit_months} oy*\n"
+            f"📆 Sana: *{pro_exit_formatted}*\n"
+            f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
+            f"💰 Yig'ilgan boylik: *{format_number(int(savings_at_exit))} so'm*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ Oylik qarz to'lovi: *{format_number(int(total_payment))} so'm*\n"
+            f"   (asosiy + qo'shimcha)"
+        )
+    else:
+        msg = (
+            "💎 *PRO ПЛАН ВЫХОДА ИЗ ДОЛГА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "📋 *МЕТОД:* Умное распределение\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *ФИНАНСОВОЕ СОСТОЯНИЕ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Доход: *{format_number(total_income)} сум*\n"
+            f"├ Обязательные: *{format_number(mandatory)} сум*\n"
+            f"├ Платёж по долгу: *{format_number(loan_payment)} сум*\n"
+            f"└ Свободные: *{format_number(free_cash)} сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *УМНОЕ РАСПРЕДЕЛЕНИЕ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ 🏦 Богатство (10%): *{format_number(int(savings))} сум*\n"
+            f"├ ⚡ Дополнительно (20%): *{format_number(int(extra_debt))} сум*\n"
+            f"└ 🏠 Жизнь (70%): *{format_number(int(living))} сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *РЕЗУЛЬТАТ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱ Срок выхода: *{pro_exit_months} мес*\n"
+            f"📆 Дата: *{pro_exit_formatted}*\n"
+            f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
+            f"💰 Накопленное богатство: *{format_number(int(savings_at_exit))} сум*\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ Ежемесячный платёж: *{format_number(int(total_payment))} сум*\n"
+            f"   (основной + дополнительный)"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📊 Statistika" if lang == "uz" else "📊 Статистика",
+            callback_data="pro_statistics"
+        )],
+        [InlineKeyboardButton(
+            "📋 Qarz nazorati" if lang == "uz" else "📋 Контроль долгов",
+            callback_data="pro_debt_monitor"
+        )],
+        [InlineKeyboardButton(
+            "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
+            callback_data="pro_export_excel"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 

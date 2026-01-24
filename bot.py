@@ -35,6 +35,8 @@ from app.handlers import (
     menu_subscription_handler,
     menu_language_handler,
     menu_help_handler,
+    debt_plan_free_callback,
+    debt_plan_pro_callback,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -195,6 +197,14 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(toggle_reminders_callback, pattern="^toggle_reminders_")
+    )
+    
+    # Debt Plan handlers (FREE vs PRO)
+    application.add_handler(
+        CallbackQueryHandler(debt_plan_free_callback, pattern="^debt_plan_free$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(debt_plan_pro_callback, pattern="^debt_plan_pro$")
     )
     
     # Add error handler
