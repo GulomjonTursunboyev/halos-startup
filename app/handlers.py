@@ -1881,8 +1881,7 @@ def get_conversation_handler() -> ConversationHandler:
             CommandHandler("start", start_command),
         ],
         allow_reentry=True,
-        # Add trial handler globally (works from any state)
-        per_message=True,
+        per_message=False,
     )
 
 # Register trial handler globally (for dispatcher setup)
