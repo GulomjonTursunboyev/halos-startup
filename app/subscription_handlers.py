@@ -104,58 +104,98 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
     if query:
         await query.answer()
     
+    telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
+    # Get user's debt info for personalization
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    profile = None
+    simple_months = 0
+    pro_months = 0
+    months_saved = 0
+    savings_at_exit = 0
+    
+    if user:
+        profile = await db.get_financial_profile(user["id"])
+        if profile:
+            total_debt = profile.get("total_debt", 0)
+            loan_payment = profile.get("loan_payment", 0)
+            
+            if loan_payment > 0 and total_debt > 0:
+                import math
+                # Simple calculation (just paying minimum)
+                simple_months = math.ceil(total_debt / loan_payment)
+                
+                # PRO calculation (with acceleration)
+                income = profile.get("income_self", 0) + profile.get("income_partner", 0)
+                mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
+                free_cash = income - mandatory - loan_payment
+                
+                if free_cash > 0:
+                    accelerated_debt = free_cash * 0.2  # 20% extra to debt
+                    total_payment = loan_payment + accelerated_debt
+                    pro_months = math.ceil(total_debt / total_payment)
+                    months_saved = simple_months - pro_months
+                    savings_at_exit = (free_cash * 0.1) * pro_months  # 10% savings
+    
     if lang == "uz":
-        if is_required:
+        # Personalized header if user has debt data
+        if simple_months > 0 and months_saved > 0:
             header = (
-                "🔐 *SOLVO dan foydalanish uchun obuna talab qilinadi*\n\n"
-                "SOLVO — sizning moliyaviy erkinligingiz yo'lidagi yordamchi.\n"
-                "Davom etish uchun obunani faollashtiring.\n\n"
+                f"💎 *SOLVO PRO*\n\n"
+                f"Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
+                f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
+                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* jamg'arasiz.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO - Premium Tarif*\n\n"
+            header = "💎 *SOLVO PRO*\n\n"
         
         msg = (
             f"{header}"
-            "✅ *Cheksiz moliyaviy hisob-kitoblar*\n"
-            "✅ *Qachon qarzsiz bo'lishingizni ko'rsatadi*\n"
-            "✅ *Qancha jamg'arishingizni hisoblaydi*\n"
-            "✅ *KATM kredit tarixini tahlil*\n"
-            "✅ *Karta tarixi import qilish*\n"
-            "✅ *AI maslahatlar*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Narxlar:*\n\n"
-            "⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
-            "⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
-            "🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n"
+            "🎯 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *Aniq sana* — qachon qarzsiz bo'lishingizni bilasiz\n"
+            "✅ *Tezkor chiqish* — bir necha oy oldin erkinlikka\n"
+            "✅ *Jamg'arma* — qarz to'layotganda ham pul yig'asiz\n"
+            "✅ *Oylik reja* — qancha sarflash, qancha yig'ish\n"
+            "✅ *12 oylik prognoz* — kelajakni ko'rasiz\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *NARXLAR:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "├ ⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
+            "├ ⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
+            "└ 🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
-        if is_required:
+        if simple_months > 0 and months_saved > 0:
             header = (
-                "🔐 *Для использования SOLVO требуется подписка*\n\n"
-                "SOLVO — ваш помощник на пути к финансовой свободе.\n"
-                "Активируйте подписку, чтобы продолжить.\n\n"
+                f"💎 *SOLVO PRO*\n\n"
+                f"Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
+                f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
+                f"Плюс накопите *{format_number(int(savings_at_exit))} сум*.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO - Премиум Тариф*\n\n"
+            header = "💎 *SOLVO PRO*\n\n"
         
         msg = (
             f"{header}"
-            "✅ *Безлимитные финансовые расчёты*\n"
-            "✅ *Показывает, когда станете без долгов*\n"
-            "✅ *Рассчитывает ваши накопления*\n"
-            "✅ *Анализ кредитной истории КАТМ*\n"
-            "✅ *Импорт истории карты*\n"
-            "✅ *AI рекомендации*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Цены:*\n\n"
-            "⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
-            "⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
-            "🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n"
+            "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *Точная дата* — знаете когда станете свободны\n"
+            "✅ *Быстрый выход* — на несколько месяцев раньше\n"
+            "✅ *Накопления* — копите даже выплачивая долг\n"
+            "✅ *Месячный план* — сколько тратить, сколько копить\n"
+            "✅ *Прогноз на 12 мес* — видите будущее\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *ЦЕНЫ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "├ ⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
+            "├ ⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
+            "└ 🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n\n"
             "💳 *Оплата: через Click*"
         )
     
@@ -207,58 +247,94 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
     
     Use this when you can't edit the previous message (e.g., after deleting it)
     """
+    telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
+    # Get user's debt info for personalization
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    simple_months = 0
+    pro_months = 0
+    months_saved = 0
+    savings_at_exit = 0
+    
+    if user:
+        profile = await db.get_financial_profile(user["id"])
+        if profile:
+            total_debt = profile.get("total_debt", 0)
+            loan_payment = profile.get("loan_payment", 0)
+            
+            if loan_payment > 0 and total_debt > 0:
+                import math
+                simple_months = math.ceil(total_debt / loan_payment)
+                
+                income = profile.get("income_self", 0) + profile.get("income_partner", 0)
+                mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
+                free_cash = income - mandatory - loan_payment
+                
+                if free_cash > 0:
+                    accelerated_debt = free_cash * 0.2
+                    total_payment = loan_payment + accelerated_debt
+                    pro_months = math.ceil(total_debt / total_payment)
+                    months_saved = simple_months - pro_months
+                    savings_at_exit = (free_cash * 0.1) * pro_months
+    
     if lang == "uz":
-        if is_required:
+        if simple_months > 0 and months_saved > 0:
             header = (
-                "🔐 *SOLVO dan foydalanish uchun obuna talab qilinadi*\n\n"
-                "SOLVO — sizning moliyaviy erkinligingiz yo'lidagi yordamchi.\n"
-                "Davom etish uchun obunani faollashtiring.\n\n"
+                f"💎 *SOLVO PRO*\n\n"
+                f"Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
+                f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
+                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* jamg'arasiz.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO - Premium Tarif*\n\n"
+            header = "💎 *SOLVO PRO*\n\n"
         
         msg = (
             f"{header}"
-            "✅ *Cheksiz moliyaviy hisob-kitoblar*\n"
-            "✅ *Qachon qarzsiz bo'lishingizni ko'rsatadi*\n"
-            "✅ *Qancha jamg'arishingizni hisoblaydi*\n"
-            "✅ *KATM kredit tarixini tahlil*\n"
-            "✅ *Karta tarixi import qilish*\n"
-            "✅ *AI maslahatlar*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Narxlar:*\n\n"
-            "⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
-            "⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
-            "🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n"
+            "🎯 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *Aniq sana* — qachon qarzsiz bo'lishingizni bilasiz\n"
+            "✅ *Tezkor chiqish* — bir necha oy oldin erkinlikka\n"
+            "✅ *Jamg'arma* — qarz to'layotganda ham pul yig'asiz\n"
+            "✅ *Oylik reja* — qancha sarflash, qancha yig'ish\n"
+            "✅ *12 oylik prognoz* — kelajakni ko'rasiz\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *NARXLAR:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "├ ⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
+            "├ ⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
+            "└ 🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
-        if is_required:
+        if simple_months > 0 and months_saved > 0:
             header = (
-                "🔐 *Для использования SOLVO требуется подписка*\n\n"
-                "SOLVO — ваш помощник на пути к финансовой свободе.\n"
-                "Активируйте подписку, чтобы продолжить.\n\n"
+                f"💎 *SOLVO PRO*\n\n"
+                f"Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
+                f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
+                f"Плюс накопите *{format_number(int(savings_at_exit))} сум*.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO - Премиум Тариф*\n\n"
+            header = "💎 *SOLVO PRO*\n\n"
         
         msg = (
             f"{header}"
-            "✅ *Безлимитные финансовые расчёты*\n"
-            "✅ *Показывает, когда станете без долгов*\n"
-            "✅ *Рассчитывает ваши накопления*\n"
-            "✅ *Анализ кредитной истории КАТМ*\n"
-            "✅ *Импорт истории карты*\n"
-            "✅ *AI рекомендации*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Цены:*\n\n"
-            "⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
-            "⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
-            "🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n"
+            "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "✅ *Точная дата* — знаете когда станете свободны\n"
+            "✅ *Быстрый выход* — на несколько месяцев раньше\n"
+            "✅ *Накопления* — копите даже выплачивая долг\n"
+            "✅ *Месячный план* — сколько тратить, сколько копить\n"
+            "✅ *Прогноз на 12 мес* — видите будущее\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *ЦЕНЫ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "├ ⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
+            "├ ⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
+            "└ 🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n\n"
             "💳 *Оплата: через Click*"
         )
     

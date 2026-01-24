@@ -1090,64 +1090,76 @@ MESSAGES = {
     "premium_pricing": {
         "uz": (
             "💎 *SOLVO PRO*\n\n"
-            "🎯 *Qarzdan tezroq chiqing. Boylik yarating.*\n\n"
+            "Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
+            "PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🔓 *PRO BILAN SIZ OLASIZ:*\n"
+            "🎯 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ Qarzdan *tezroq* chiqish\n"
-            "✅ *Aniq sana* - qachon qarzsiz bo'lishingizni bilib oling\n"
-            "✅ *Jamg'arma rejasi* - qarz to'layotganda ham pul yig'ing\n"
-            "✅ *Oylik nazorat* - qancha sarflash, qancha yig'ish\n"
-            "✅ *Kelajak prognozi* - 12 oydan keyingi holatni ko'ring\n\n"
+            "✅ *Aniq sana* — qachon qarzsiz bo'lishingizni bilasiz\n"
+            "✅ *Tezkor chiqish* — bir necha oy oldin erkinlikka\n"
+            "✅ *Jamg'arma* — qarz to'layotganda ham pul yig'asiz\n"
+            "✅ *Oylik reja* — qancha sarflash, qancha yig'ish\n"
+            "✅ *12 oylik prognoz* — kelajakni ko'rasiz\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━"
         ),
         "ru": (
             "💎 *SOLVO PRO*\n\n"
-            "🎯 *Выйдите из долга быстрее. Создайте богатство.*\n\n"
+            "Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
+            "С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🔓 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
+            "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ Выйти из долга *быстрее*\n"
-            "✅ *Точная дата* - узнайте когда станете свободны\n"
-            "✅ *План накоплений* - копите даже выплачивая долг\n"
-            "✅ *Ежемесячный контроль* - сколько тратить, сколько копить\n"
-            "✅ *Прогноз будущего* - ваш статус через 12 месяцев\n\n"
+            "✅ *Точная дата* — знаете когда станете свободны\n"
+            "✅ *Быстрый выход* — на несколько месяцев раньше\n"
+            "✅ *Накопления* — копите даже выплачивая долг\n"
+            "✅ *Месячный план* — сколько тратить, сколько копить\n"
+            "✅ *Прогноз на 12 мес* — видите будущее\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━"
         )
     },
     
+    "price_weekly": {
+        "uz": "├ ⚡ 1 hafta: *5,000 so'm* — sinab ko'ring",
+        "ru": "├ ⚡ 1 неделя: *5,000 сум* — попробуйте"
+    },
+    
     "price_monthly": {
-        "uz": "├ 1 oy: *15,000 so'm* yoki *50 ⭐*",
-        "ru": "├ 1 месяц: *15,000 сум* или *50 ⭐*"
+        "uz": "├ ⭐ 1 oy: *15,000 so'm* — tavsiya etiladi",
+        "ru": "├ ⭐ 1 месяц: *15,000 сум* — рекомендуем"
     },
     
     "price_quarterly": {
-        "uz": "├ 3 oy: *40,500 so'm* (−10%) yoki *135 ⭐*",
-        "ru": "├ 3 месяца: *40,500 сум* (−10%) или *135 ⭐*"
+        "uz": "├ 3 oy: *40,000 so'm* (−11%)",
+        "ru": "├ 3 месяца: *40,000 сум* (−11%)"
     },
     
     "price_yearly": {
-        "uz": "└ 1 yil: *135,000 so'm* (−25%) yoki *450 ⭐*",
-        "ru": "└ 1 год: *135,000 сум* (−25%) или *450 ⭐*"
+        "uz": "└ 🏆 1 yil: *120,000 so'm* (−33% tejash)",
+        "ru": "└ 🏆 1 год: *120,000 сум* (−33% экономия)"
+    },
+    
+    "btn_buy_weekly": {
+        "uz": "⚡ 1 hafta - 5,000 so'm",
+        "ru": "⚡ 1 неделя - 5,000 сум"
     },
     
     "btn_buy_monthly": {
-        "uz": "1️⃣ 1 oy - 50 ⭐",
-        "ru": "1️⃣ 1 месяц - 50 ⭐"
+        "uz": "⭐ 1 oy - 15,000 so'm",
+        "ru": "⭐ 1 месяц - 15,000 сум"
     },
     
     "btn_buy_quarterly": {
-        "uz": "3️⃣ 3 oy - 135 ⭐",
-        "ru": "3️⃣ 3 месяца - 135 ⭐"
+        "uz": "3 oy - 40,000 so'm",
+        "ru": "3 месяца - 40,000 сум"
     },
     
     "btn_buy_yearly": {
-        "uz": "🎁 1 yil - 450 ⭐ (Eng foydali!)",
-        "ru": "🎁 1 год - 450 ⭐ (Выгодно!)"
+        "uz": "🏆 1 yil - 120,000 so'm",
+        "ru": "🏆 1 год - 120,000 сум"
     },
     
     "btn_pay_click": {
