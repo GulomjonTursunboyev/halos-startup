@@ -2140,7 +2140,8 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not user:
         await update.message.reply_text(
             get_message("profile_no_data", lang),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
         )
         return
     
@@ -2149,7 +2150,8 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not profile:
         await update.message.reply_text(
             get_message("profile_no_data", lang),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
         )
         return
     
