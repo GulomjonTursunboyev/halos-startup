@@ -1548,6 +1548,186 @@ MESSAGES = {
         "uz": "📋 Qarz rejam",
         "ru": "📋 Мой план долга"
     },
+    
+    # ==================== PRO CARING MESSAGES ====================
+    # Wolt-style supportive messages
+    "care_inactive_3days": {
+        "uz": (
+            "💙 Biz hali shu yerdamiz.\n\n"
+            "Siz o'ylaganingizdan *yaqinroqsiz*.\n"
+            "Keling, davom etamiz — qadam qadamdan."
+        ),
+        "ru": (
+            "💙 Мы всё ещё здесь.\n\n"
+            "Вы *ближе*, чем думаете.\n"
+            "Давайте продолжим — шаг за шагом."
+        )
+    },
+    
+    "care_salary_day": {
+        "uz": (
+            "🌟 Bugun kuchli kun.\n\n"
+            "Oylik keldi — bu *imkoniyat lahzasi*.\n"
+            "Kelajagingiz bugun quriladi.\n\n"
+            "📊 Qarz rejangizni ko'ring →"
+        ),
+        "ru": (
+            "🌟 Сегодня важный день.\n\n"
+            "Пришла зарплата — это *момент возможности*.\n"
+            "Ваше будущее строится сегодня.\n\n"
+            "📊 Посмотрите ваш план →"
+        )
+    },
+    
+    "care_first_week": {
+        "uz": (
+            "🎯 Birinchi hafta o'tdi!\n\n"
+            "Eng qiyin qadam — boshlash.\n"
+            "Siz allaqachon *harakatdasiz*.\n\n"
+            "Har bir kun — yangi imkoniyat."
+        ),
+        "ru": (
+            "🎯 Первая неделя позади!\n\n"
+            "Самый сложный шаг — начать.\n"
+            "Вы уже *в движении*.\n\n"
+            "Каждый день — новая возможность."
+        )
+    },
+    
+    "care_milestone_50": {
+        "uz": (
+            "🏆 Ajoyib natija!\n\n"
+            "Siz qarzingizning *50%* ini to'ladingiz.\n"
+            "Yarim yo'ldasiz — davom eting!"
+        ),
+        "ru": (
+            "🏆 Отличный результат!\n\n"
+            "Вы погасили *50%* вашего долга.\n"
+            "Полпути пройдено — продолжайте!"
+        )
+    },
+    
+    # Weekly progress messages
+    "weekly_progress": {
+        "uz": (
+            "📊 *Haftalik hisobot*\n\n"
+            "Bu hafta siz qarzingizdan\n"
+            "*{amount}* ga yaqinlashdingiz.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 To'langan: *{paid}*\n"
+            "📅 Qoldi: *{remaining}*\n"
+            "⏱ Chiqish sanasi: *{exit_date}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💪 Davom eting!"
+        ),
+        "ru": (
+            "📊 *Еженедельный отчёт*\n\n"
+            "На этой неделе вы приблизились\n"
+            "к свободе от долгов на *{amount}*.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 Погашено: *{paid}*\n"
+            "📅 Осталось: *{remaining}*\n"
+            "⏱ Дата выхода: *{exit_date}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💪 Продолжайте!"
+        )
+    },
+    
+    "weekly_progress_family": {
+        "uz": (
+            "👨‍👩‍👦 *Oilaviy haftalik hisobot*\n\n"
+            "Bu hafta oilangiz qarzdan\n"
+            "*{amount}* ga yaqinlashdi.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 To'langan: *{paid}*\n"
+            "📅 Qoldi: *{remaining}*\n"
+            "⏱ Chiqish sanasi: *{exit_date}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "👏 Birgalikda kuchlimizsiz!"
+        ),
+        "ru": (
+            "👨‍👩‍👦 *Семейный еженедельный отчёт*\n\n"
+            "На этой неделе ваша семья\n"
+            "приблизилась к свободе на *{amount}*.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 Погашено: *{paid}*\n"
+            "📅 Осталось: *{remaining}*\n"
+            "⏱ Дата выхода: *{exit_date}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "👏 Вместе вы сильнее!"
+        )
+    },
+    
+    # Monthly countdown messages
+    "monthly_countdown": {
+        "uz": (
+            "📅 *Oylik eslatma*\n\n"
+            "🗓 Qarzdan chiqish sanangiz:\n"
+            "*{exit_date}*\n\n"
+            "⏱ Yana *{months_left} oy* qoldi.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💳 Qolgan qarz: *{remaining_debt}*\n"
+            "💰 Jamg'arma: *{savings}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎯 Maqsadga yaqinlashmoqdasiz!"
+        ),
+        "ru": (
+            "📅 *Ежемесячное напоминание*\n\n"
+            "🗓 Ваша дата свободы от долгов:\n"
+            "*{exit_date}*\n\n"
+            "⏱ Осталось *{months_left} месяцев*.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💳 Остаток долга: *{remaining_debt}*\n"
+            "💰 Накопления: *{savings}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎯 Вы приближаетесь к цели!"
+        )
+    },
+    
+    "monthly_countdown_family": {
+        "uz": (
+            "👨‍👩‍👦 *Oilaviy oylik eslatma*\n\n"
+            "🗓 Oilangiz qarzdan chiqish sanasi:\n"
+            "*{exit_date}*\n\n"
+            "⏱ Yana *{months_left} oy* qoldi.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💳 Qolgan qarz: *{remaining_debt}*\n"
+            "👨‍👩‍👦 Oilaviy jamg'arma: *{savings}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏠 Oilangiz bilan birgalikda maqsadga!"
+        ),
+        "ru": (
+            "👨‍👩‍👦 *Семейное напоминание*\n\n"
+            "🗓 Дата свободы вашей семьи:\n"
+            "*{exit_date}*\n\n"
+            "⏱ Осталось *{months_left} месяцев*.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💳 Остаток долга: *{remaining_debt}*\n"
+            "👨‍👩‍👦 Семейные накопления: *{savings}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏠 Вместе — к цели!"
+        )
+    },
+    
+    # Celebration messages
+    "debt_free_congrats": {
+        "uz": (
+            "🎉🎉🎉\n\n"
+            "*TABRIKLAYMIZ!*\n\n"
+            "Siz qarzdan *OZOD* bo'ldingiz!\n\n"
+            "Bu — sizning qattiq mehnatingiz natijasi.\n"
+            "Endi boylik rejimiga o'tish vaqti!\n\n"
+            "🚀 Yangi bosqichga tayyormisiz?"
+        ),
+        "ru": (
+            "🎉🎉🎉\n\n"
+            "*ПОЗДРАВЛЯЕМ!*\n\n"
+            "Вы *СВОБОДНЫ* от долгов!\n\n"
+            "Это результат вашего упорного труда.\n"
+            "Теперь время перейти к режиму богатства!\n\n"
+            "🚀 Готовы к новому этапу?"
+        )
+    },
 }
 
 

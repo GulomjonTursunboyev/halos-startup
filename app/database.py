@@ -48,6 +48,10 @@ class Database:
                 trial_used INTEGER DEFAULT 0,
                 referral_code TEXT,
                 referred_by INTEGER,
+                last_active TIMESTAMP,
+                last_salary_message TIMESTAMP,
+                last_weekly_message TIMESTAMP,
+                last_monthly_message TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -168,6 +172,28 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_feature_usage_user_id ON feature_usage(user_id);
         """)
         await self._connection.commit()
+        
+        # Run migrations for existing databases
+        await self._run_migrations()
+    
+    async def _run_migrations(self):
+        """Add new columns to existing tables"""
+        migrations = [
+            ("users", "last_active", "TIMESTAMP"),
+            ("users", "last_salary_message", "TIMESTAMP"),
+            ("users", "last_weekly_message", "TIMESTAMP"),
+            ("users", "last_monthly_message", "TIMESTAMP"),
+        ]
+        
+        for table, column, col_type in migrations:
+            try:
+                await self._connection.execute(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
+                )
+                await self._connection.commit()
+            except Exception:
+                # Column already exists
+                pass
     
     # ==================== USER OPERATIONS ====================
     
@@ -212,6 +238,11 @@ class Database:
         )
         await self._connection.commit()
         return True
+    
+    async def update_user_activity(self, telegram_id: int) -> bool:
+        """Update user's last_active timestamp"""
+        from datetime import datetime
+        return await self.update_user(telegram_id, last_active=datetime.now().isoformat())
     
     async def user_exists(self, telegram_id: int) -> bool:
         """Check if user exists"""

@@ -15,6 +15,7 @@ from telegram.ext import (
 
 from app.config import BOT_TOKEN, ADMIN_IDS
 from app.database import get_database, close_database
+from app.scheduler import start_scheduler, stop_scheduler
 from app.handlers import (
     get_conversation_handler,
     help_command,
@@ -53,14 +54,21 @@ logger = logging.getLogger(__name__)
 
 
 async def post_init(application: Application) -> None:
-    """Initialize database after application starts"""
+    """Initialize database and scheduler after application starts"""
     logger.info("Initializing database...")
     await get_database()
     logger.info("Database initialized successfully")
+    
+    # Start PRO care scheduler
+    logger.info("Starting PRO Care Scheduler...")
+    await start_scheduler(application.bot)
+    logger.info("PRO Care Scheduler started")
 
 
 async def post_shutdown(application: Application) -> None:
     """Cleanup on shutdown"""
+    logger.info("Stopping PRO Care Scheduler...")
+    await stop_scheduler()
     logger.info("Closing database connection...")
     await close_database()
     logger.info("Shutdown complete")

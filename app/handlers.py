@@ -95,6 +95,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     existing_user = await db.get_user(telegram_id)
     
     if existing_user and existing_user.get("phone_number"):
+        # Update user activity for PRO care scheduler
+        await db.update_user_activity(telegram_id)
+        
         # User already registered - skip contact sharing
         lang = existing_user.get("language", "uz")
         context.user_data["telegram_id"] = telegram_id
@@ -2557,6 +2560,9 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     db = await get_database()
     user = await db.get_user(telegram_id)
     
+    # Update activity for PRO care scheduler
+    await db.update_user_activity(telegram_id)
+    
     if not user:
         await update.message.reply_text(
             get_message("profile_no_data", lang),
@@ -2623,6 +2629,10 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle 👤 Profil button"""
+    # Update activity for PRO care scheduler
+    db = await get_database()
+    await db.update_user_activity(update.effective_user.id)
+    
     await profile_command(update, context)
 
 
@@ -2632,8 +2642,11 @@ async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAUL
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
     
-    # Show subscription status and options
+    # Update activity for PRO care scheduler
     db = await get_database()
+    await db.update_user_activity(telegram_id)
+    
+    # Show subscription status and options
     user = await db.get_user(telegram_id)
     is_pro = await get_user_subscription_status(telegram_id)
     
@@ -2655,6 +2668,10 @@ async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAUL
 
 async def menu_language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle 🌐 Til button"""
+    # Update activity for PRO care scheduler
+    db = await get_database()
+    await db.update_user_activity(update.effective_user.id)
+    
     keyboard = [
         [
             InlineKeyboardButton("🇺🇿 O'zbekcha", callback_data="change_lang_uz"),
@@ -2673,6 +2690,10 @@ async def menu_help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     """Handle ❓ Yordam button"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
+    
+    # Update activity for PRO care scheduler
+    db = await get_database()
+    await db.update_user_activity(telegram_id)
     
     await update.message.reply_text(
         get_message("help", lang),
