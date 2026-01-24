@@ -1,0 +1,1890 @@
+"""
+SOLVO Bot Handlers
+All conversation handlers and command handlers
+"""
+import logging
+import os
+from pathlib import Path
+from telegram import (
+    Update, 
+    ReplyKeyboardMarkup, 
+    ReplyKeyboardRemove,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
+from telegram.ext import (
+    ContextTypes,
+    ConversationHandler,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    filters
+)
+
+from app.config import States, PDF_UPLOAD_DIR, TRANSACTION_UPLOAD_DIR, TRANSACTION_EXTENSIONS
+from app.database import get_database
+import asyncio
+from app.languages import get_message, format_number
+from app.subscription_handlers import require_pro
+from app.engine import calculate_finances, format_result_message
+from app.pdf_parser import parse_katm_pdf
+from app.transaction_parser import parse_transactions, calculate_monthly_averages
+
+logger = logging.getLogger(__name__)
+
+
+# ==================== HELPER FUNCTIONS ====================
+
+async def get_user_language(telegram_id: int) -> str:
+    """Get user's language preference"""
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    return user.get("language", "uz") if user else "uz"
+
+
+def parse_number(text: str) -> float:
+    """Parse number from user input"""
+    # Remove spaces, commas, and common text
+    cleaned = text.strip().replace(" ", "").replace(",", "").replace(".", "")
+    cleaned = cleaned.replace("so'm", "").replace("sum", "").replace("сум", "")
+    cleaned = cleaned.replace("mln", "000000").replace("млн", "000000")
+    
+    try:
+        return float(cleaned)
+    except ValueError:
+        return -1
+
+
+# ==================== START COMMAND ====================
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle /start command - request phone number"""
+    user = update.effective_user
+    telegram_id = user.id
+    
+    # Check if user already registered
+    db = await get_database()
+    existing_user = await db.get_user(telegram_id)
+    
+    if existing_user:
+        lang = existing_user.get("language", "uz")
+    else:
+        lang = "uz"  # Default for new users
+    
+    # Store user info in context
+    context.user_data["telegram_id"] = telegram_id
+    context.user_data["first_name"] = user.first_name
+    context.user_data["last_name"] = user.last_name
+    context.user_data["username"] = user.username
+    context.user_data["lang"] = lang
+    
+    # Request phone number
+    keyboard = [
+        [KeyboardButton(
+            get_message("share_contact_button", lang),
+            request_contact=True
+        )]
+    ]
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard, 
+        resize_keyboard=True, 
+        one_time_keyboard=True
+    )
+    
+    await update.message.reply_text(
+        get_message("welcome", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.LANGUAGE
+
+
+# ==================== CONTACT HANDLER ====================
+
+async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle shared contact"""
+    contact = update.message.contact
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Verify it's the user's own contact
+    if contact.user_id != telegram_id:
+        await update.message.reply_text(
+            get_message("error_contact_mismatch", lang),
+            parse_mode="Markdown"
+        )
+        return States.LANGUAGE
+    
+    # Store phone number
+    context.user_data["phone_number"] = contact.phone_number
+    
+    # Send confirmation
+    msg = await update.message.reply_text(
+        get_message("contact_received", lang),
+        reply_markup=ReplyKeyboardRemove()
+    )
+    try:
+        await asyncio.sleep(1.5)
+        await msg.delete()
+    except:
+        pass
+    
+    # Ask for language
+    keyboard = [
+        [
+            InlineKeyboardButton("🇺🇿 O'zbekcha", callback_data="lang_uz"),
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("select_language", lang),
+        reply_markup=reply_markup
+    )
+    
+    return States.LANGUAGE
+
+
+# ==================== LANGUAGE SELECTION ====================
+
+async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle language selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Get selected language
+    lang = query.data.replace("lang_", "")
+    context.user_data["lang"] = lang
+    
+    telegram_id = update.effective_user.id
+    db = await get_database()
+    
+    # Create or update user
+    existing_user = await db.get_user(telegram_id)
+    
+    if existing_user:
+        await db.update_user(telegram_id, language=lang)
+    else:
+        # Create new user
+        await db.create_user(
+            telegram_id=telegram_id,
+            phone_number=context.user_data.get("phone_number", ""),
+            first_name=context.user_data.get("first_name"),
+            last_name=context.user_data.get("last_name"),
+            username=context.user_data.get("username"),
+            language=lang
+        )
+    
+    # Confirm language
+    lang_msg = await query.edit_message_text(
+        get_message("language_set", lang)
+    )
+    try:
+        await asyncio.sleep(1.5)
+        await lang_msg.delete()
+    except:
+        pass
+    
+    # Ask for mode
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
+            InlineKeyboardButton(get_message("mode_family", lang), callback_data="mode_family")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("select_mode", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.MODE
+
+
+# ==================== MODE SELECTION ====================
+
+async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle mode selection (solo/family)"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    mode = query.data.replace("mode_", "")
+    context.user_data["mode"] = mode
+    
+    # Update user mode in database
+    telegram_id = update.effective_user.id
+    db = await get_database()
+    await db.update_user(telegram_id, mode=mode)
+    
+    # Confirm mode
+    if mode == "solo":
+        mode_msg = await query.edit_message_text(get_message("mode_set_solo", lang))
+    else:
+        mode_msg = await query.edit_message_text(get_message("mode_set_family", lang))
+    try:
+        await asyncio.sleep(1.5)
+        await mode_msg.delete()
+    except:
+        pass
+    
+    # Ask about transaction history upload
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("transaction_yes", lang), callback_data="tx_yes"),
+            InlineKeyboardButton(get_message("transaction_no", lang), callback_data="tx_no")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("transaction_choice", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.TRANSACTION_CHOICE
+
+
+# ==================== TRANSACTION HISTORY UPLOAD (MULTI-CARD) ====================
+
+async def transaction_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle transaction history upload choice"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    choice = query.data
+    
+    if choice == "tx_yes":
+        # Initialize multi-card storage
+        context.user_data["tx_cards"] = []  # List of card results
+        
+        # Show instructions
+        await query.edit_message_text(
+            get_message("transaction_instructions", lang),
+            parse_mode="Markdown"
+        )
+        return States.TRANSACTION_UPLOAD
+    
+    else:  # tx_no - manual entry
+        await query.edit_message_text(
+            get_message("input_income_self", lang),
+            parse_mode="Markdown"
+        )
+        return States.INCOME_SELF
+
+
+def get_monthly_breakdown(transactions):
+    """Group transactions by month for breakdown view"""
+    from collections import defaultdict
+    from datetime import datetime
+    
+    monthly = defaultdict(lambda: {"income": 0, "expense": 0})
+    
+    for t in transactions:
+        if not t.date:
+            continue
+        # Try to parse date
+        try:
+            # Handle various date formats
+            date_str = t.date
+            month_key = None
+            for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]:
+                try:
+                    dt = datetime.strptime(date_str[:10], fmt)
+                    month_key = dt.strftime("%Y-%m")
+                    break
+                except:
+                    continue
+            
+            if month_key:
+                if t.transaction_type.value == "income":
+                    monthly[month_key]["income"] += t.amount
+                elif t.transaction_type.value == "expense":
+                    monthly[month_key]["expense"] += t.amount
+        except:
+            continue
+    
+    return dict(sorted(monthly.items()))
+
+
+async def transaction_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle transaction file upload (supports multiple cards)"""
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    document = update.message.document
+    
+    if not document:
+        await update.message.reply_text(
+            get_message("transaction_invalid_file", lang)
+        )
+        return States.TRANSACTION_UPLOAD
+    
+    # Check file extension
+    file_ext = Path(document.file_name).suffix.lower()
+    if file_ext not in TRANSACTION_EXTENSIONS:
+        await update.message.reply_text(
+            get_message("transaction_invalid_file", lang)
+        )
+        return States.TRANSACTION_UPLOAD
+    
+    # Show processing message
+    processing_msg = await update.message.reply_text(
+        get_message("transaction_processing", lang)
+    )
+    
+    try:
+        # Create upload directory
+        TRANSACTION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Download file
+        file = await document.get_file()
+        file_name = f"{telegram_id}_{document.file_name}"
+        file_path = TRANSACTION_UPLOAD_DIR / file_name
+        
+        await file.download_to_drive(str(file_path))
+        
+        # Parse transactions
+        result = parse_transactions(str(file_path))
+        
+        # Delete processing message
+        await processing_msg.delete()
+        
+        if result.success and (result.income_count > 0 or result.expense_count > 0):
+            # Initialize cards list if not exists
+            if "tx_cards" not in context.user_data:
+                context.user_data["tx_cards"] = []
+            
+            # Get card name from filename
+            card_name = Path(document.file_name).stem
+            # Clean up card name
+            card_name = card_name.replace("_", " ").replace("-", " ")
+            if len(card_name) > 30:
+                card_name = card_name[:30] + "..."
+            
+            # Calculate monthly averages
+            averages = calculate_monthly_averages(result)
+            monthly_breakdown = get_monthly_breakdown(result.transactions)
+            
+            # Store card data
+            card_data = {
+                "name": card_name,
+                "file_name": document.file_name,
+                "result": result,
+                "averages": averages,
+                "monthly_breakdown": monthly_breakdown,
+                "total_income": result.total_income,
+                "total_expense": result.total_expense,
+                "income_count": result.income_count,
+                "expense_count": result.expense_count,
+                "period_start": result.period_start,
+                "period_end": result.period_end
+            }
+            context.user_data["tx_cards"].append(card_data)
+            
+            card_num = len(context.user_data["tx_cards"])
+            
+            # Format period
+            period = ""
+            if result.period_start and result.period_end:
+                period = f"{result.period_start} — {result.period_end}"
+            else:
+                period = "—"
+            
+            # Show card added message
+            card_msg = get_message("transaction_card_added", lang).format(
+                card_num=card_num,
+                card_name=card_name,
+                period=period,
+                income_count=result.income_count,
+                total_income=format_number(result.total_income),
+                expense_count=result.expense_count,
+                total_expense=format_number(result.total_expense)
+            )
+            
+            await update.message.reply_text(card_msg, parse_mode="Markdown")
+            
+            # Ask to add more or finish
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        get_message("transaction_add_more", lang),
+                        callback_data="tx_add_more"
+                    ),
+                    InlineKeyboardButton(
+                        get_message("transaction_finish_cards", lang),
+                        callback_data="tx_finish"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                get_message("transaction_add_more_prompt", lang),
+                reply_markup=reply_markup
+            )
+            
+            return States.TRANSACTION_UPLOAD
+        
+        else:
+            # Parsing failed
+            await update.message.reply_text(
+                get_message("transaction_failed", lang),
+                parse_mode="Markdown"
+            )
+            
+            # If we have some cards already, ask to continue
+            if context.user_data.get("tx_cards"):
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            get_message("transaction_add_more", lang),
+                            callback_data="tx_add_more"
+                        ),
+                        InlineKeyboardButton(
+                            get_message("transaction_finish_cards", lang),
+                            callback_data="tx_finish"
+                        )
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    get_message("transaction_add_more_prompt", lang),
+                    reply_markup=reply_markup
+                )
+                return States.TRANSACTION_UPLOAD
+            else:
+                await update.message.reply_text(
+                    get_message("input_income_self", lang),
+                    parse_mode="Markdown"
+                )
+                return States.INCOME_SELF
+    
+    except Exception as e:
+        logger.error(f"Transaction file processing error: {e}")
+        await processing_msg.delete()
+        
+        await update.message.reply_text(
+            get_message("transaction_failed", lang),
+            parse_mode="Markdown"
+        )
+        
+        # If we have some cards, allow continue
+        if context.user_data.get("tx_cards"):
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        get_message("transaction_add_more", lang),
+                        callback_data="tx_add_more"
+                    ),
+                    InlineKeyboardButton(
+                        get_message("transaction_finish_cards", lang),
+                        callback_data="tx_finish"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                get_message("transaction_add_more_prompt", lang),
+                reply_markup=reply_markup
+            )
+            return States.TRANSACTION_UPLOAD
+        else:
+            await update.message.reply_text(
+                get_message("input_income_self", lang),
+                parse_mode="Markdown"
+            )
+            return States.INCOME_SELF
+
+
+async def transaction_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle add more cards or finish"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    action = query.data
+    
+    if action == "tx_add_more":
+        await query.edit_message_text(
+            get_message("transaction_instructions", lang),
+            parse_mode="Markdown"
+        )
+        return States.TRANSACTION_UPLOAD
+    
+    elif action == "tx_finish":
+        # Show multi-card summary
+        return await show_transaction_summary(query, context)
+    
+    return States.TRANSACTION_UPLOAD
+
+
+async def show_transaction_summary(query, context) -> int:
+    """Show summary of all uploaded cards"""
+    lang = context.user_data.get("lang", "uz")
+    cards = context.user_data.get("tx_cards", [])
+    
+    if not cards:
+        await query.edit_message_text(
+            get_message("input_income_self", lang),
+            parse_mode="Markdown"
+        )
+        return States.INCOME_SELF
+    
+    # Calculate totals
+    total_income = sum(c["total_income"] for c in cards)
+    total_expense = sum(c["total_expense"] for c in cards)
+    balance = total_income - total_expense
+    
+    # Calculate monthly averages across all cards
+    all_monthly = {}
+    for card in cards:
+        for month, data in card.get("monthly_breakdown", {}).items():
+            if month not in all_monthly:
+                all_monthly[month] = {"income": 0, "expense": 0}
+            all_monthly[month]["income"] += data["income"]
+            all_monthly[month]["expense"] += data["expense"]
+    
+    # Calculate average monthly
+    if all_monthly:
+        num_months = len(all_monthly)
+        monthly_income = sum(m["income"] for m in all_monthly.values()) / num_months
+        monthly_expense = sum(m["expense"] for m in all_monthly.values()) / num_months
+    else:
+        monthly_income = total_income
+        monthly_expense = total_expense
+    
+    # Store for later use
+    context.user_data["tx_total_income"] = total_income
+    context.user_data["tx_total_expense"] = total_expense
+    context.user_data["tx_monthly_income"] = monthly_income
+    context.user_data["tx_monthly_expense"] = monthly_expense
+    context.user_data["tx_all_monthly"] = all_monthly
+    
+    # Build card details
+    card_details = ""
+    for i, card in enumerate(cards, 1):
+        card_detail = get_message("transaction_card_detail", lang).format(
+            card_name=f"#{i} {card['name']}",
+            total_income=format_number(card["total_income"]),
+            total_expense=format_number(card["total_expense"])
+        )
+        card_details += card_detail + "\n"
+    
+    # Build monthly breakdown (last 3 months)
+    month_lines = []
+    sorted_months = sorted(all_monthly.keys(), reverse=True)[:3]
+    month_names = {
+        "01": "Yanvar" if lang == "uz" else "Январь",
+        "02": "Fevral" if lang == "uz" else "Февраль",
+        "03": "Mart" if lang == "uz" else "Март",
+        "04": "Aprel" if lang == "uz" else "Апрель",
+        "05": "May" if lang == "uz" else "Май",
+        "06": "Iyun" if lang == "uz" else "Июнь",
+        "07": "Iyul" if lang == "uz" else "Июль",
+        "08": "Avgust" if lang == "uz" else "Август",
+        "09": "Sentyabr" if lang == "uz" else "Сентябрь",
+        "10": "Oktyabr" if lang == "uz" else "Октябрь",
+        "11": "Noyabr" if lang == "uz" else "Ноябрь",
+        "12": "Dekabr" if lang == "uz" else "Декабрь",
+    }
+    
+    for month_key in sorted_months:
+        data = all_monthly[month_key]
+        year, month = month_key.split("-")
+        month_name = month_names.get(month, month)
+        month_lines.append(get_message("transaction_month_row", lang).format(
+            month=f"{month_name} {year}",
+            income=format_number(data["income"]),
+            expense=format_number(data["expense"])
+        ))
+    
+    # Build summary message
+    summary_msg = get_message("transaction_multi_summary", lang).format(
+        card_details=card_details,
+        total_income=format_number(total_income),
+        total_expense=format_number(total_expense),
+        balance=format_number(balance),
+        monthly_income=format_number(monthly_income),
+        monthly_expense=format_number(monthly_expense)
+    )
+    
+    if month_lines:
+        summary_msg += get_message("transaction_monthly_breakdown", lang).format(
+            months="\n".join(month_lines)
+        )
+    
+    await query.edit_message_text(summary_msg, parse_mode="Markdown")
+    
+    # Ask for confirmation
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                get_message("transaction_summary_confirm_yes", lang),
+                callback_data="tx_summary_confirm"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                get_message("transaction_summary_add_income", lang),
+                callback_data="tx_summary_add_income"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                get_message("transaction_summary_manual", lang),
+                callback_data="tx_summary_manual"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("transaction_summary_confirm", lang),
+        reply_markup=reply_markup
+    )
+    
+    return States.TRANSACTION_SUMMARY
+
+
+async def transaction_summary_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle transaction summary confirmation"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    action = query.data
+    
+    if action == "tx_summary_confirm":
+        # Use the calculated monthly income
+        monthly_income = context.user_data.get("tx_monthly_income", 0)
+        
+        if monthly_income > 0:
+            context.user_data["income_self"] = monthly_income
+            
+            await query.edit_message_text(
+                get_message("transaction_income_used", lang).format(
+                    amount=format_number(monthly_income)
+                )
+            )
+            
+            # Check if family mode needs partner income
+            if context.user_data.get("mode") == "family":
+                # Add quick button for partner with no income
+                keyboard = [
+                    [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.message.reply_text(
+                    get_message("input_income_partner", lang),
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup
+                )
+                return States.INCOME_PARTNER
+            else:
+                context.user_data["income_partner"] = 0
+                # Add quick button for own home
+                keyboard = [
+                    [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.message.reply_text(
+                    get_message("input_rent", lang),
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup
+                )
+                return States.RENT
+        else:
+            await query.edit_message_text(
+                get_message("input_income_self", lang),
+                parse_mode="Markdown"
+            )
+            return States.INCOME_SELF
+    
+    elif action == "tx_summary_add_income":
+        # Ask for additional income
+        await query.edit_message_text(
+            get_message("transaction_extra_income_prompt", lang),
+            parse_mode="Markdown"
+        )
+        return States.TRANSACTION_SUMMARY
+    
+    elif action == "tx_summary_manual":
+        # Manual entry
+        await query.edit_message_text(
+            get_message("input_income_self", lang),
+            parse_mode="Markdown"
+        )
+        return States.INCOME_SELF
+    
+    return States.TRANSACTION_SUMMARY
+
+
+async def transaction_extra_income_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle extra income input during transaction summary"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    extra_income = parse_number(text)
+    
+    if extra_income < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.TRANSACTION_SUMMARY
+    
+    # Add extra income to monthly income
+    monthly_income = context.user_data.get("tx_monthly_income", 0)
+    total_income = monthly_income + extra_income
+    context.user_data["income_self"] = total_income
+    
+    await update.message.reply_text(
+        get_message("transaction_income_used", lang).format(
+            amount=format_number(total_income)
+        )
+    )
+    
+    # Check if family mode needs partner income
+    if context.user_data.get("mode") == "family":
+        # Add quick button for partner with no income
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("input_income_partner", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.INCOME_PARTNER
+    else:
+        context.user_data["income_partner"] = 0
+        # Add quick button for own home
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("input_rent", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.RENT
+
+
+async def transaction_skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle text during transaction upload (skip to manual)"""
+    lang = context.user_data.get("lang", "uz")
+    
+    # If we have cards, show summary
+    if context.user_data.get("tx_cards"):
+        # Create a fake query object for show_transaction_summary
+        class FakeQuery:
+            message = update.message
+            async def edit_message_text(self, text, parse_mode=None):
+                await update.message.reply_text(text, parse_mode=parse_mode)
+        
+        return await show_transaction_summary(FakeQuery(), context)
+    
+    await update.message.reply_text(
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
+    )
+    
+    return States.INCOME_SELF
+
+
+# ==================== INCOME INPUT ====================
+
+async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle user's income input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.INCOME_SELF
+    
+    if amount == 0:
+        await update.message.reply_text(
+            get_message("number_too_small", lang)
+        )
+        return States.INCOME_SELF
+    
+    context.user_data["income_self"] = amount
+    
+    await update.message.reply_text(
+        get_message("income_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Check if family mode
+    if context.user_data.get("mode") == "family":
+        # Add quick button for partner with no income
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("input_income_partner", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.INCOME_PARTNER
+    else:
+        context.user_data["income_partner"] = 0
+        # Add quick button for own home
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("input_rent", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.RENT
+
+
+async def income_partner_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle partner's income input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.INCOME_PARTNER
+    
+    context.user_data["income_partner"] = amount
+    
+    await update.message.reply_text(
+        get_message("income_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Add quick button for own home
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("input_rent", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.RENT
+
+
+async def quick_partner_income_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle quick button for partner with no income"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    context.user_data["income_partner"] = 0
+    
+    await query.edit_message_text(
+        get_message("income_saved", lang).format(amount="0")
+    )
+    
+    # Add quick button for own home
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("input_rent", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.RENT
+
+
+# ==================== LIVING COSTS INPUT ====================
+
+async def rent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle rent input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.RENT
+    
+    context.user_data["rent"] = amount
+    
+    await update.message.reply_text(
+        get_message("cost_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Add quick button for no kindergarten
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("input_kindergarten", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KINDERGARTEN
+
+
+async def quick_rent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle quick button for own home (rent = 0)"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    context.user_data["rent"] = 0
+    
+    await query.edit_message_text(
+        get_message("cost_saved", lang).format(amount="0")
+    )
+    
+    # Add quick button for no kindergarten
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("input_kindergarten", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KINDERGARTEN
+
+
+async def kindergarten_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle kindergarten/education input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.KINDERGARTEN
+    
+    context.user_data["kindergarten"] = amount
+    
+    await update.message.reply_text(
+        get_message("cost_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Add quick buttons for common utility amounts
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("btn_utilities_300", lang), callback_data="quick_utilities_300000"),
+            InlineKeyboardButton(get_message("btn_utilities_500", lang), callback_data="quick_utilities_500000"),
+            InlineKeyboardButton(get_message("btn_utilities_800", lang), callback_data="quick_utilities_800000")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("input_utilities", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.UTILITIES
+
+
+async def quick_kindergarten_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle quick button for no kindergarten/kids"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    context.user_data["kindergarten"] = 0
+    
+    await query.edit_message_text(
+        get_message("cost_saved", lang).format(amount="0")
+    )
+    
+    # Add quick buttons for common utility amounts
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("btn_utilities_300", lang), callback_data="quick_utilities_300000"),
+            InlineKeyboardButton(get_message("btn_utilities_500", lang), callback_data="quick_utilities_500000"),
+            InlineKeyboardButton(get_message("btn_utilities_800", lang), callback_data="quick_utilities_800000")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("input_utilities", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.UTILITIES
+
+
+async def utilities_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle utilities input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.UTILITIES
+    
+    context.user_data["utilities"] = amount
+    
+    await update.message.reply_text(
+        get_message("cost_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Ask about KATM PDF upload
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("katm_yes", lang), callback_data="katm_yes"),
+            InlineKeyboardButton(get_message("katm_no", lang), callback_data="katm_no")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("katm_choice", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KATM_CHOICE
+
+
+async def quick_utilities_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle quick button for common utility amounts"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract amount from callback data (quick_utilities_300000 -> 300000)
+    amount = int(query.data.split("_")[-1])
+    context.user_data["utilities"] = amount
+    
+    await query.edit_message_text(
+        get_message("cost_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Ask about KATM PDF upload
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("katm_yes", lang), callback_data="katm_yes"),
+            InlineKeyboardButton(get_message("katm_no", lang), callback_data="katm_no")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("katm_choice", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KATM_CHOICE
+
+
+# ==================== KATM PDF UPLOAD ====================
+
+async def katm_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle KATM choice (yes/no)"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    choice = query.data
+    
+    if choice == "katm_yes":
+        # PRO tekshiruv
+        if not await require_pro(update, context):
+            return ConversationHandler.END
+        # Show instructions for PDF upload
+        await query.edit_message_text(
+            get_message("katm_instructions", lang),
+            parse_mode="Markdown"
+        )
+        return States.KATM_UPLOAD
+    
+    else:  # katm_no - manual entry
+        # Add quick button for no loans
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_no_loans", lang), callback_data="quick_loan_0")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.LOAN_PAYMENT
+
+
+async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle PDF file upload"""
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    # PRO tekshiruv
+    if not await require_pro(update, context):
+        return ConversationHandler.END
+    # Check if document is PDF
+    document = update.message.document
+    if not document:
+        await update.message.reply_text(
+            get_message("katm_not_pdf", lang)
+        )
+        return States.KATM_UPLOAD
+    if not document.file_name.lower().endswith('.pdf'):
+        await update.message.reply_text(
+            get_message("katm_not_pdf", lang)
+        )
+        return States.KATM_UPLOAD
+    # Show processing message
+    processing_msg = await update.message.reply_text(
+        get_message("katm_processing", lang)
+    )
+    
+    try:
+        # Create upload directory
+        PDF_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Download PDF
+        file = await document.get_file()
+        pdf_filename = f"{telegram_id}_{document.file_name}"
+        pdf_path = PDF_UPLOAD_DIR / pdf_filename
+        
+        await file.download_to_drive(str(pdf_path))
+        
+        # Parse PDF
+        result = parse_katm_pdf(str(pdf_path))
+        
+        # Delete processing message
+        await processing_msg.delete()
+        
+        if result.success and result.loans:
+            # Store parsed data
+            context.user_data["loan_payment"] = result.total_monthly_payment
+            context.user_data["total_debt"] = result.total_remaining_debt
+            context.user_data["katm_loans"] = result.loans
+            context.user_data["katm_pdf"] = pdf_filename
+            
+            # Save to database
+            db = await get_database()
+            user = await db.get_user(telegram_id)
+            if user:
+                await db.delete_user_katm_loans(user["id"])
+                await db.save_katm_loans(
+                    user_id=user["id"],
+                    loans=result.loans,
+                    pdf_filename=pdf_filename
+                )
+            
+            # Format loans list
+            loans_list = "\n".join([
+                get_message("katm_loan_item", lang).format(
+                    bank=loan.bank_name,
+                    amount=format_number(loan.remaining_balance)
+                )
+                for loan in result.loans
+            ])
+            
+            # Show success message with parsed data
+            success_msg = get_message("katm_success", lang).format(
+                loans_list=loans_list,
+                total_debt=format_number(result.total_remaining_debt),
+                monthly_payment=format_number(result.total_monthly_payment)
+            )
+            
+            # Add confirmation buttons
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        get_message("katm_confirm_yes", lang), 
+                        callback_data="katm_confirm_yes"
+                    ),
+                    InlineKeyboardButton(
+                        get_message("katm_confirm_no", lang), 
+                        callback_data="katm_confirm_no"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                success_msg + "\n\n" + get_message("katm_confirm", lang),
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+            
+            return States.KATM_UPLOAD
+        
+        else:
+            # Parsing failed - fallback to manual
+            error_msg = result.error_message if result.error_message else ""
+            
+            await update.message.reply_text(
+                get_message("katm_failed", lang),
+                parse_mode="Markdown"
+            )
+            
+            await update.message.reply_text(
+                get_message("input_loan_payment", lang),
+                parse_mode="Markdown"
+            )
+            
+            return States.LOAN_PAYMENT
+    
+    except Exception as e:
+        logger.error(f"PDF processing error: {e}")
+        await processing_msg.delete()
+        
+        await update.message.reply_text(
+            get_message("katm_failed", lang),
+            parse_mode="Markdown"
+        )
+        
+        await update.message.reply_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown"
+        )
+        
+        return States.LOAN_PAYMENT
+
+
+async def katm_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle KATM data confirmation"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    choice = query.data
+    
+    if choice == "katm_confirm_yes":
+        # Data confirmed, proceed to calculation
+        await query.edit_message_text(
+            get_message("debt_saved", lang)
+        )
+        
+        # Go directly to calculation
+        return await calculate_and_show_results_from_callback(query, context)
+    
+    else:  # katm_confirm_no - manual entry
+        await query.edit_message_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown"
+        )
+        return States.LOAN_PAYMENT
+
+
+async def katm_skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle skip button or text during KATM upload"""
+    lang = context.user_data.get("lang", "uz")
+    
+    await update.message.reply_text(
+        get_message("input_loan_payment", lang),
+        parse_mode="Markdown"
+    )
+    
+    return States.LOAN_PAYMENT
+
+
+# ==================== LOAN INPUT ====================
+
+async def loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle monthly loan payment input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.LOAN_PAYMENT
+    
+    context.user_data["loan_payment"] = amount
+    
+    await update.message.reply_text(
+        get_message("debt_saved", lang)
+    )
+    
+    # If no loan payment, skip total debt
+    if amount == 0:
+        context.user_data["total_debt"] = 0
+        return await calculate_and_show_results(update, context)
+    
+    # Add quick button for no debt remaining
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_debt", lang), callback_data="quick_debt_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("input_total_debt", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.TOTAL_DEBT
+
+
+async def quick_loan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle quick button for no loans"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    context.user_data["loan_payment"] = 0
+    context.user_data["total_debt"] = 0
+    
+    await query.edit_message_text(
+        get_message("debt_saved", lang)
+    )
+    
+    # Go to calculation
+    return await calculate_and_show_results_from_callback(query, context)
+
+
+async def quick_debt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle quick button for no remaining debt"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    context.user_data["total_debt"] = 0
+    
+    await query.edit_message_text(
+        get_message("debt_saved", lang)
+    )
+    
+    # Go to calculation
+    return await calculate_and_show_results_from_callback(query, context)
+
+
+async def total_debt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle total debt input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return States.TOTAL_DEBT
+    
+    context.user_data["total_debt"] = amount
+    
+    return await calculate_and_show_results(update, context)
+
+
+# ==================== CALCULATION & RESULTS ====================
+
+# ==================== TRIAL HANDLER ====================
+async def start_trial_callback(update, context):
+    """Handle 3-day free trial activation"""
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    if not user:
+        await update.callback_query.answer(get_message("error_not_registered", lang), show_alert=True)
+        return ConversationHandler.END
+    if user.get("trial_used", 0):
+        await update.callback_query.answer(get_message("trial_already_used", lang) if "trial_already_used" in get_message else "Siz allaqachon trialdan foydalandingiz", show_alert=True)
+        return ConversationHandler.END
+    # Activate trial: set PRO, 3 days, mark trial_used
+    from datetime import datetime, timedelta
+    expires = datetime.now() + timedelta(days=3)
+    await db._connection.execute(
+        """
+        UPDATE users SET subscription_tier = 'pro', subscription_expires = ?, subscription_plan = 'trial', trial_used = 1, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
+        """,
+        (expires.isoformat(), telegram_id)
+    )
+    await db._connection.commit()
+    # Show confirmation
+    msg = get_message("trial_activated", lang)
+    if isinstance(msg, dict):
+        msg = msg.get(lang, list(msg.values())[0])
+    await update.callback_query.answer()
+    await update.callback_query.message.reply_text(
+        msg.format(date=expires.strftime("%d.%m.%Y")),
+        parse_mode="Markdown"
+    )
+    return ConversationHandler.END
+
+async def get_user_subscription_status(telegram_id: int) -> bool:
+    """Check if user has active PRO subscription"""
+    from datetime import datetime
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return False
+    
+    tier = user.get("subscription_tier", "free")
+    if tier == "free":
+        return False
+    
+    expires = user.get("subscription_expires")
+    if expires:
+        if isinstance(expires, str):
+            expires = datetime.fromisoformat(expires)
+        if datetime.now() > expires:
+            return False
+    
+    return True
+
+
+async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Calculate finances and show results"""
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    # Show calculating message
+    calc_msg = await update.message.reply_text(
+        get_message("calculating", lang)
+    )
+    
+    # Get all input data
+    income_self = context.user_data.get("income_self", 0)
+    income_partner = context.user_data.get("income_partner", 0)
+    rent = context.user_data.get("rent", 0)
+    kindergarten = context.user_data.get("kindergarten", 0)
+    utilities = context.user_data.get("utilities", 0)
+    loan_payment = context.user_data.get("loan_payment", 0)
+    total_debt = context.user_data.get("total_debt", 0)
+    
+    # Calculate
+    result = calculate_finances(
+        income_self=income_self,
+        income_partner=income_partner,
+        rent=rent,
+        kindergarten=kindergarten,
+        utilities=utilities,
+        loan_payment=loan_payment,
+        total_debt=total_debt
+    )
+    
+    # Save to database
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if user:
+        # Create financial profile
+        profile_id = await db.create_financial_profile(
+            user_id=user["id"],
+            income_self=income_self,
+            income_partner=income_partner,
+            rent=rent,
+            kindergarten=kindergarten,
+            utilities=utilities,
+            loan_payment=loan_payment,
+            total_debt=total_debt
+        )
+        
+        # Save calculation
+        await db.save_calculation(
+            user_id=user["id"],
+            profile_id=profile_id,
+            calculation_data=result
+        )
+    
+    # Delete calculating message
+    await calc_msg.delete()
+    
+    # Check if user has PRO subscription
+    is_pro = await get_user_subscription_status(telegram_id)
+    
+    # Format and send result (partial for free users)
+    result_message = format_result_message(result, lang, is_pro=is_pro)
+    
+    # Add action buttons
+    if is_pro:
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+        ]
+    else:
+        # Show PRO upgrade and trial buttons for free users
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_try_free", lang), callback_data="start_trial")],
+            [InlineKeyboardButton(get_message("btn_upgrade_pro", lang), callback_data="show_pricing")],
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+        ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        result_message,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    # Show first calculation offer for free users
+    if not is_pro:
+        await update.message.reply_text(
+            get_message("offer_after_first_calc", lang),
+            parse_mode="Markdown"
+        )
+    
+    return ConversationHandler.END
+
+
+async def calculate_and_show_results_from_callback(query, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Calculate finances and show results (from callback query)"""
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = query.from_user.id
+    
+    # Get all input data
+    income_self = context.user_data.get("income_self", 0)
+    income_partner = context.user_data.get("income_partner", 0)
+    rent = context.user_data.get("rent", 0)
+    kindergarten = context.user_data.get("kindergarten", 0)
+    utilities = context.user_data.get("utilities", 0)
+    loan_payment = context.user_data.get("loan_payment", 0)
+    total_debt = context.user_data.get("total_debt", 0)
+    
+    # Calculate
+    result = calculate_finances(
+        income_self=income_self,
+        income_partner=income_partner,
+        rent=rent,
+        kindergarten=kindergarten,
+        utilities=utilities,
+        loan_payment=loan_payment,
+        total_debt=total_debt
+    )
+    
+    # Save to database
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if user:
+        # Create financial profile
+        profile_id = await db.create_financial_profile(
+            user_id=user["id"],
+            income_self=income_self,
+            income_partner=income_partner,
+            rent=rent,
+            kindergarten=kindergarten,
+            utilities=utilities,
+            loan_payment=loan_payment,
+            total_debt=total_debt
+        )
+        
+        # Update KATM loans with profile_id if they exist
+        katm_loans = context.user_data.get("katm_loans")
+        if katm_loans:
+            # Loans already saved, could update profile_id here if needed
+            pass
+        
+        # Save calculation
+        await db.save_calculation(
+            user_id=user["id"],
+            profile_id=profile_id,
+            calculation_data=result
+        )
+    
+    # Check if user has PRO subscription
+    is_pro = await get_user_subscription_status(telegram_id)
+    
+    # Format and send result (partial for free users)
+    result_message = format_result_message(result, lang, is_pro=is_pro)
+    
+    # Add action buttons
+    if is_pro:
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_try_free", lang), callback_data="start_trial")],
+            [InlineKeyboardButton(get_message("btn_upgrade_pro", lang), callback_data="show_pricing")],
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
+        ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        result_message,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return ConversationHandler.END
+
+
+# ==================== RECALCULATE ====================
+
+async def recalculate_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle recalculate button"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Clear previous data but keep user info
+    telegram_id = context.user_data.get("telegram_id")
+    phone = context.user_data.get("phone_number")
+    
+    context.user_data.clear()
+    context.user_data["telegram_id"] = telegram_id
+    context.user_data["phone_number"] = phone
+    context.user_data["lang"] = lang
+    
+    # Ask for mode again
+    keyboard = [
+        [
+            InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
+            InlineKeyboardButton(get_message("mode_family", lang), callback_data="mode_family")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("select_mode", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.MODE
+
+
+# ==================== OTHER COMMANDS ====================
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /help command"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    
+    await update.message.reply_text(
+        get_message("help", lang),
+        parse_mode="Markdown"
+    )
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /status command - show last calculation"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await update.message.reply_text(
+            get_message("no_data", lang)
+        )
+        return
+    
+    calculation = await db.get_latest_calculation(user["id"])
+    
+    if not calculation:
+        await update.message.reply_text(
+            get_message("no_data", lang)
+        )
+        return
+    
+    # Format result
+    result_message = format_result_message(calculation, lang)
+    
+    await update.message.reply_text(
+        get_message("status_header", lang) + "\n\n" + result_message,
+        parse_mode="Markdown"
+    )
+
+
+async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /language command"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🇺🇿 O'zbekcha", callback_data="change_lang_uz"),
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="change_lang_ru")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "🌐 Tilni tanlang / Выберите язык:",
+        reply_markup=reply_markup
+    )
+
+
+async def change_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle language change from /language command"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = query.data.replace("change_lang_", "")
+    telegram_id = update.effective_user.id
+    
+    db = await get_database()
+    await db.update_user(telegram_id, language=lang)
+    
+    context.user_data["lang"] = lang
+    
+    await query.edit_message_text(
+        get_message("language_set", lang)
+    )
+
+
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle /cancel command"""
+    lang = context.user_data.get("lang", "uz")
+    
+    await update.message.reply_text(
+        get_message("restart", lang),
+        reply_markup=ReplyKeyboardRemove()
+    )
+    
+    return ConversationHandler.END
+
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle errors"""
+    logger.error(f"Error: {context.error}")
+    
+    if update and update.effective_message:
+        lang = context.user_data.get("lang", "uz") if context.user_data else "uz"
+        
+        await update.effective_message.reply_text(
+            get_message("error_generic", lang)
+        )
+
+
+# ==================== CONVERSATION HANDLER ====================
+
+def get_conversation_handler() -> ConversationHandler:
+    """Create and return the main conversation handler"""
+    
+    return ConversationHandler(
+        entry_points=[
+            CommandHandler("start", start_command),
+            CallbackQueryHandler(recalculate_callback, pattern="^recalculate$"),
+        ],
+        states={
+            States.LANGUAGE: [
+                MessageHandler(filters.CONTACT, contact_handler),
+                CallbackQueryHandler(language_callback, pattern="^lang_"),
+            ],
+            States.MODE: [
+                CallbackQueryHandler(mode_callback, pattern="^mode_"),
+            ],
+            States.TRANSACTION_CHOICE: [
+                CallbackQueryHandler(transaction_choice_callback, pattern="^tx_(yes|no)$"),
+            ],
+            States.TRANSACTION_UPLOAD: [
+                MessageHandler(filters.Document.ALL, transaction_file_handler),
+                CallbackQueryHandler(transaction_action_callback, pattern="^tx_(add_more|finish)$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, transaction_skip_handler),
+            ],
+            States.TRANSACTION_SUMMARY: [
+                CallbackQueryHandler(transaction_summary_callback, pattern="^tx_summary_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, transaction_extra_income_handler),
+            ],
+            States.INCOME_SELF: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, income_self_handler),
+            ],
+            States.INCOME_PARTNER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, income_partner_handler),
+                CallbackQueryHandler(quick_partner_income_callback, pattern="^quick_partner_0$"),
+            ],
+            States.RENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, rent_handler),
+                CallbackQueryHandler(quick_rent_callback, pattern="^quick_rent_0$"),
+            ],
+            States.KINDERGARTEN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, kindergarten_handler),
+                CallbackQueryHandler(quick_kindergarten_callback, pattern="^quick_kindergarten_0$"),
+            ],
+            States.UTILITIES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, utilities_handler),
+                CallbackQueryHandler(quick_utilities_callback, pattern="^quick_utilities_"),
+            ],
+            States.KATM_CHOICE: [
+                CallbackQueryHandler(katm_choice_callback, pattern="^katm_(yes|no)$"),
+            ],
+            States.KATM_UPLOAD: [
+                MessageHandler(filters.Document.PDF, katm_pdf_handler),
+                MessageHandler(filters.Document.ALL, katm_pdf_handler),  # Catch non-PDF
+                CallbackQueryHandler(katm_confirm_callback, pattern="^katm_confirm_(yes|no)$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, katm_skip_handler),
+            ],
+            States.LOAN_PAYMENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, loan_payment_handler),
+                CallbackQueryHandler(quick_loan_callback, pattern="^quick_loan_0$"),
+            ],
+            States.TOTAL_DEBT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, total_debt_handler),
+                CallbackQueryHandler(quick_debt_callback, pattern="^quick_debt_0$"),
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel_command),
+            CommandHandler("start", start_command),
+        ],
+        allow_reentry=True,
+        # Add trial handler globally (works from any state)
+        per_message=True,
+    )
+
+# Register trial handler globally (for dispatcher setup)
+def add_trial_handler_to_app(application):
+    application.add_handler(CallbackQueryHandler(start_trial_callback, pattern="^start_trial$"), group=0)
