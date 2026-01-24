@@ -18,8 +18,8 @@ class SubscriptionTier(Enum):
 
 class SubscriptionPeriod(Enum):
     """Subscription period in days"""
+    WEEKLY = 7
     MONTHLY = 30
-    QUARTERLY = 90
     YEARLY = 365
 
 
@@ -34,34 +34,38 @@ class PricingPlan:
     price_uzs: int  # Price in Uzbek Som
     description_uz: str
     description_ru: str
+    is_recommended: bool = False
 
 
 # ==================== PRICING CONFIGURATION ====================
 
 PRICING_PLANS: Dict[str, PricingPlan] = {
+    "pro_weekly": PricingPlan(
+        id="pro_weekly",
+        tier=SubscriptionTier.PRO,
+        period=SubscriptionPeriod.WEEKLY,
+        price_uzs=5000,
+        description_uz="SOLVO PRO - 1 haftalik",
+        description_ru="SOLVO PRO - 1 неделя",
+        is_recommended=False,
+    ),
     "pro_monthly": PricingPlan(
         id="pro_monthly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.MONTHLY,
         price_uzs=15000,
-        description_uz="SOLVO PRO - 1 oylik obuna",
-        description_ru="SOLVO PRO - подписка на 1 месяц",
-    ),
-    "pro_quarterly": PricingPlan(
-        id="pro_quarterly",
-        tier=SubscriptionTier.PRO,
-        period=SubscriptionPeriod.QUARTERLY,
-        price_uzs=40500,  # 10% discount
-        description_uz="SOLVO PRO - 3 oylik obuna (10% chegirma)",
-        description_ru="SOLVO PRO - подписка на 3 месяца (скидка 10%)",
+        description_uz="SOLVO PRO - 1 oylik",
+        description_ru="SOLVO PRO - 1 месяц",
+        is_recommended=True,
     ),
     "pro_yearly": PricingPlan(
         id="pro_yearly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.YEARLY,
-        price_uzs=135000,  # 25% discount
-        description_uz="SOLVO PRO - 1 yillik obuna (25% chegirma)",
-        description_ru="SOLVO PRO - подписка на 1 год (скидка 25%)",
+        price_uzs=120000,  # 33% discount (vs 180,000 if monthly)
+        description_uz="SOLVO PRO - 1 yillik (33% tejash)",
+        description_ru="SOLVO PRO - 1 год (скидка 33%)",
+        is_recommended=False,
     ),
 }
 
@@ -72,6 +76,7 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
 FEATURE_LIMITS = {
     SubscriptionTier.FREE: {
         "calculations_per_day": 0,  # No free calculations - must be PRO
+        "can_use_bot": False,       # Cannot use bot at all without subscription
         "katm_analysis": False,
         "card_import": False,
         "ai_advice": False,
@@ -80,6 +85,7 @@ FEATURE_LIMITS = {
     },
     SubscriptionTier.PRO: {
         "calculations_per_day": -1,  # Unlimited
+        "can_use_bot": True,         # Full bot access
         "katm_analysis": True,
         "card_import": True,
         "ai_advice": True,

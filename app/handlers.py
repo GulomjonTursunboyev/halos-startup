@@ -26,7 +26,7 @@ from app.config import States, PDF_UPLOAD_DIR, TRANSACTION_UPLOAD_DIR, TRANSACTI
 from app.database import get_database
 import asyncio
 from app.languages import get_message, format_number
-from app.subscription_handlers import require_pro
+from app.subscription_handlers import require_pro, is_user_pro, show_pricing, show_subscription_expiring_warning
 from app.engine import calculate_finances, format_result_message
 from app.pdf_parser import parse_katm_pdf
 from app.transaction_parser import parse_transactions, calculate_monthly_averages
@@ -187,6 +187,15 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await lang_msg.delete()
     except:
         pass
+    
+    # CHECK SUBSCRIPTION - bot requires active subscription to use
+    if not await is_user_pro(telegram_id):
+        # User has no subscription - show pricing and stop here
+        await show_pricing(update, context, is_required=True)
+        return ConversationHandler.END
+    
+    # User has active subscription - check if expiring soon
+    await show_subscription_expiring_warning(update, context)
     
     # Ask for mode
     keyboard = [

@@ -94,8 +94,12 @@ async def subscription_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ==================== PRICING DISPLAY ====================
 
-async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show pricing options for Click payment"""
+async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_required: bool = False) -> None:
+    """Show pricing options for Click payment
+    
+    Args:
+        is_required: If True, shows that subscription is required to use the bot
+    """
     query = update.callback_query
     if query:
         await query.answer()
@@ -103,40 +107,54 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     lang = context.user_data.get("lang", "uz")
     
     if lang == "uz":
+        if is_required:
+            header = (
+                "🔐 *SOLVO dan foydalanish uchun obuna talab qilinadi*\n\n"
+                "SOLVO — sizning moliyaviy erkinligingiz yo'lidagi yordamchi.\n"
+                "Davom etish uchun obunani faollashtiring.\n\n"
+            )
+        else:
+            header = "💎 *SOLVO PRO - Premium Tarif*\n\n"
+        
         msg = (
-            "💎 *SOLVO PRO - Premium Tarif*\n\n"
-            "PRO obunasi bilan siz quyidagi imkoniyatlarga ega bo'lasiz:\n\n"
-            "✅ *Cheksiz hisob-kitoblar*\n"
-            "✅ *To'liq moliyaviy tahlil*\n"
+            f"{header}"
+            "✅ *Cheksiz moliyaviy hisob-kitoblar*\n"
+            "✅ *Qachon qarzsiz bo'lishingizni ko'rsatadi*\n"
+            "✅ *Qancha jamg'arishingizni hisoblaydi*\n"
             "✅ *KATM kredit tarixini tahlil*\n"
             "✅ *Karta tarixi import qilish*\n"
-            "✅ *AI maslahatlar*\n"
-            "✅ *PDF hisobotlar*\n"
-            "✅ *Ustuvor qo'llab-quvvatlash*\n\n"
+            "✅ *AI maslahatlar*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📊 *Narxlar:*\n\n"
-            "📅 *1 oylik:* `15,000 so'm`\n"
-            "📅 *3 oylik:* `40,500 so'm` _(10% tejash)_\n"
-            "📅 *1 yillik:* `135,000 so'm` _(25% tejash)_\n"
+            "⚡ *1 hafta:* `5,000 so'm` — sinab ko'ring\n"
+            "⭐ *1 oy:* `15,000 so'm` — tavsiya etiladi\n"
+            "🏆 *1 yil:* `120,000 so'm` _(33% tejash)_\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
+        if is_required:
+            header = (
+                "🔐 *Для использования SOLVO требуется подписка*\n\n"
+                "SOLVO — ваш помощник на пути к финансовой свободе.\n"
+                "Активируйте подписку, чтобы продолжить.\n\n"
+            )
+        else:
+            header = "💎 *SOLVO PRO - Премиум Тариф*\n\n"
+        
         msg = (
-            "💎 *SOLVO PRO - Премиум Тариф*\n\n"
-            "С подпиской PRO вы получаете:\n\n"
-            "✅ *Безлимитные расчёты*\n"
-            "✅ *Полный финансовый анализ*\n"
+            f"{header}"
+            "✅ *Безлимитные финансовые расчёты*\n"
+            "✅ *Показывает, когда станете без долгов*\n"
+            "✅ *Рассчитывает ваши накопления*\n"
             "✅ *Анализ кредитной истории КАТМ*\n"
             "✅ *Импорт истории карты*\n"
-            "✅ *AI рекомендации*\n"
-            "✅ *PDF отчёты*\n"
-            "✅ *Приоритетная поддержка*\n\n"
+            "✅ *AI рекомендации*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📊 *Цены:*\n\n"
-            "📅 *1 месяц:* `15,000 сум`\n"
-            "📅 *3 месяца:* `40,500 сум` _(скидка 10%)_\n"
-            "📅 *1 год:* `135,000 сум` _(скидка 25%)_\n"
+            "⚡ *1 неделя:* `5,000 сум` — попробуйте\n"
+            "⭐ *1 месяц:* `15,000 сум` — рекомендуем\n"
+            "🏆 *1 год:* `120,000 сум` _(скидка 33%)_\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💳 *Оплата: через Click*"
         )
@@ -144,26 +162,30 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Click Payment buttons
     keyboard = [
         [InlineKeyboardButton(
-            "📅 1 oy - 15,000 so'm" if lang == "uz" else "📅 1 мес - 15,000 сум",
+            "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+            callback_data="click_buy_pro_weekly"
+        )],
+        [InlineKeyboardButton(
+            "⭐ 1 oy - 15,000 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 15,000 сум (реком.)",
             callback_data="click_buy_pro_monthly"
         )],
         [InlineKeyboardButton(
-            "📅 3 oy - 40,500 so'm (-10%)" if lang == "uz" else "📅 3 мес - 40,500 сум (-10%)",
-            callback_data="click_buy_pro_quarterly"
-        )],
-        [InlineKeyboardButton(
-            "📅 1 yil - 135,000 so'm (-25%)" if lang == "uz" else "📅 1 год - 135,000 сум (-25%)",
+            "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
             callback_data="click_buy_pro_yearly"
         )],
         [InlineKeyboardButton(
             "🎁 Promo-kod" if lang == "uz" else "🎁 Промо-код",
             callback_data="enter_promo"
         )],
-        [InlineKeyboardButton(
+    ]
+    
+    # Only show back button if not required (i.e., user came here voluntarily)
+    if not is_required:
+        keyboard.append([InlineKeyboardButton(
             "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
             callback_data="back_to_main"
-        )]
-    ]
+        )])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if query:
@@ -183,6 +205,11 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def pro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /pro command - show pricing"""
     await show_pricing(update, context)
+
+
+async def show_pricing_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle show_pricing callback button - wrapper for show_pricing"""
+    await show_pricing(update, context, is_required=False)
 
 
 # ==================== CLICK PAYMENT HANDLER ====================
@@ -410,78 +437,81 @@ async def is_user_pro(telegram_id: int) -> bool:
 
 async def require_pro(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
-    Check if user has PRO access. If not, show payment required message.
+    Check if user has PRO access. If not, show subscription required message.
     Returns True if user has PRO, False otherwise.
+    This is the main gate - bot CANNOT be used without active subscription.
     """
     telegram_id = update.effective_user.id
     
     if await is_user_pro(telegram_id):
         return True
     
-    # User doesn't have PRO - show payment required
-    await show_payment_required(update, context)
+    # User doesn't have PRO - show subscription required with pricing
+    await show_pricing(update, context, is_required=True)
     return False
 
 
-async def show_payment_required(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show payment required message for non-PRO users"""
+async def get_subscription_days_left(telegram_id: int) -> int:
+    """Get remaining days of subscription, -1 if expired or no subscription"""
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return -1
+    
+    tier = user.get("subscription_tier", "free")
+    expires = user.get("subscription_expires")
+    
+    if tier == "free" or not expires:
+        return -1
+    
+    if isinstance(expires, str):
+        expires = datetime.fromisoformat(expires)
+    
+    days_left = (expires - datetime.now()).days
+    return max(0, days_left)
+
+
+async def show_subscription_expiring_warning(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show warning if subscription is expiring soon (3 days or less)"""
+    telegram_id = update.effective_user.id
+    days_left = await get_subscription_days_left(telegram_id)
+    
+    if days_left <= 0 or days_left > 3:
+        return
+    
     lang = context.user_data.get("lang", "uz")
     
     if lang == "uz":
-        msg = (
-            "🔒 *PRO obuna talab qilinadi*\n\n"
-            "Bu funksiya faqat PRO foydalanuvchilar uchun!\n\n"
-            "💎 PRO obunasi bilan:\n"
-            "• Cheksiz moliyaviy hisob-kitoblar\n"
-            "• To'liq KATM tahlili\n"
-            "• Karta tarixi import\n"
-            "• AI maslahatlar\n"
-            "• PDF hisobotlar\n\n"
-            "💰 *Narxlar:*\n"
-            "• 1 oy: 15,000 so'm\n"
-            "• 3 oy: 40,500 so'm\n"
-            "• 1 yil: 135,000 so'm\n\n"
-            "💳 *To'lov: Click orqali*\n\n"
-            "👇 Obunani sotib olish uchun tugmani bosing:"
-        )
+        if days_left == 0:
+            msg = "⚠️ *Obunangiz bugun tugaydi!* Davom etish uchun yangilang 👇"
+        elif days_left == 1:
+            msg = "⚠️ *Obunangiz ertaga tugaydi!* Hozir yangilang 👇"
+        else:
+            msg = f"⚠️ *Obunangiz {days_left} kundan so'ng tugaydi.* Yangilang 👇"
     else:
-        msg = (
-            "🔒 *Требуется PRO подписка*\n\n"
-            "Эта функция доступна только PRO пользователям!\n\n"
-            "💎 С подпиской PRO:\n"
-            "• Безлимитные финансовые расчёты\n"
-            "• Полный анализ КАТМ\n"
-            "• Импорт истории карты\n"
-            "• AI рекомендации\n"
-            "• PDF отчёты\n\n"
-            "💰 *Цены:*\n"
-            "• 1 месяц: 15,000 сум\n"
-            "• 3 месяца: 40,500 сум\n"
-            "• 1 год: 135,000 сум\n\n"
-            "💳 *Оплата: через Click*\n\n"
-            "👇 Нажмите кнопку для покупки:"
-        )
+        if days_left == 0:
+            msg = "⚠️ *Подписка истекает сегодня!* Продлите сейчас 👇"
+        elif days_left == 1:
+            msg = "⚠️ *Подписка истекает завтра!* Продлите сейчас 👇"
+        else:
+            msg = f"⚠️ *Подписка истекает через {days_left} дн.* Продлите 👇"
     
-    keyboard = [
-        [InlineKeyboardButton(
-            "💎 PRO sotib olish" if lang == "uz" else "💎 Купить PRO",
-            callback_data="show_pricing"
-        )]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = [[InlineKeyboardButton(
+        "🔄 Yangilash" if lang == "uz" else "🔄 Продлить",
+        callback_data="show_pricing"
+    )]]
     
-    if update.callback_query:
-        await update.callback_query.message.reply_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
-    else:
-        await update.message.reply_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
+    await update.effective_message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def show_payment_required(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show payment required message for non-PRO users - redirects to pricing"""
+    await show_pricing(update, context, is_required=True)
 
 
 # ==================== HELPER FUNCTIONS ====================

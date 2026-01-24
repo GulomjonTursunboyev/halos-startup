@@ -27,7 +27,7 @@ from app.handlers import (
 from app.subscription_handlers import (
     subscription_command,
     pro_command,
-    show_pricing,
+    show_pricing_callback,
     enter_promo_callback,
     cancel_promo_callback,
     click_buy_callback,
@@ -93,7 +93,7 @@ def main() -> None:
     
     # Add subscription/payment handlers
     application.add_handler(
-        CallbackQueryHandler(show_pricing, pattern="^show_pricing$")
+        CallbackQueryHandler(show_pricing_callback, pattern="^show_pricing$")
     )
     
     # Click Payment handlers
