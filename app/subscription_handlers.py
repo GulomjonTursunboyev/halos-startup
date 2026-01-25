@@ -547,15 +547,26 @@ async def handle_promo_code_input(update: Update, context: ContextTypes.DEFAULT_
         expires_at = datetime.now() + timedelta(days=days)
         
         db = await get_database()
-        await db._connection.execute("""
-            UPDATE users 
-            SET subscription_tier = 'pro',
-                subscription_expires = ?,
-                subscription_plan = 'promo',
-                updated_at = CURRENT_TIMESTAMP
-            WHERE telegram_id = ?
-        """, (expires_at.isoformat(), telegram_id))
-        await db._connection.commit()
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET subscription_tier = 'pro',
+                        subscription_expires = $1,
+                        subscription_plan = 'promo',
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE telegram_id = $2
+                """, expires_at, telegram_id)
+        else:
+            await db._connection.execute("""
+                UPDATE users 
+                SET subscription_tier = 'pro',
+                    subscription_expires = ?,
+                    subscription_plan = 'promo',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE telegram_id = ?
+            """, (expires_at.isoformat(), telegram_id))
+            await db._connection.commit()
         
         if lang == "uz":
             msg = (
@@ -694,21 +705,38 @@ async def show_payment_required(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def get_feature_usage(user_id: int, feature: str, db) -> int:
     """Get today's usage count for a feature"""
-    async with db._connection.execute("""
-        SELECT usage_count FROM feature_usage 
-        WHERE user_id = ? AND feature = ? AND usage_date = DATE('now')
-    """, (user_id, feature)) as cursor:
-        row = await cursor.fetchone()
-        return row["usage_count"] if row else 0
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT usage_count FROM feature_usage 
+                WHERE user_id = $1 AND feature = $2 AND usage_date = CURRENT_DATE
+            """, user_id, feature)
+            return row["usage_count"] if row else 0
+    else:
+        async with db._connection.execute("""
+            SELECT usage_count FROM feature_usage 
+            WHERE user_id = ? AND feature = ? AND usage_date = DATE('now')
+        """, (user_id, feature)) as cursor:
+            row = await cursor.fetchone()
+            return row["usage_count"] if row else 0
 
 
 async def increment_feature_usage(user_id: int, feature: str, db) -> None:
     """Increment feature usage counter"""
-    await db._connection.execute("""
-        INSERT INTO feature_usage (user_id, feature, usage_date, usage_count)
-        VALUES (?, ?, DATE('now'), 1)
-        ON CONFLICT(user_id, feature, usage_date) 
-        DO UPDATE SET usage_count = usage_count + 1
-    """, (user_id, feature))
-    await db._connection.commit()
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO feature_usage (user_id, feature, usage_date, usage_count)
+                VALUES ($1, $2, CURRENT_DATE, 1)
+                ON CONFLICT(user_id, feature, usage_date) 
+                DO UPDATE SET usage_count = feature_usage.usage_count + 1
+            """, user_id, feature)
+    else:
+        await db._connection.execute("""
+            INSERT INTO feature_usage (user_id, feature, usage_date, usage_count)
+            VALUES (?, ?, DATE('now'), 1)
+            ON CONFLICT(user_id, feature, usage_date) 
+            DO UPDATE SET usage_count = usage_count + 1
+        """, (user_id, feature))
+        await db._connection.commit()
 

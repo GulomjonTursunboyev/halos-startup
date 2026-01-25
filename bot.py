@@ -127,12 +127,18 @@ def main() -> None:
     
     logger.info("Starting HALOS Bot...")
     
-    # Create application
+    # Create application with optimized settings
     application = (
         Application.builder()
         .token(BOT_TOKEN)
         .post_init(post_init)
         .post_shutdown(post_shutdown)
+        .concurrent_updates(True)  # Allow concurrent update processing
+        .connection_pool_size(32)  # Increase connection pool
+        .read_timeout(10)  # Faster timeout
+        .write_timeout(10)
+        .connect_timeout(10)
+        .pool_timeout(5)
         .build()
     )
     
@@ -374,9 +380,13 @@ def main() -> None:
     # Add error handler
     application.add_error_handler(error_handler)
     
-    # Start polling
+    # Start polling with optimized settings
     logger.info("Bot is running! Press Ctrl+C to stop.")
-    application.run_polling(allowed_updates=["message", "callback_query"])
+    application.run_polling(
+        allowed_updates=["message", "callback_query"],
+        drop_pending_updates=True,  # Skip old updates on restart
+        poll_interval=0.5,  # Faster polling (0.5 seconds)
+    )
 
 
 if __name__ == "__main__":
