@@ -169,7 +169,13 @@ def main() -> None:
         CallbackQueryHandler(admin_callback, pattern="^admin_")
     )
     
-    # Admin broadcast message handler (high priority)
+    # Promo code input handler - HIGHEST PRIORITY (must be before admin broadcast)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_promo_code_input),
+        group=-1  # Highest priority
+    )
+    
+    # Admin broadcast message handler
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_message),
         group=0
@@ -189,12 +195,6 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_")
-    )
-    
-    # Promo code input handler (must be before profile edit handler)
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_promo_code_input),
-        group=0
     )
     
     # Profile edit text input handler (must be before other message handlers)
