@@ -69,6 +69,10 @@ from app.handlers import (
     ai_debt_return_callback,
     ai_debt_correct_callback,
     ai_debt_delete_callback,
+    # Admin handlers
+    admin_command,
+    admin_callback,
+    admin_broadcast_message,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -156,6 +160,20 @@ def main() -> None:
     application.add_handler(CommandHandler("subscription", subscription_command))
     application.add_handler(CommandHandler("pro", pro_command))
     application.add_handler(CommandHandler("profile", profile_command))
+    
+    # Admin command handler
+    application.add_handler(CommandHandler("admin", admin_command))
+    
+    # Admin callback handlers
+    application.add_handler(
+        CallbackQueryHandler(admin_callback, pattern="^admin_")
+    )
+    
+    # Admin broadcast message handler (high priority)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_message),
+        group=0
+    )
     
     # Add callback handlers for language change
     application.add_handler(

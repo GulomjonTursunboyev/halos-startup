@@ -1419,6 +1419,157 @@ class Database:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
+    # ==================== ADMIN STATISTICS ====================
+    
+    async def get_admin_statistics(self) -> dict:
+        """Admin panel uchun to'liq statistikani olish"""
+        stats = {}
+        
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                # Jami foydalanuvchilar
+                row = await conn.fetchrow("SELECT COUNT(*) as total FROM users")
+                stats["total_users"] = row["total"] if row else 0
+                
+                # Bugungi yangi foydalanuvchilar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as today FROM users 
+                    WHERE DATE(created_at) = CURRENT_DATE
+                """)
+                stats["today_users"] = row["today"] if row else 0
+                
+                # Haftalik yangi foydalanuvchilar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as week FROM users 
+                    WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+                """)
+                stats["week_users"] = row["week"] if row else 0
+                
+                # Oylik yangi foydalanuvchilar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as month FROM users 
+                    WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                """)
+                stats["month_users"] = row["month"] if row else 0
+                
+                # ==================== PRO STATISTIKASI ====================
+                
+                # Jami aktiv PRO foydalanuvchilar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as pro FROM users 
+                    WHERE subscription_tier = 'pro' 
+                    AND (subscription_expires IS NULL OR subscription_expires > NOW())
+                """)
+                stats["active_pro"] = row["pro"] if row else 0
+                
+                # Haftalik PRO sotib olganlar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as weekly FROM users 
+                    WHERE subscription_plan = 'pro_weekly'
+                    AND subscription_tier = 'pro'
+                """)
+                stats["pro_weekly"] = row["weekly"] if row else 0
+                
+                # Oylik PRO sotib olganlar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as monthly FROM users 
+                    WHERE subscription_plan = 'pro_monthly'
+                    AND subscription_tier = 'pro'
+                """)
+                stats["pro_monthly"] = row["monthly"] if row else 0
+                
+                # Yillik PRO sotib olganlar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as yearly FROM users 
+                    WHERE subscription_plan = 'pro_yearly'
+                    AND subscription_tier = 'pro'
+                """)
+                stats["pro_yearly"] = row["yearly"] if row else 0
+                
+                # Promo orqali PRO olganlar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as promo FROM users 
+                    WHERE subscription_plan = 'promo'
+                    AND subscription_tier = 'pro'
+                """)
+                stats["pro_promo"] = row["promo"] if row else 0
+                
+                # Trial PRO
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as trial FROM users 
+                    WHERE subscription_plan = 'trial'
+                    AND subscription_tier = 'pro'
+                """)
+                stats["pro_trial"] = row["trial"] if row else 0
+                
+                # Muddati tugagan PRO
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as expired FROM users 
+                    WHERE subscription_tier = 'pro' 
+                    AND subscription_expires IS NOT NULL 
+                    AND subscription_expires <= NOW()
+                """)
+                stats["pro_expired"] = row["expired"] if row else 0
+                
+                # ==================== MOLIYAVIY STATISTIKA ====================
+                
+                # Jami tranzaksiyalar
+                row = await conn.fetchrow("SELECT COUNT(*) as total FROM transactions")
+                stats["total_transactions"] = row["total"] if row else 0
+                
+                # Bugungi tranzaksiyalar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as today FROM transactions 
+                    WHERE DATE(created_at) = CURRENT_DATE
+                """)
+                stats["today_transactions"] = row["today"] if row else 0
+                
+                # Jami qarzlar
+                row = await conn.fetchrow("""
+                    SELECT COUNT(*) as total, COALESCE(SUM(amount), 0) as sum 
+                    FROM personal_debts WHERE status = 'active'
+                """)
+                stats["active_debts"] = row["total"] if row else 0
+                stats["total_debt_amount"] = row["sum"] if row else 0
+                
+                # ==================== TIL STATISTIKASI ====================
+                
+                rows = await conn.fetch("""
+                    SELECT language, COUNT(*) as count FROM users 
+                    GROUP BY language
+                """)
+                stats["languages"] = {row["language"]: row["count"] for row in rows}
+                
+        else:
+            # SQLite versiyasi
+            cursor = await self._connection.execute("SELECT COUNT(*) FROM users")
+            row = await cursor.fetchone()
+            stats["total_users"] = row[0] if row else 0
+            
+            cursor = await self._connection.execute("""
+                SELECT COUNT(*) FROM users WHERE DATE(created_at) = DATE('now')
+            """)
+            row = await cursor.fetchone()
+            stats["today_users"] = row[0] if row else 0
+            
+            # ... boshqa statistikalar ham shu formatda
+            stats["week_users"] = 0
+            stats["month_users"] = 0
+            stats["active_pro"] = 0
+            stats["pro_weekly"] = 0
+            stats["pro_monthly"] = 0
+            stats["pro_yearly"] = 0
+            stats["pro_promo"] = 0
+            stats["pro_trial"] = 0
+            stats["pro_expired"] = 0
+            stats["total_transactions"] = 0
+            stats["today_transactions"] = 0
+            stats["active_debts"] = 0
+            stats["total_debt_amount"] = 0
+            stats["languages"] = {}
+        
+        return stats
+
 
 # Singleton database instance
 _db: Optional[Database] = None

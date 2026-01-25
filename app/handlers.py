@@ -22,7 +22,7 @@ from telegram.ext import (
     filters
 )
 
-from app.config import States, PDF_UPLOAD_DIR, TRANSACTION_UPLOAD_DIR, TRANSACTION_EXTENSIONS
+from app.config import States, PDF_UPLOAD_DIR, TRANSACTION_UPLOAD_DIR, TRANSACTION_EXTENSIONS, ADMIN_IDS
 from app.database import get_database
 import asyncio
 from app.languages import get_message, format_number
@@ -5394,6 +5394,228 @@ async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_
         msg = "🗑 *Запись о долге удалена*"
     
     await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+# ==================== ADMIN COMMAND ====================
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /admin command - show statistics for admins only"""
+    telegram_id = update.effective_user.id
+    
+    # Faqat adminlar uchun
+    if telegram_id not in ADMIN_IDS:
+        return
+    
+    await update.message.reply_text("⏳ Statistika yuklanmoqda...")
+    
+    db = await get_database()
+    stats = await db.get_admin_statistics()
+    
+    # Format statistics
+    message = """
+📊 *HALOS BOT ADMIN PANEL*
+━━━━━━━━━━━━━━━━━━━━━
+
+👥 *FOYDALANUVCHILAR*
+├ Jami: *{total_users:,}* ta
+├ Bugun: *+{today_users:,}* ta
+├ Haftalik: *+{week_users:,}* ta
+└ Oylik: *+{month_users:,}* ta
+
+💎 *PRO OBUNALAR*
+├ Aktiv PRO: *{active_pro:,}* ta
+├ ↳ Haftalik: *{pro_weekly:,}* ta
+├ ↳ Oylik: *{pro_monthly:,}* ta
+├ ↳ Yillik: *{pro_yearly:,}* ta
+├ ↳ Promo: *{pro_promo:,}* ta
+├ ↳ Trial: *{pro_trial:,}* ta
+└ Muddati tugagan: *{pro_expired:,}* ta
+
+📈 *FAOLLIK*
+├ Jami tranzaksiyalar: *{total_transactions:,}* ta
+├ Bugungi tranzaksiyalar: *{today_transactions:,}* ta
+├ Aktiv qarzlar: *{active_debts:,}* ta
+└ Qarzlar summasi: *{total_debt:,}* so'm
+
+🌐 *TILLAR*
+{lang_stats}
+
+━━━━━━━━━━━━━━━━━━━━━
+⏰ Yangilangan: {timestamp}
+""".format(
+        total_users=stats.get("total_users", 0),
+        today_users=stats.get("today_users", 0),
+        week_users=stats.get("week_users", 0),
+        month_users=stats.get("month_users", 0),
+        active_pro=stats.get("active_pro", 0),
+        pro_weekly=stats.get("pro_weekly", 0),
+        pro_monthly=stats.get("pro_monthly", 0),
+        pro_yearly=stats.get("pro_yearly", 0),
+        pro_promo=stats.get("pro_promo", 0),
+        pro_trial=stats.get("pro_trial", 0),
+        pro_expired=stats.get("pro_expired", 0),
+        total_transactions=stats.get("total_transactions", 0),
+        today_transactions=stats.get("today_transactions", 0),
+        active_debts=stats.get("active_debts", 0),
+        total_debt=int(stats.get("total_debt_amount", 0)),
+        lang_stats="\n".join([f"├ {lang.upper()}: *{count:,}* ta" for lang, count in stats.get("languages", {}).items()]),
+        timestamp=__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
+    
+    # Admin tugmalari
+    keyboard = [
+        [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_refresh")],
+        [InlineKeyboardButton("📤 Xabar yuborish", callback_data="admin_broadcast")],
+    ]
+    
+    await update.message.reply_text(
+        message,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin panel callbacks"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    
+    # Faqat adminlar uchun
+    if telegram_id not in ADMIN_IDS:
+        return
+    
+    if query.data == "admin_refresh":
+        db = await get_database()
+        stats = await db.get_admin_statistics()
+        
+        message = """
+📊 *HALOS BOT ADMIN PANEL*
+━━━━━━━━━━━━━━━━━━━━━
+
+👥 *FOYDALANUVCHILAR*
+├ Jami: *{total_users:,}* ta
+├ Bugun: *+{today_users:,}* ta
+├ Haftalik: *+{week_users:,}* ta
+└ Oylik: *+{month_users:,}* ta
+
+💎 *PRO OBUNALAR*
+├ Aktiv PRO: *{active_pro:,}* ta
+├ ↳ Haftalik: *{pro_weekly:,}* ta
+├ ↳ Oylik: *{pro_monthly:,}* ta
+├ ↳ Yillik: *{pro_yearly:,}* ta
+├ ↳ Promo: *{pro_promo:,}* ta
+├ ↳ Trial: *{pro_trial:,}* ta
+└ Muddati tugagan: *{pro_expired:,}* ta
+
+📈 *FAOLLIK*
+├ Jami tranzaksiyalar: *{total_transactions:,}* ta
+├ Bugungi tranzaksiyalar: *{today_transactions:,}* ta
+├ Aktiv qarzlar: *{active_debts:,}* ta
+└ Qarzlar summasi: *{total_debt:,}* so'm
+
+🌐 *TILLAR*
+{lang_stats}
+
+━━━━━━━━━━━━━━━━━━━━━
+⏰ Yangilangan: {timestamp}
+""".format(
+            total_users=stats.get("total_users", 0),
+            today_users=stats.get("today_users", 0),
+            week_users=stats.get("week_users", 0),
+            month_users=stats.get("month_users", 0),
+            active_pro=stats.get("active_pro", 0),
+            pro_weekly=stats.get("pro_weekly", 0),
+            pro_monthly=stats.get("pro_monthly", 0),
+            pro_yearly=stats.get("pro_yearly", 0),
+            pro_promo=stats.get("pro_promo", 0),
+            pro_trial=stats.get("pro_trial", 0),
+            pro_expired=stats.get("pro_expired", 0),
+            total_transactions=stats.get("total_transactions", 0),
+            today_transactions=stats.get("today_transactions", 0),
+            active_debts=stats.get("active_debts", 0),
+            total_debt=int(stats.get("total_debt_amount", 0)),
+            lang_stats="\n".join([f"├ {lang.upper()}: *{count:,}* ta" for lang, count in stats.get("languages", {}).items()]),
+            timestamp=__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_refresh")],
+            [InlineKeyboardButton("📤 Xabar yuborish", callback_data="admin_broadcast")],
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif query.data == "admin_broadcast":
+        context.user_data["admin_broadcast"] = True
+        await query.edit_message_text(
+            "📤 *Broadcast xabar*\n\n"
+            "Barcha foydalanuvchilarga yuboriladigan xabarni yozing:\n\n"
+            "❌ Bekor qilish uchun /cancel yozing",
+            parse_mode="Markdown"
+        )
+
+
+async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send broadcast message to all users"""
+    telegram_id = update.effective_user.id
+    
+    if telegram_id not in ADMIN_IDS:
+        return
+    
+    if not context.user_data.get("admin_broadcast"):
+        return
+    
+    context.user_data["admin_broadcast"] = False
+    
+    broadcast_text = update.message.text
+    
+    if broadcast_text == "/cancel":
+        await update.message.reply_text("❌ Broadcast bekor qilindi")
+        return
+    
+    db = await get_database()
+    
+    # Barcha foydalanuvchilarni olish
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch("SELECT telegram_id FROM users")
+            users = [row["telegram_id"] for row in rows]
+    else:
+        cursor = await db._connection.execute("SELECT telegram_id FROM users")
+        rows = await cursor.fetchall()
+        users = [row[0] for row in rows]
+    
+    await update.message.reply_text(f"📤 Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    
+    success = 0
+    failed = 0
+    
+    for user_id in users:
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"📢 *HALOS BOT E'LON*\n\n{broadcast_text}",
+                parse_mode="Markdown"
+            )
+            success += 1
+        except Exception:
+            failed += 1
+        
+        # Rate limiting
+        if success % 30 == 0:
+            await asyncio.sleep(1)
+    
+    await update.message.reply_text(
+        f"✅ Broadcast yakunlandi!\n\n"
+        f"✅ Yuborildi: {success} ta\n"
+        f"❌ Xato: {failed} ta"
+    )
 
 
 # Keep old function for backwards compatibility
