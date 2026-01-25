@@ -610,53 +610,87 @@ async def save_transaction(db, user_id: int, transaction: Dict) -> int:
     """
     Tranzaksiyani bazaga saqlash
     """
-    await db._connection.execute("""
-        INSERT INTO transactions (user_id, type, category, amount, description, original_text, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    """, (
-        user_id,
-        transaction["type"],
-        transaction["category"],
-        transaction["amount"],
-        transaction["description"],
-        transaction["original_text"]
-    ))
-    await db._connection.commit()
-    
-    cursor = await db._connection.execute("SELECT last_insert_rowid()")
-    row = await cursor.fetchone()
-    return row[0] if row else 0
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            return await conn.fetchval("""
+                INSERT INTO transactions (user_id, type, category, amount, description, original_text, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+                RETURNING id
+            """, 
+                user_id,
+                transaction["type"],
+                transaction["category"],
+                transaction["amount"],
+                transaction["description"],
+                transaction["original_text"]
+            )
+    else:
+        await db._connection.execute("""
+            INSERT INTO transactions (user_id, type, category, amount, description, original_text, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (
+            user_id,
+            transaction["type"],
+            transaction["category"],
+            transaction["amount"],
+            transaction["description"],
+            transaction["original_text"]
+        ))
+        await db._connection.commit()
+        
+        cursor = await db._connection.execute("SELECT last_insert_rowid()")
+        row = await cursor.fetchone()
+        return row[0] if row else 0
 
 
 async def get_user_transactions(db, user_id: int, days: int = 30, transaction_type: str = None) -> List[Dict]:
     """
     Foydalanuvchi tranzaksiyalarini olish
     """
-    query = """
-        SELECT id, type, category, amount, description, created_at
-        FROM transactions
-        WHERE user_id = ?
-        AND created_at >= datetime('now', ?)
-    """
-    params = [user_id, f'-{days} days']
-    
-    if transaction_type:
-        query += " AND type = ?"
-        params.append(transaction_type)
-    
-    query += " ORDER BY created_at DESC"
-    
-    cursor = await db._connection.execute(query, params)
-    rows = await cursor.fetchall()
+    if db.is_postgres:
+        query = """
+            SELECT id, type, category, amount, description, created_at
+            FROM transactions
+            WHERE user_id = $1
+            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+        """ % days
+        params = [user_id]
+        
+        if transaction_type:
+            query += " AND type = $2"
+            params.append(transaction_type)
+        
+        query += " ORDER BY created_at DESC"
+        
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
+            return [dict(row) for row in rows]
+    else:
+        query = """
+            SELECT id, type, category, amount, description, created_at
+            FROM transactions
+            WHERE user_id = ?
+            AND created_at >= datetime('now', ?)
+        """
+        params = [user_id, f'-{days} days']
+        
+        if transaction_type:
+            query += " AND type = ?"
+            params.append(transaction_type)
+        
+        query += " ORDER BY created_at DESC"
+        
+        cursor = await db._connection.execute(query, params)
+        rows = await cursor.fetchall()
     
     return [
         {
-            "id": row[0],
-            "type": row[1],
-            "category": row[2],
-            "amount": row[3],
-            "description": row[4],
-            "created_at": row[5]
+            "id": row[0] if isinstance(row, (list, tuple)) else row["id"],
+            "type": row[1] if isinstance(row, (list, tuple)) else row["type"],
+            "category": row[2] if isinstance(row, (list, tuple)) else row["category"],
+            "amount": row[3] if isinstance(row, (list, tuple)) else row["amount"],
+            "description": row[4] if isinstance(row, (list, tuple)) else row["description"],
+            "created_at": row[5] if isinstance(row, (list, tuple)) else row["created_at"]
         }
         for row in rows
     ]
@@ -666,28 +700,51 @@ async def get_transaction_summary(db, user_id: int, days: int = 30) -> Dict:
     """
     Tranzaksiyalar xulosasini olish
     """
-    # Daromadlar
-    cursor = await db._connection.execute("""
-        SELECT category, SUM(amount) as total
-        FROM transactions
-        WHERE user_id = ? AND type = 'income'
-        AND created_at >= datetime('now', ?)
-        GROUP BY category
-    """, (user_id, f'-{days} days'))
-    income_rows = await cursor.fetchall()
-    
-    # Xarajatlar
-    cursor = await db._connection.execute("""
-        SELECT category, SUM(amount) as total
-        FROM transactions
-        WHERE user_id = ? AND type = 'expense'
-        AND created_at >= datetime('now', ?)
-        GROUP BY category
-    """, (user_id, f'-{days} days'))
-    expense_rows = await cursor.fetchall()
-    
-    income_by_category = {row[0]: row[1] for row in income_rows}
-    expense_by_category = {row[0]: row[1] for row in expense_rows}
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            # Daromadlar
+            income_rows = await conn.fetch("""
+                SELECT category, SUM(amount) as total
+                FROM transactions
+                WHERE user_id = $1 AND type = 'income'
+                AND created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                GROUP BY category
+            """ % days, user_id)
+            
+            # Xarajatlar
+            expense_rows = await conn.fetch("""
+                SELECT category, SUM(amount) as total
+                FROM transactions
+                WHERE user_id = $1 AND type = 'expense'
+                AND created_at >= CURRENT_TIMESTAMP - INTERVAL '%s days'
+                GROUP BY category
+            """ % days, user_id)
+            
+            income_by_category = {row["category"]: row["total"] for row in income_rows}
+            expense_by_category = {row["category"]: row["total"] for row in expense_rows}
+    else:
+        # Daromadlar
+        cursor = await db._connection.execute("""
+            SELECT category, SUM(amount) as total
+            FROM transactions
+            WHERE user_id = ? AND type = 'income'
+            AND created_at >= datetime('now', ?)
+            GROUP BY category
+        """, (user_id, f'-{days} days'))
+        income_rows = await cursor.fetchall()
+        
+        # Xarajatlar
+        cursor = await db._connection.execute("""
+            SELECT category, SUM(amount) as total
+            FROM transactions
+            WHERE user_id = ? AND type = 'expense'
+            AND created_at >= datetime('now', ?)
+            GROUP BY category
+        """, (user_id, f'-{days} days'))
+        expense_rows = await cursor.fetchall()
+        
+        income_by_category = {row[0]: row[1] for row in income_rows}
+        expense_by_category = {row[0]: row[1] for row in expense_rows}
     
     total_income = sum(income_by_category.values())
     total_expense = sum(expense_by_category.values())
@@ -1329,25 +1386,40 @@ async def get_voice_usage(db, user_id: int) -> Dict:
     """
     current_month = datetime.now().strftime("%Y-%m")
     
-    cursor = await db._connection.execute("""
-        SELECT voice_count, total_duration
-        FROM voice_usage
-        WHERE user_id = ? AND month = ?
-    """, (user_id, current_month))
-    row = await cursor.fetchone()
-    
-    if row:
-        return {
-            "voice_count": row[0],
-            "total_duration": row[1],
-            "remaining": max(0, MONTHLY_VOICE_LIMIT - row[0])
-        }
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT voice_count, total_duration
+                FROM voice_usage
+                WHERE user_id = $1 AND month = $2
+            """, user_id, current_month)
+            
+            if row:
+                return {
+                    "voice_count": row["voice_count"],
+                    "total_duration": row["total_duration"],
+                    "remaining": max(0, MONTHLY_VOICE_LIMIT - row["voice_count"])
+                }
     else:
-        return {
-            "voice_count": 0,
-            "total_duration": 0,
-            "remaining": MONTHLY_VOICE_LIMIT
-        }
+        cursor = await db._connection.execute("""
+            SELECT voice_count, total_duration
+            FROM voice_usage
+            WHERE user_id = ? AND month = ?
+        """, (user_id, current_month))
+        row = await cursor.fetchone()
+        
+        if row:
+            return {
+                "voice_count": row[0],
+                "total_duration": row[1],
+                "remaining": max(0, MONTHLY_VOICE_LIMIT - row[0])
+            }
+    
+    return {
+        "voice_count": 0,
+        "total_duration": 0,
+        "remaining": MONTHLY_VOICE_LIMIT
+    }
 
 
 async def increment_voice_usage(db, user_id: int, duration: int = 0) -> bool:
@@ -1356,15 +1428,24 @@ async def increment_voice_usage(db, user_id: int, duration: int = 0) -> bool:
     """
     current_month = datetime.now().strftime("%Y-%m")
     
-    # Upsert - insert or update
-    await db._connection.execute("""
-        INSERT INTO voice_usage (user_id, month, voice_count, total_duration)
-        VALUES (?, ?, 1, ?)
-        ON CONFLICT(user_id, month) DO UPDATE SET
-            voice_count = voice_count + 1,
-            total_duration = total_duration + ?
-    """, (user_id, current_month, duration, duration))
-    await db._connection.commit()
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO voice_usage (user_id, month, voice_count, total_duration)
+                VALUES ($1, $2, 1, $3)
+                ON CONFLICT(user_id, month) DO UPDATE SET
+                    voice_count = voice_usage.voice_count + 1,
+                    total_duration = voice_usage.total_duration + $4
+            """, user_id, current_month, duration, duration)
+    else:
+        await db._connection.execute("""
+            INSERT INTO voice_usage (user_id, month, voice_count, total_duration)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT(user_id, month) DO UPDATE SET
+                voice_count = voice_count + 1,
+                total_duration = total_duration + ?
+        """, (user_id, current_month, duration, duration))
+        await db._connection.commit()
     
     return True
 
@@ -1450,23 +1531,42 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
     """
     Tranzaksiyani ID bo'yicha olish
     """
-    cursor = await db._connection.execute("""
-        SELECT id, user_id, type, category, amount, description, original_text, created_at
-        FROM transactions WHERE id = ?
-    """, (transaction_id,))
-    row = await cursor.fetchone()
-    
-    if row:
-        return {
-            "id": row[0],
-            "user_id": row[1],
-            "type": row[2],
-            "category": row[3],
-            "amount": row[4],
-            "description": row[5],
-            "original_text": row[6],
-            "created_at": row[7]
-        }
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT id, user_id, type, category, amount, description, original_text, created_at
+                FROM transactions WHERE id = $1
+            """, transaction_id)
+            
+            if row:
+                return {
+                    "id": row["id"],
+                    "user_id": row["user_id"],
+                    "type": row["type"],
+                    "category": row["category"],
+                    "amount": row["amount"],
+                    "description": row["description"],
+                    "original_text": row["original_text"],
+                    "created_at": row["created_at"]
+                }
+    else:
+        cursor = await db._connection.execute("""
+            SELECT id, user_id, type, category, amount, description, original_text, created_at
+            FROM transactions WHERE id = ?
+        """, (transaction_id,))
+        row = await cursor.fetchone()
+        
+        if row:
+            return {
+                "id": row[0],
+                "user_id": row[1],
+                "type": row[2],
+                "category": row[3],
+                "amount": row[4],
+                "description": row[5],
+                "original_text": row[6],
+                "created_at": row[7]
+            }
     return None
 
 
@@ -1474,10 +1574,16 @@ async def delete_transaction(db, transaction_id: int, user_id: int) -> bool:
     """
     Tranzaksiyani o'chirish (faqat o'z tranzaksiyasini)
     """
-    await db._connection.execute("""
-        DELETE FROM transactions WHERE id = ? AND user_id = ?
-    """, (transaction_id, user_id))
-    await db._connection.commit()
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute("""
+                DELETE FROM transactions WHERE id = $1 AND user_id = $2
+            """, transaction_id, user_id)
+    else:
+        await db._connection.execute("""
+            DELETE FROM transactions WHERE id = ? AND user_id = ?
+        """, (transaction_id, user_id))
+        await db._connection.commit()
     return True
 
 
@@ -1488,14 +1594,25 @@ async def update_transaction(db, transaction_id: int, user_id: int, **kwargs) ->
     if not kwargs:
         return False
     
-    fields = ", ".join(f"{k} = ?" for k in kwargs.keys())
-    values = list(kwargs.values()) + [transaction_id, user_id]
-    
-    await db._connection.execute(
-        f"UPDATE transactions SET {fields} WHERE id = ? AND user_id = ?",
-        values
-    )
-    await db._connection.commit()
+    if db.is_postgres:
+        fields = ", ".join(f"{k} = ${i+1}" for i, k in enumerate(kwargs.keys()))
+        values = list(kwargs.values()) + [transaction_id, user_id]
+        param_count = len(kwargs)
+        
+        async with db._pool.acquire() as conn:
+            await conn.execute(
+                f"UPDATE transactions SET {fields} WHERE id = ${param_count+1} AND user_id = ${param_count+2}",
+                *values
+            )
+    else:
+        fields = ", ".join(f"{k} = ?" for k in kwargs.keys())
+        values = list(kwargs.values()) + [transaction_id, user_id]
+        
+        await db._connection.execute(
+            f"UPDATE transactions SET {fields} WHERE id = ? AND user_id = ?",
+            values
+        )
+        await db._connection.commit()
     return True
 
 
@@ -1503,26 +1620,48 @@ async def get_last_transaction(db, user_id: int) -> Optional[Dict]:
     """
     Foydalanuvchining oxirgi tranzaksiyasini olish
     """
-    cursor = await db._connection.execute("""
-        SELECT id, user_id, type, category, amount, description, original_text, created_at
-        FROM transactions 
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-    """, (user_id,))
-    row = await cursor.fetchone()
-    
-    if row:
-        return {
-            "id": row[0],
-            "user_id": row[1],
-            "type": row[2],
-            "category": row[3],
-            "amount": row[4],
-            "description": row[5],
-            "original_text": row[6],
-            "created_at": row[7]
-        }
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT id, user_id, type, category, amount, description, original_text, created_at
+                FROM transactions 
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, user_id)
+            
+            if row:
+                return {
+                    "id": row["id"],
+                    "user_id": row["user_id"],
+                    "type": row["type"],
+                    "category": row["category"],
+                    "amount": row["amount"],
+                    "description": row["description"],
+                    "original_text": row["original_text"],
+                    "created_at": row["created_at"]
+                }
+    else:
+        cursor = await db._connection.execute("""
+            SELECT id, user_id, type, category, amount, description, original_text, created_at
+            FROM transactions 
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id,))
+        row = await cursor.fetchone()
+        
+        if row:
+            return {
+                "id": row[0],
+                "user_id": row[1],
+                "type": row[2],
+                "category": row[3],
+                "amount": row[4],
+                "description": row[5],
+                "original_text": row[6],
+                "created_at": row[7]
+            }
     return None
 
 
@@ -1893,79 +2032,141 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
     """
     Qarzni bazaga saqlash
     """
-    await db._connection.execute("""
-        INSERT INTO personal_debts 
-        (user_id, debt_type, person_name, amount, description, original_text, given_date, due_date, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
-    """, (
-        user_id,
-        debt_info["type"],
-        debt_info["person"],
-        debt_info["amount"],
-        debt_info.get("description", ""),
-        debt_info.get("original_text", ""),
-        debt_info["given_date"],
-        debt_info.get("due_date")
-    ))
-    await db._connection.commit()
-    
-    cursor = await db._connection.execute("SELECT last_insert_rowid()")
-    row = await cursor.fetchone()
-    return row[0] if row else 0
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                INSERT INTO personal_debts 
+                (user_id, debt_type, person_name, amount, description, original_text, given_date, due_date, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+                RETURNING id
+            """, 
+                user_id,
+                debt_info["type"],
+                debt_info["person"],
+                debt_info["amount"],
+                debt_info.get("description", ""),
+                debt_info.get("original_text", ""),
+                debt_info["given_date"],
+                debt_info.get("due_date")
+            )
+            return row["id"] if row else 0
+    else:
+        await db._connection.execute("""
+            INSERT INTO personal_debts 
+            (user_id, debt_type, person_name, amount, description, original_text, given_date, due_date, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        """, (
+            user_id,
+            debt_info["type"],
+            debt_info["person"],
+            debt_info["amount"],
+            debt_info.get("description", ""),
+            debt_info.get("original_text", ""),
+            debt_info["given_date"],
+            debt_info.get("due_date")
+        ))
+        await db._connection.commit()
+        
+        cursor = await db._connection.execute("SELECT last_insert_rowid()")
+        row = await cursor.fetchone()
+        return row[0] if row else 0
 
 
 async def get_user_debts(db, user_id: int, status: str = "active") -> List[Dict]:
     """
     Foydalanuvchi qarzlarini olish
     """
-    if status == "all":
-        cursor = await db._connection.execute("""
-            SELECT * FROM personal_debts 
-            WHERE user_id = ?
-            ORDER BY given_date DESC
-        """, (user_id,))
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            if status == "all":
+                rows = await conn.fetch("""
+                    SELECT * FROM personal_debts 
+                    WHERE user_id = $1
+                    ORDER BY given_date DESC
+                """, user_id)
+            else:
+                rows = await conn.fetch("""
+                    SELECT * FROM personal_debts 
+                    WHERE user_id = $1 AND status = $2
+                    ORDER BY given_date DESC
+                """, user_id, status)
+            return [dict(row) for row in rows]
     else:
-        cursor = await db._connection.execute("""
-            SELECT * FROM personal_debts 
-            WHERE user_id = ? AND status = ?
-            ORDER BY given_date DESC
-        """, (user_id, status))
-    
-    rows = await cursor.fetchall()
-    return [dict(row) for row in rows]
+        if status == "all":
+            cursor = await db._connection.execute("""
+                SELECT * FROM personal_debts 
+                WHERE user_id = ?
+                ORDER BY given_date DESC
+            """, (user_id,))
+        else:
+            cursor = await db._connection.execute("""
+                SELECT * FROM personal_debts 
+                WHERE user_id = ? AND status = ?
+                ORDER BY given_date DESC
+            """, (user_id, status))
+        
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
 
 async def get_debt_summary(db, user_id: int) -> Dict:
     """
     Qarz xulosasi - bergan va olgan qarzlar
     """
-    # Bergan qarzlar (lent) - menga qaytarilishi kerak
-    cursor = await db._connection.execute("""
-        SELECT COALESCE(SUM(amount - returned_amount), 0) as total
-        FROM personal_debts 
-        WHERE user_id = ? AND debt_type = 'lent' AND status != 'returned'
-    """, (user_id,))
-    row = await cursor.fetchone()
-    total_lent = row[0] if row else 0
-    
-    # Olgan qarzlar (borrowed) - men qaytarishim kerak
-    cursor = await db._connection.execute("""
-        SELECT COALESCE(SUM(amount - returned_amount), 0) as total
-        FROM personal_debts 
-        WHERE user_id = ? AND debt_type = 'borrowed' AND status != 'returned'
-    """, (user_id,))
-    row = await cursor.fetchone()
-    total_borrowed = row[0] if row else 0
-    
-    # Soni
-    cursor = await db._connection.execute("""
-        SELECT debt_type, COUNT(*) as count
-        FROM personal_debts 
-        WHERE user_id = ? AND status != 'returned'
-        GROUP BY debt_type
-    """, (user_id,))
-    rows = await cursor.fetchall()
-    counts = {row[0]: row[1] for row in rows}
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            # Bergan qarzlar (lent)
+            row = await conn.fetchrow("""
+                SELECT COALESCE(SUM(amount - returned_amount), 0) as total
+                FROM personal_debts 
+                WHERE user_id = $1 AND debt_type = 'lent' AND status != 'returned'
+            """, user_id)
+            total_lent = row["total"] if row else 0
+            
+            # Olgan qarzlar (borrowed)
+            row = await conn.fetchrow("""
+                SELECT COALESCE(SUM(amount - returned_amount), 0) as total
+                FROM personal_debts 
+                WHERE user_id = $1 AND debt_type = 'borrowed' AND status != 'returned'
+            """, user_id)
+            total_borrowed = row["total"] if row else 0
+            
+            # Soni
+            rows = await conn.fetch("""
+                SELECT debt_type, COUNT(*) as count
+                FROM personal_debts 
+                WHERE user_id = $1 AND status != 'returned'
+                GROUP BY debt_type
+            """, user_id)
+            counts = {row["debt_type"]: row["count"] for row in rows}
+    else:
+        # Bergan qarzlar (lent) - menga qaytarilishi kerak
+        cursor = await db._connection.execute("""
+            SELECT COALESCE(SUM(amount - returned_amount), 0) as total
+            FROM personal_debts 
+            WHERE user_id = ? AND debt_type = 'lent' AND status != 'returned'
+        """, (user_id,))
+        row = await cursor.fetchone()
+        total_lent = row[0] if row else 0
+        
+        # Olgan qarzlar (borrowed) - men qaytarishim kerak
+        cursor = await db._connection.execute("""
+            SELECT COALESCE(SUM(amount - returned_amount), 0) as total
+            FROM personal_debts 
+            WHERE user_id = ? AND debt_type = 'borrowed' AND status != 'returned'
+        """, (user_id,))
+        row = await cursor.fetchone()
+        total_borrowed = row[0] if row else 0
+        
+        # Soni
+        cursor = await db._connection.execute("""
+            SELECT debt_type, COUNT(*) as count
+            FROM personal_debts 
+            WHERE user_id = ? AND status != 'returned'
+            GROUP BY debt_type
+        """, (user_id,))
+        rows = await cursor.fetchall()
+        counts = {row[0]: row[1] for row in rows}
     
     return {
         "total_lent": total_lent,  # Bergan qarzlar (menga qaytariladi)
@@ -1980,20 +2181,35 @@ async def update_debt_status(db, debt_id: int, user_id: int, status: str, return
     """
     Qarz statusini yangilash
     """
-    if returned_amount is not None:
-        await db._connection.execute("""
-            UPDATE personal_debts 
-            SET status = ?, returned_amount = ?, returned_date = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND user_id = ?
-        """, (status, returned_amount, datetime.now().strftime("%Y-%m-%d"), debt_id, user_id))
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            if returned_amount is not None:
+                await conn.execute("""
+                    UPDATE personal_debts 
+                    SET status = $1, returned_amount = $2, returned_date = $3, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $4 AND user_id = $5
+                """, status, returned_amount, datetime.now().strftime("%Y-%m-%d"), debt_id, user_id)
+            else:
+                await conn.execute("""
+                    UPDATE personal_debts 
+                    SET status = $1, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $2 AND user_id = $3
+                """, status, debt_id, user_id)
     else:
-        await db._connection.execute("""
-            UPDATE personal_debts 
-            SET status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND user_id = ?
-        """, (status, debt_id, user_id))
-    
-    await db._connection.commit()
+        if returned_amount is not None:
+            await db._connection.execute("""
+                UPDATE personal_debts 
+                SET status = ?, returned_amount = ?, returned_date = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+            """, (status, returned_amount, datetime.now().strftime("%Y-%m-%d"), debt_id, user_id))
+        else:
+            await db._connection.execute("""
+                UPDATE personal_debts 
+                SET status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+            """, (status, debt_id, user_id))
+        
+        await db._connection.commit()
     return True
 
 
