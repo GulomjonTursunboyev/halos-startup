@@ -5468,14 +5468,22 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Handle /admin command - show statistics for admins only"""
     telegram_id = update.effective_user.id
     
+    logger.info(f"Admin command received from user {telegram_id}")
+    logger.info(f"ADMIN_IDS: {ADMIN_IDS}")
+    
     # Faqat adminlar uchun
     if telegram_id not in ADMIN_IDS:
+        logger.info(f"User {telegram_id} is not admin, ignoring")
         return
+    
+    logger.info(f"User {telegram_id} is admin, showing stats...")
     
     await update.message.reply_text("⏳ Statistika yuklanmoqda...")
     
     db = await get_database()
     stats = await db.get_admin_statistics()
+    
+    logger.info(f"Stats retrieved: {stats}")
     
     # Format statistics
     message = """
