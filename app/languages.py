@@ -643,13 +643,17 @@ MESSAGES = {
             "🏦 *Kredit ma'lumotlari*\n\n"
             "Kredit tarixingizni qanday kiritmoqchisiz?\n\n"
             "📄 *Kredit tarixi* — infokredit.uz dan yuklab olingan HTML/PDF fayl\n"
-            "✏️ *Qo'lda kiritish* — ma'lumotlarni o'zingiz yozasiz"
+            "✏️ *Qo'lda kiritish* — ma'lumotlarni o'zingiz yozasiz\n"
+            "0️⃣ *Kreditim yo'q* — 0 yuboring yoki tugmani bosing\n\n"
+            "💡 _Agar kredit bo'lmasa, 0 yuborish yoki \"Kreditim yo'q\" tugmasini bosish tavsiya etiladi._"
         ),
         "ru": (
             "🏦 *Данные о кредитах*\n\n"
             "Как хотите ввести кредитную историю?\n\n"
             "📄 *Кредитная история* — HTML/PDF файл с infokredit.uz\n"
-            "✏️ *Ввести вручную* — введёте данные сами"
+            "✏️ *Ввести вручную* — введёте данные сами\n"
+            "0️⃣ *Нет кредитов* — отправьте 0 или нажмите кнопку\n\n"
+            "💡 _Если кредитов нет, рекомендуем отправить 0 или нажать \"Нет кредитов\"._"
         )
     },
     
@@ -664,20 +668,22 @@ MESSAGES = {
     },
     
     "btn_no_credit": {
-        "uz": "✨ Kreditim yo'q",
-        "ru": "✨ Нет кредитов"
+        "uz": "0️⃣ Kreditim yo'q",
+        "ru": "0️⃣ Нет кредитов"
     },
     
     "upload_credit_file": {
         "uz": (
             "📄 *Kredit tarixini yuklang*\n\n"
             "infokredit.uz dan olingan HTML yoki PDF faylni yuboring.\n\n"
-            "💡 Fayl avtomatik tahlil qilinadi va ma'lumotlar olinadi."
+            "💡 Fayl avtomatik tahlil qilinadi va ma'lumotlar olinadi.\n\n"
+            "_Kreditingiz bo'lmasa — 0 yuboring yoki \"Kreditim yo'q\" tugmasini bosing._"
         ),
         "ru": (
             "📄 *Загрузите кредитную историю*\n\n"
             "Отправьте HTML или PDF файл с infokredit.uz.\n\n"
-            "💡 Файл будет автоматически проанализирован."
+            "💡 Файл будет автоматически проанализирован.\n\n"
+            "_Если кредитов нет — отправьте 0 или нажмите \"Нет кредитов\"._"
         )
     },
     
@@ -686,30 +692,32 @@ MESSAGES = {
         "uz": (
             "🏦 *Oylik kredit to'lovi*\n\n"
             "Barcha kreditlar bo'yicha oylik to'lovni kiriting (so'mda).\n\n"
-            "Kreditingiz yo'qmi — pastdagi tugmani bosing."
+            "💡 _Kredit yo'qmi? 0 yuboring yoki pastdagi tugmani bosing._"
         ),
         "ru": (
             "🏦 *Ежемесячный платёж по кредитам*\n\n"
             "Введите общий ежемесячный платёж по всем кредитам (в сумах).\n\n"
-            "Нет кредитов — нажмите кнопку ниже."
+            "💡 _Нет кредитов? Отправьте 0 или нажмите кнопку ниже._"
         )
     },
     
     "btn_no_loans": {
-        "uz": "✨ Kreditim yo'q",
-        "ru": "✨ Нет кредитов"
+        "uz": "0️⃣ Kreditim yo'q",
+        "ru": "0️⃣ Нет кредитов"
     },
     
     "input_total_debt": {
         "uz": (
             "📊 *Jami qarz qoldig'i*\n\n"
             "Barcha kreditlar bo'yicha umumiy qarz qoldig'ini kiriting (so'mda).\n\n"
-            "Masalan: `50 000 000`"
+            "💡 _Qarz yo'qmi? 0 yuboring._\n\n"
+            "Masalan: `50 000 000` yoki `0`"
         ),
         "ru": (
             "📊 *Общий остаток долга*\n\n"
             "Введите общую сумму оставшегося долга по всем кредитам (в сумах).\n\n"
-            "Например: `50 000 000`"
+            "💡 _Нет долгов? Отправьте 0._\n\n"
+            "Например: `50 000 000` или `0`"
         )
     },
     
