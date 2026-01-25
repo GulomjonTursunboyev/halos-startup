@@ -2032,7 +2032,18 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
     """
     Qarzni bazaga saqlash
     """
+    # Convert string dates to date objects for PostgreSQL
+    given_date = debt_info["given_date"]
+    due_date = debt_info.get("due_date")
+    
     if db.is_postgres:
+        # PostgreSQL requires date objects, not strings
+        from datetime import datetime as dt
+        if isinstance(given_date, str):
+            given_date = dt.strptime(given_date, "%Y-%m-%d").date()
+        if due_date and isinstance(due_date, str):
+            due_date = dt.strptime(due_date, "%Y-%m-%d").date()
+        
         async with db._pool.acquire() as conn:
             row = await conn.fetchrow("""
                 INSERT INTO personal_debts 
@@ -2046,8 +2057,8 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
                 debt_info["amount"],
                 debt_info.get("description", ""),
                 debt_info.get("original_text", ""),
-                debt_info["given_date"],
-                debt_info.get("due_date")
+                given_date,
+                due_date
             )
             return row["id"] if row else 0
     else:
@@ -2062,8 +2073,8 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
             debt_info["amount"],
             debt_info.get("description", ""),
             debt_info.get("original_text", ""),
-            debt_info["given_date"],
-            debt_info.get("due_date")
+            given_date,
+            due_date
         ))
         await db._connection.commit()
         
@@ -2184,11 +2195,13 @@ async def update_debt_status(db, debt_id: int, user_id: int, status: str, return
     if db.is_postgres:
         async with db._pool.acquire() as conn:
             if returned_amount is not None:
+                # PostgreSQL requires date object, not string
+                returned_date = datetime.now().date()
                 await conn.execute("""
                     UPDATE personal_debts 
                     SET status = $1, returned_amount = $2, returned_date = $3, updated_at = CURRENT_TIMESTAMP
                     WHERE id = $4 AND user_id = $5
-                """, status, returned_amount, datetime.now().strftime("%Y-%m-%d"), debt_id, user_id)
+                """, status, returned_amount, returned_date, debt_id, user_id)
             else:
                 await conn.execute("""
                     UPDATE personal_debts 
