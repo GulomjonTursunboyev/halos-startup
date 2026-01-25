@@ -3076,6 +3076,8 @@ def parse_credit_text(text: str) -> dict:
 
 async def smart_credit_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle any text input for credit data - smart parsing"""
+    logger.info(f"smart_credit_input_handler called. awaiting_credit_input={context.user_data.get('awaiting_credit_input')}")
+    
     if not context.user_data.get("awaiting_credit_input"):
         return
     
@@ -3083,8 +3085,12 @@ async def smart_credit_input_handler(update: Update, context: ContextTypes.DEFAU
     lang = context.user_data.get("lang", "uz")
     text = update.message.text.strip()
     
+    logger.info(f"Processing credit input: {text}")
+    
     # Parse the text
     parsed = parse_credit_text(text)
+    
+    logger.info(f"Parsed credit: monthly={parsed['monthly_payment']}, total={parsed['total_debt']}")
     
     # Store parsed values
     context.user_data["loan_payment"] = parsed["monthly_payment"]
