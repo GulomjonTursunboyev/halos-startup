@@ -316,6 +316,12 @@ def setup_handlers(app: Application) -> None:
         CallbackQueryHandler(ai_debt_delete_callback, pattern="^ai_debt_delete_")
     )
     
+    # PROMO CODE INPUT HANDLER - HIGHEST PRIORITY
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_promo_code_input),
+        group=-1  # Highest priority - runs first
+    )
+    
     # Smart credit input handler - MUST be before other text handlers
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
