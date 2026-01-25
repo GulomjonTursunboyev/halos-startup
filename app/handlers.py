@@ -2964,12 +2964,17 @@ async def menu_income_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def ask_credit_history_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str) -> None:
-    """Ask user to input credit data - accepts any format"""
-    # Set flag to accept credit input
+    """Ask user to input credit data - step by step"""
+    # Set flags for credit input flow
     context.user_data["awaiting_credit_input"] = True
-    context.user_data["awaiting_credit_file"] = True  # Also accept files
+    context.user_data["awaiting_credit_file"] = True
+    context.user_data["credit_step"] = "initial"  # initial -> monthly -> total
     
     keyboard = [
+        [InlineKeyboardButton(
+            get_message("btn_upload_credit", lang),
+            callback_data="menu_credit_upload"
+        )],
         [InlineKeyboardButton(
             get_message("btn_no_credit", lang),
             callback_data="menu_credit_none"
@@ -2984,98 +2989,47 @@ async def ask_credit_history_choice(update: Update, context: ContextTypes.DEFAUL
     )
 
 
-def parse_credit_text(text: str) -> dict:
+def parse_simple_number(text: str) -> int:
     """
-    Parse credit information from free-form text.
-    Returns dict with monthly_payment and total_debt
+    Parse a simple number from text with mln/млн support.
+    Returns the number in base units (so'm)
     """
     import re
     
     text_lower = text.lower().strip()
-    result = {"monthly_payment": 0, "total_debt": 0}
     
     # Check if just "0" or "yo'q" / "нет"
     if text_lower in ["0", "yo'q", "yoq", "нет", "net"]:
-        return result
+        return 0
     
-    # Try to parse as single number first
-    simple_num = parse_number(text)
-    if simple_num > 0 and not any(kw in text_lower for kw in ["jami", "qarz", "долг", "всего", "oy", "месяц", "mln", "млн"]):
-        # Single number - assume it's monthly payment
-        result["monthly_payment"] = simple_num
-        # Estimate total debt as 12x monthly (rough estimate)
-        result["total_debt"] = simple_num * 12
-        return result
+    # Remove spaces
+    text_clean = re.sub(r'\s+', '', text_lower)
     
-    # Parse numbers from text
-    # Pattern for numbers with optional mln/million markers
-    number_pattern = r'(\d[\d\s]*(?:[,\.]\d+)?)\s*(mln|млн|million|ming|тыс)?'
+    # Check for mln/млн suffix
+    multiplier = 1
+    if 'mln' in text_clean or 'млн' in text_clean or 'million' in text_clean:
+        multiplier = 1_000_000
+        text_clean = re.sub(r'(mln|млн|million)', '', text_clean)
+    elif 'ming' in text_clean or 'тыс' in text_clean:
+        multiplier = 1_000
+        text_clean = re.sub(r'(ming|тыс)', '', text_clean)
     
-    # Keywords for monthly payment
-    monthly_keywords = ["oylik", "oy", "oyiga", "месяц", "мес", "ежемесячн", "monthly", "/oy", "/мес"]
-    # Keywords for total debt
-    total_keywords = ["jami", "umumiy", "qarz", "qoldi", "долг", "всего", "остат", "total"]
+    # Extract number
+    match = re.search(r'[\d.,]+', text_clean)
+    if match:
+        num_str = match.group().replace(',', '.')
+        try:
+            value = float(num_str) * multiplier
+            return int(value)
+        except:
+            pass
     
-    # Find all numbers in text
-    numbers_found = re.findall(number_pattern, text_lower)
-    
-    # Process each sentence/phrase
-    sentences = re.split(r'[,;.]|\n', text)
-    
-    for sentence in sentences:
-        sentence_lower = sentence.lower().strip()
-        if not sentence_lower:
-            continue
-            
-        # Extract number from this sentence
-        nums = re.findall(number_pattern, sentence_lower)
-        if not nums:
-            continue
-            
-        for num_str, multiplier in nums:
-            # Clean and parse number
-            clean_num = re.sub(r'\s', '', num_str)
-            try:
-                value = float(clean_num.replace(',', '.'))
-            except:
-                continue
-                
-            # Apply multiplier
-            if multiplier in ['mln', 'млн', 'million']:
-                value *= 1_000_000
-            elif multiplier in ['ming', 'тыс']:
-                value *= 1_000
-            
-            value = int(value)
-            
-            # Determine if monthly or total based on keywords
-            is_monthly = any(kw in sentence_lower for kw in monthly_keywords)
-            is_total = any(kw in sentence_lower for kw in total_keywords)
-            
-            if is_total:
-                result["total_debt"] = max(result["total_debt"], value)
-            elif is_monthly:
-                result["monthly_payment"] += value
-            else:
-                # Default: smaller numbers likely monthly, larger likely total
-                if value > 50_000_000:  # More than 50mln likely total debt
-                    result["total_debt"] = max(result["total_debt"], value)
-                else:
-                    result["monthly_payment"] += value
-    
-    # If we found monthly but not total, estimate total as 12-24 months
-    if result["monthly_payment"] > 0 and result["total_debt"] == 0:
-        result["total_debt"] = result["monthly_payment"] * 18  # 18 months average
-    
-    # If we found total but not monthly, estimate monthly
-    if result["total_debt"] > 0 and result["monthly_payment"] == 0:
-        result["monthly_payment"] = result["total_debt"] // 24  # 2 years estimate
-    
-    return result
+    # Fallback to parse_number
+    return parse_number(text)
 
 
 async def smart_credit_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle any text input for credit data - smart parsing"""
+    """Handle credit input - step by step (monthly payment -> total debt)"""
     logger.info(f"smart_credit_input_handler called. awaiting_credit_input={context.user_data.get('awaiting_credit_input')}")
     
     if not context.user_data.get("awaiting_credit_input"):
@@ -3084,49 +3038,73 @@ async def smart_credit_input_handler(update: Update, context: ContextTypes.DEFAU
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     text = update.message.text.strip()
+    credit_step = context.user_data.get("credit_step", "initial")
     
-    logger.info(f"Processing credit input: {text}")
+    logger.info(f"Processing credit input: {text}, step: {credit_step}")
     
-    # Parse the text
-    parsed = parse_credit_text(text)
+    # Parse the number
+    amount = parse_simple_number(text)
     
-    logger.info(f"Parsed credit: monthly={parsed['monthly_payment']}, total={parsed['total_debt']}")
-    
-    # Store parsed values
-    context.user_data["loan_payment"] = parsed["monthly_payment"]
-    context.user_data["total_debt"] = parsed["total_debt"]
-    
-    # If both are 0, treat as no credit
-    if parsed["monthly_payment"] == 0 and parsed["total_debt"] == 0:
-        context.user_data["awaiting_credit_input"] = False
-        context.user_data["awaiting_credit_file"] = False
-        await update.message.reply_text("✅")
-        await save_and_show_menu_results(update.message, context, telegram_id, lang)
+    if amount < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
         return
     
-    # Show parsed result for confirmation
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                get_message("credit_confirm_yes", lang),
-                callback_data="credit_confirm_yes"
-            ),
-            InlineKeyboardButton(
-                get_message("credit_confirm_no", lang),
-                callback_data="credit_confirm_no"
+    # Step logic
+    if credit_step == "initial" or credit_step == "monthly":
+        # First step: Monthly payment
+        context.user_data["loan_payment"] = amount
+        
+        if amount == 0:
+            # No credit - save and finish
+            context.user_data["total_debt"] = 0
+            context.user_data["awaiting_credit_input"] = False
+            context.user_data["awaiting_credit_file"] = False
+            context.user_data["credit_step"] = None
+            await update.message.reply_text("✅")
+            await save_and_show_menu_results(update.message, context, telegram_id, lang)
+        else:
+            # Move to step 2: Ask for total debt
+            context.user_data["credit_step"] = "total"
+            await update.message.reply_text(
+                get_message("input_total_debt", lang),
+                parse_mode="Markdown"
             )
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(
-        get_message("credit_parsed_result", lang).format(
-            monthly_payment=format_number(parsed["monthly_payment"]),
-            total_debt=format_number(parsed["total_debt"])
-        ),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
+    elif credit_step == "total":
+        # Second step: Total debt
+        context.user_data["total_debt"] = amount
+        context.user_data["awaiting_credit_input"] = False
+        context.user_data["awaiting_credit_file"] = False
+        context.user_data["credit_step"] = None
+        
+        # Show confirmation
+        monthly = context.user_data.get("loan_payment", 0)
+        
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    get_message("credit_confirm_yes", lang),
+                    callback_data="credit_confirm_yes"
+                ),
+                InlineKeyboardButton(
+                    get_message("credit_confirm_no", lang),
+                    callback_data="credit_confirm_no"
+                )
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("credit_parsed_result", lang).format(
+                monthly_payment=format_number(monthly),
+                total_debt=format_number(amount)
+            ),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
 
 
 async def credit_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3142,60 +3120,17 @@ async def credit_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
         # Confirmed - save and show results
         context.user_data["awaiting_credit_input"] = False
         context.user_data["awaiting_credit_file"] = False
+        context.user_data["credit_step"] = None
         await query.edit_message_text(get_message("debt_saved", lang))
         await save_and_show_menu_results(query.message, context, telegram_id, lang)
     
-    else:  # credit_confirm_no - ask for correction
-        context.user_data["awaiting_credit_edit"] = True
+    else:  # credit_confirm_no - restart from monthly payment
+        context.user_data["awaiting_credit_input"] = True
+        context.user_data["credit_step"] = "monthly"
         await query.edit_message_text(
-            get_message("credit_edit_prompt", lang),
+            get_message("input_loan_payment", lang),
             parse_mode="Markdown"
         )
-
-
-async def credit_edit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle credit data correction"""
-    if not context.user_data.get("awaiting_credit_edit"):
-        return
-    
-    telegram_id = update.effective_user.id
-    lang = context.user_data.get("lang", "uz")
-    text = update.message.text.strip()
-    
-    # Re-parse with the correction
-    parsed = parse_credit_text(text)
-    
-    # Update only non-zero values
-    if parsed["monthly_payment"] > 0:
-        context.user_data["loan_payment"] = parsed["monthly_payment"]
-    if parsed["total_debt"] > 0:
-        context.user_data["total_debt"] = parsed["total_debt"]
-    
-    # Show updated result
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                get_message("credit_confirm_yes", lang),
-                callback_data="credit_confirm_yes"
-            ),
-            InlineKeyboardButton(
-                get_message("credit_confirm_no", lang),
-                callback_data="credit_confirm_no"
-            )
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    context.user_data["awaiting_credit_edit"] = False
-    
-    await update.message.reply_text(
-        get_message("credit_parsed_result", lang).format(
-            monthly_payment=format_number(context.user_data.get("loan_payment", 0)),
-            total_debt=format_number(context.user_data.get("total_debt", 0))
-        ),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
 
 
 async def menu_credit_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3210,17 +3145,20 @@ async def menu_credit_choice_callback(update: Update, context: ContextTypes.DEFA
     if choice == "menu_credit_upload":
         # Ask for file upload
         context.user_data["awaiting_credit_file"] = True
+        context.user_data["awaiting_credit_input"] = True
+        context.user_data["credit_step"] = "file"
         await query.edit_message_text(
             get_message("upload_credit_file", lang),
             parse_mode="Markdown"
         )
     
     elif choice == "menu_credit_manual":
-        # Manual entry - now uses smart input
+        # Manual entry - step by step
         context.user_data["awaiting_credit_input"] = True
-        context.user_data["awaiting_credit_file"] = True
+        context.user_data["awaiting_credit_file"] = False
+        context.user_data["credit_step"] = "monthly"
         await query.edit_message_text(
-            get_message("credit_history_choice", lang),
+            get_message("input_loan_payment", lang),
             parse_mode="Markdown"
         )
     
@@ -3230,6 +3168,7 @@ async def menu_credit_choice_callback(update: Update, context: ContextTypes.DEFA
         context.user_data["total_debt"] = 0
         context.user_data["awaiting_credit_input"] = False
         context.user_data["awaiting_credit_file"] = False
+        context.user_data["credit_step"] = None
         await query.edit_message_text("✅")
         await save_and_show_menu_results(query.message, context, telegram_id, lang)
 

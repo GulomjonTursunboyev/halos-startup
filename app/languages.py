@@ -640,36 +640,32 @@ MESSAGES = {
     # ==================== CREDIT HISTORY CHOICE ====================
     "credit_history_choice": {
         "uz": (
-            "🏦 *Kredit ma'lumotlari*\n\n"
-            "Kredit haqida ma'lumot yuboring:\n\n"
-            "📄 *Fayl* — infokredit.uz dan HTML/PDF yuklang\n"
-            "✏️ *Matn* — istalgan formatda yozing\n"
-            "0️⃣ *Yo'q* — kredit yo'q bo'lsa 0 yuboring\n\n"
-            "💡 *Misollar:*\n"
-            "• `0` — kreditim yo'q\n"
-            "• `2 000 000` — oylik to'lov\n"
-            "• `Oyiga 2 mln, jami 30 mln qarz`\n"
-            "• `Ipoteka 15 mln/oy, avto 3 mln/oy`\n\n"
-            "_Istalgan formatda yozing — tizim avtomatik tahlil qiladi_"
+            "🏦 *KREDIT MA'LUMOTLARI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Kredit ma'lumotlaringizni kiriting:\n\n"
+            "📄 *Avtomatik* — KATM kredit tarixini yuklang\n"
+            "_(Barcha ma'lumotlar avtomatik olinadi)_\n\n"
+            "✏️ *Qo'lda* — oylik to'lov summasini yozing\n"
+            "_(Masalan: `2000000` yoki `2 mln`)_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Kreditingiz yo'qmi? 0 yuboring_"
         ),
         "ru": (
-            "🏦 *Данные о кредитах*\n\n"
-            "Отправьте информацию о кредитах:\n\n"
-            "📄 *Файл* — загрузите HTML/PDF с infokredit.uz\n"
-            "✏️ *Текст* — напишите в любом формате\n"
-            "0️⃣ *Нет* — отправьте 0 если нет кредитов\n\n"
-            "💡 *Примеры:*\n"
-            "• `0` — нет кредитов\n"
-            "• `2 000 000` — ежемесячный платёж\n"
-            "• `В месяц 2 млн, всего 30 млн долга`\n"
-            "• `Ипотека 15 млн/мес, авто 3 млн/мес`\n\n"
-            "_Пишите как удобно — система сама проанализирует_"
+            "🏦 *ДАННЫЕ О КРЕДИТАХ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Введите данные о кредитах:\n\n"
+            "📄 *Автоматически* — загрузите кредитную историю KATM\n"
+            "_(Все данные будут получены автоматически)_\n\n"
+            "✏️ *Вручную* — напишите сумму ежемесячного платежа\n"
+            "_(Например: `2000000` или `2 млн`)_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Нет кредитов? Отправьте 0_"
         )
     },
     
     "btn_upload_credit": {
-        "uz": "📄 Fayl yuklash",
-        "ru": "📄 Загрузить файл"
+        "uz": "📄 KATM dan yuklash",
+        "ru": "📄 Загрузить из KATM"
     },
     
     "btn_manual_credit": {
@@ -684,30 +680,60 @@ MESSAGES = {
     
     "upload_credit_file": {
         "uz": (
-            "📄 *Kredit tarixini yuklang*\n\n"
-            "infokredit.uz dan olingan HTML yoki PDF faylni yuboring.\n\n"
-            "💡 Fayl avtomatik tahlil qilinadi va ma'lumotlar olinadi.\n\n"
-            "_Kreditingiz bo'lmasa — 0 yuboring yoki \"Kreditim yo'q\" tugmasini bosing._"
+            "📄 *KATM KREDIT TARIXINI YUKLASH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "infokredit.uz saytidan kredit tarixingizni yuklang.\n\n"
+            "📋 *Qanday olish:*\n"
+            "1️⃣ infokredit.uz saytiga kiring\n"
+            "2️⃣ MyID orqali tizimga kiring\n"
+            "3️⃣ \"Kredit tarixi\" → \"Yuklab olish\"\n"
+            "4️⃣ HTML yoki PDF faylni menga yuboring\n\n"
+            "💡 _4-bo'lim \"Amaldagi shartnamalar\"dan barcha ma'lumotlar avtomatik olinadi_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔙 _Yuklamasangiz — oylik to'lov summasini yozing_"
         ),
         "ru": (
-            "📄 *Загрузите кредитную историю*\n\n"
-            "Отправьте HTML или PDF файл с infokredit.uz.\n\n"
-            "💡 Файл будет автоматически проанализирован.\n\n"
-            "_Если кредитов нет — отправьте 0 или нажмите \"Нет кредитов\"._"
+            "📄 *ЗАГРУЗКА КРЕДИТНОЙ ИСТОРИИ KATM*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Загрузите кредитную историю с сайта infokredit.uz.\n\n"
+            "📋 *Как получить:*\n"
+            "1️⃣ Зайдите на infokredit.uz\n"
+            "2️⃣ Войдите через MyID\n"
+            "3️⃣ \"Кредитная история\" → \"Скачать\"\n"
+            "4️⃣ Отправьте мне HTML или PDF файл\n\n"
+            "💡 _Из раздела 4 \"Действующие договора\" все данные будут получены автоматически_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔙 _Не загружаете — напишите сумму ежемесячного платежа_"
         )
     },
     
-    # ==================== LOAN INPUT ====================
+    # ==================== LOAN INPUT (Step by Step) ====================
     "input_loan_payment": {
         "uz": (
-            "🏦 *Oylik kredit to'lovi*\n\n"
-            "Barcha kreditlar bo'yicha oylik to'lovni kiriting (so'mda).\n\n"
-            "💡 _Kredit yo'qmi? 0 yuboring yoki pastdagi tugmani bosing._"
+            "💳 *1-QADAM: OYLIK KREDIT TO'LOVI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Har oyda barcha kreditlar uchun\n"
+            "qancha to'laysiz?\n\n"
+            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
+            "💡 *Misollar:*\n"
+            "• `2500000` — 2.5 million\n"
+            "• `2 mln` — 2 million\n"
+            "• `0` — kredit yo'q\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ _Bu oylik TO'LOV summasi, jami qarz emas!_"
         ),
         "ru": (
-            "🏦 *Ежемесячный платёж по кредитам*\n\n"
-            "Введите общий ежемесячный платёж по всем кредитам (в сумах).\n\n"
-            "💡 _Нет кредитов? Отправьте 0 или нажмите кнопку ниже._"
+            "💳 *ШАГ 1: ЕЖЕМЕСЯЧНЫЙ ПЛАТЁЖ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Сколько вы платите каждый месяц\n"
+            "по всем кредитам?\n\n"
+            "📝 *Напишите:* только число (в сумах)\n\n"
+            "💡 *Примеры:*\n"
+            "• `2500000` — 2.5 миллиона\n"
+            "• `2 млн` — 2 миллиона\n"
+            "• `0` — нет кредитов\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ _Это ежемесячный ПЛАТЁЖ, не общий долг!_"
         )
     },
     
@@ -718,16 +744,30 @@ MESSAGES = {
     
     "input_total_debt": {
         "uz": (
-            "📊 *Jami qarz qoldig'i*\n\n"
-            "Barcha kreditlar bo'yicha umumiy qarz qoldig'ini kiriting (so'mda).\n\n"
-            "💡 _Qarz yo'qmi? 0 yuboring._\n\n"
-            "Masalan: `50 000 000` yoki `0`"
+            "📊 *2-QADAM: JAMI QARZ QOLDIG'I*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Barcha kreditlar bo'yicha\n"
+            "hali qancha qarz qoldi?\n\n"
+            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
+            "💡 *Misollar:*\n"
+            "• `50000000` — 50 million\n"
+            "• `30 mln` — 30 million\n"
+            "• `0` — qarz yo'q\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ _Bu jami QARZ qoldig'i, oylik to'lov emas!_"
         ),
         "ru": (
-            "📊 *Общий остаток долга*\n\n"
-            "Введите общую сумму оставшегося долга по всем кредитам (в сумах).\n\n"
-            "💡 _Нет долгов? Отправьте 0._\n\n"
-            "Например: `50 000 000` или `0`"
+            "📊 *ШАГ 2: ОСТАТОК ДОЛГА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Сколько всего осталось выплатить\n"
+            "по всем кредитам?\n\n"
+            "📝 *Напишите:* только число (в сумах)\n\n"
+            "💡 *Примеры:*\n"
+            "• `50000000` — 50 миллионов\n"
+            "• `30 млн` — 30 миллионов\n"
+            "• `0` — нет долга\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ _Это общий ОСТАТОК долга, не ежемесячный платёж!_"
         )
     },
     

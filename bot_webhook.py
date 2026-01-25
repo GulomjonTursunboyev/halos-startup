@@ -50,7 +50,6 @@ from app.handlers import (
     menu_katm_confirm_callback,
     smart_credit_input_handler,
     credit_confirm_callback,
-    credit_edit_handler,
     # AI Assistant handlers
     ai_assistant_callback,
     ai_voice_handler,
@@ -321,12 +320,6 @@ def setup_handlers(app: Application) -> None:
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
         group=3  # Lower group number = higher priority
-    )
-    
-    # Credit edit handler
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, credit_edit_handler),
-        group=3
     )
     
     # Amount input handler for corrections
