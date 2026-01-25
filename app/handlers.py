@@ -1567,13 +1567,23 @@ async def start_trial_callback(update, context):
     # Activate trial: set PRO, 3 days, mark trial_used
     from datetime import datetime, timedelta
     expires = datetime.now() + timedelta(days=3)
-    await db._connection.execute(
-        """
-        UPDATE users SET subscription_tier = 'pro', subscription_expires = ?, subscription_plan = 'trial', trial_used = 1, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?
-        """,
-        (expires.isoformat(), telegram_id)
-    )
-    await db._connection.commit()
+    
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE users SET subscription_tier = 'pro', subscription_expires = $1, 
+                   subscription_plan = 'trial', trial_used = 1, updated_at = CURRENT_TIMESTAMP 
+                   WHERE telegram_id = $2""",
+                expires, telegram_id
+            )
+    else:
+        await db._connection.execute(
+            """UPDATE users SET subscription_tier = 'pro', subscription_expires = ?, 
+               subscription_plan = 'trial', trial_used = 1, updated_at = CURRENT_TIMESTAMP 
+               WHERE telegram_id = ?""",
+            (expires.isoformat(), telegram_id)
+        )
+        await db._connection.commit()
     # Show confirmation
     msg = get_message("trial_activated", lang)
     if isinstance(msg, dict):
@@ -5052,16 +5062,23 @@ async def ai_debt_return_callback(update: Update, context: ContextTypes.DEFAULT_
         return
     
     # Get debt info first
-    cursor = await db._connection.execute(
-        "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
-        (debt_id, user["id"])
-    )
-    debt = await cursor.fetchone()
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            debt = await conn.fetchrow(
+                "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
+                debt_id, user["id"]
+            )
+            debt = dict(debt) if debt else None
+    else:
+        cursor = await db._connection.execute(
+            "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
+            (debt_id, user["id"])
+        )
+        debt = await cursor.fetchone()
+        debt = dict(debt) if debt else None
     
     if not debt:
         return
-    
-    debt = dict(debt)
     
     # Mark as returned (full amount)
     await update_debt_status(db, debt_id, user["id"], "returned", debt["amount"])
@@ -5128,19 +5145,26 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
         return
     
     # Get debt info
-    cursor = await db._connection.execute(
-        "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
-        (debt_id, user["id"])
-    )
-    debt = await cursor.fetchone()
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            debt = await conn.fetchrow(
+                "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
+                debt_id, user["id"]
+            )
+            debt = dict(debt) if debt else None
+    else:
+        cursor = await db._connection.execute(
+            "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
+            (debt_id, user["id"])
+        )
+        debt = await cursor.fetchone()
+        debt = dict(debt) if debt else None
     
     if not debt:
         await query.edit_message_text(
             "❌ Qarz topilmadi" if lang == "uz" else "❌ Долг не найден"
         )
         return
-    
-    debt = dict(debt)
     
     if lang == "uz":
         type_text = "Bergan qarz" if debt["debt_type"] == "lent" else "Olgan qarz"
@@ -5207,11 +5231,18 @@ async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_
         return
     
     # Delete debt
-    await db._connection.execute(
-        "DELETE FROM personal_debts WHERE id = ? AND user_id = ?",
-        (debt_id, user["id"])
-    )
-    await db._connection.commit()
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM personal_debts WHERE id = $1 AND user_id = $2",
+                debt_id, user["id"]
+            )
+    else:
+        await db._connection.execute(
+            "DELETE FROM personal_debts WHERE id = ? AND user_id = ?",
+            (debt_id, user["id"])
+        )
+        await db._connection.commit()
     
     if lang == "uz":
         msg = "🗑 *Qarz yozuvi o'chirildi*"

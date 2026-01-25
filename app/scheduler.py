@@ -67,9 +67,8 @@ class ProCareScheduler:
         if db.is_postgres:
             async with db._pool.acquire() as conn:
                 rows = await conn.fetch("""
-                    SELECT u.*, fp.monthly_income, fp.partner_income, fp.loan_payment, fp.total_debt
+                    SELECT u.*
                     FROM users u
-                    LEFT JOIN financial_profiles fp ON fp.user_id = u.id
                     WHERE u.subscription_tier = 'pro'
                     AND (u.subscription_expires IS NULL OR u.subscription_expires > NOW())
                 """)
@@ -93,9 +92,8 @@ class ProCareScheduler:
         if db.is_postgres:
             async with db._pool.acquire() as conn:
                 rows = await conn.fetch("""
-                    SELECT u.*, fp.monthly_income, fp.partner_income, fp.loan_payment, fp.total_debt
+                    SELECT u.*
                     FROM users u
-                    LEFT JOIN financial_profiles fp ON fp.user_id = u.id
                     WHERE u.subscription_tier = 'pro'
                     AND (u.subscription_expires IS NULL OR u.subscription_expires > NOW())
                     AND (u.last_active IS NULL OR u.last_active < $1)
