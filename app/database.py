@@ -75,12 +75,12 @@ class Database:
             
             try:
                 # Use DSN directly. For Supabase pooler, ssl='require' is essential.
-                # Optimized pool settings for faster response
+                # MAXIMUM SPEED pool settings
                 self._pool = await asyncpg.create_pool(
                     dsn=db_url,
-                    min_size=5,      # Keep 5 connections ready
-                    max_size=20,     # Allow up to 20 concurrent connections
-                    command_timeout=30,  # Faster timeout
+                    min_size=10,     # Keep 10 connections ready (warm pool)
+                    max_size=50,     # Allow up to 50 concurrent connections
+                    command_timeout=10,  # Fast timeout (10 sec)
                     ssl='require'
                 )
                 await self._create_tables_postgres()
@@ -94,9 +94,9 @@ class Database:
                         logger.info("Retrying without explicit SSL requirement...")
                         self._pool = await asyncpg.create_pool(
                             dsn=db_url,
-                            min_size=5,
-                            max_size=20,
-                            command_timeout=30
+                            min_size=10,
+                            max_size=50,
+                            command_timeout=10
                         )
                         await self._create_tables_postgres()
                         logger.info("PostgreSQL connected (No SSL)!")
