@@ -113,6 +113,54 @@ class Database:
             await self._run_migrations()
             logger.info(f"SQLite connected: {self.db_path}")
     
+    async def ensure_connection(self):
+        """Ensure database connection is active, reconnect if needed"""
+        if self.is_postgres:
+            if self._pool is None or self._pool._closed:
+                logger.warning("PostgreSQL pool is None or closed, reconnecting...")
+                await self.connect()
+        else:
+            if self._connection is None:
+                logger.warning("SQLite connection is None, reconnecting...")
+                await self.connect()
+    
+    async def execute_update(self, query: str, *args):
+        """Execute an UPDATE/INSERT query safely with auto-reconnect"""
+        await self.ensure_connection()
+        
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                await conn.execute(query, *args)
+        else:
+            await self._connection.execute(query, args)
+            await self._connection.commit()
+    
+    async def fetch_one(self, query: str, *args):
+        """Fetch one row safely with auto-reconnect"""
+        await self.ensure_connection()
+        
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                row = await conn.fetchrow(query, *args)
+                return dict(row) if row else None
+        else:
+            cursor = await self._connection.execute(query, args)
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+    
+    async def fetch_all(self, query: str, *args):
+        """Fetch all rows safely with auto-reconnect"""
+        await self.ensure_connection()
+        
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch(query, *args)
+                return [dict(row) for row in rows]
+        else:
+            cursor = await self._connection.execute(query, args)
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+    
     async def close(self):
         """Close database connection"""
         if self.is_postgres and self._pool:

@@ -1569,13 +1569,12 @@ async def start_trial_callback(update, context):
     expires = datetime.now() + timedelta(days=3)
     
     if db.is_postgres:
-        async with db._pool.acquire() as conn:
-            await conn.execute(
-                """UPDATE users SET subscription_tier = 'pro', subscription_expires = $1, 
-                   subscription_plan = 'trial', trial_used = 1, updated_at = CURRENT_TIMESTAMP 
-                   WHERE telegram_id = $2""",
-                expires, telegram_id
-            )
+        await db.execute_update(
+            """UPDATE users SET subscription_tier = 'pro', subscription_expires = $1, 
+               subscription_plan = 'trial', trial_used = 1, updated_at = CURRENT_TIMESTAMP 
+               WHERE telegram_id = $2""",
+            expires, telegram_id
+        )
     else:
         await db._connection.execute(
             """UPDATE users SET subscription_tier = 'pro', subscription_expires = ?, 
@@ -5213,12 +5212,10 @@ async def ai_debt_return_callback(update: Update, context: ContextTypes.DEFAULT_
     
     # Get debt info first
     if db.is_postgres:
-        async with db._pool.acquire() as conn:
-            debt = await conn.fetchrow(
-                "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
-                debt_id, user["id"]
-            )
-            debt = dict(debt) if debt else None
+        debt = await db.fetch_one(
+            "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
+            debt_id, user["id"]
+        )
     else:
         cursor = await db._connection.execute(
             "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
@@ -5296,12 +5293,10 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
     
     # Get debt info
     if db.is_postgres:
-        async with db._pool.acquire() as conn:
-            debt = await conn.fetchrow(
-                "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
-                debt_id, user["id"]
-            )
-            debt = dict(debt) if debt else None
+        debt = await db.fetch_one(
+            "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
+            debt_id, user["id"]
+        )
     else:
         cursor = await db._connection.execute(
             "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
@@ -5382,11 +5377,10 @@ async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_
     
     # Delete debt
     if db.is_postgres:
-        async with db._pool.acquire() as conn:
-            await conn.execute(
-                "DELETE FROM personal_debts WHERE id = $1 AND user_id = $2",
-                debt_id, user["id"]
-            )
+        await db.execute_update(
+            "DELETE FROM personal_debts WHERE id = $1 AND user_id = $2",
+            debt_id, user["id"]
+        )
     else:
         await db._connection.execute(
             "DELETE FROM personal_debts WHERE id = ? AND user_id = ?",
