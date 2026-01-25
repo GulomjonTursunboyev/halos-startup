@@ -1,6 +1,10 @@
 """
 AI Yordamchi - Ovozli xabarlarni qayta ishlash va xarajat/daromad tracking
 Aisha.group STT API integratsiyasi
+
+MULTI-TRANSACTION PARSING ENGINE v2.0
+=====================================
+Bir ovozli xabarda bir nechta tranzaksiyalarni aniqlash va saqlash
 """
 
 import aiohttp
@@ -73,33 +77,47 @@ INCOME_CATEGORIES = {
     }
 }
 
-# Kategoriya aniqlash uchun kalit so'zlar
+# Kategoriya aniqlash uchun kalit so'zlar - KENGAYTIRILGAN
 CATEGORY_KEYWORDS = {
     # Xarajatlar
-    "oziq_ovqat": ["ovqat", "taom", "restoran", "kafe", "choy", "non", "go'sht", "sabzavot", "meva", 
-                   "bozor", "magazin", "market", "еда", "продукты", "ресторан", "кафе", "food", "eat",
-                   "osh", "palov", "somsa", "lag'mon", "shashlik"],
-    "transport": ["taksi", "avtobus", "metro", "benzin", "mashina", "yoqilg'i", "uber", "yandex",
-                  "такси", "транспорт", "бензин", "taxi", "transport", "fuel", "yo'l", "yol"],
+    "oziq_ovqat": [
+        "ovqat", "taom", "restoran", "kafe", "choy", "non", "go'sht", "sabzavot", "meva", 
+        "bozor", "magazin", "market", "еда", "продукты", "ресторан", "кафе", "food", "eat",
+        "osh", "palov", "somsa", "lag'mon", "shashlik", "tushlik", "nonushta", "kechki",
+        "ovqatlandim", "yedim", "ichdim", "olib yedim", "olgani", "sotib oldim ovqat",
+        "choyxona", "oshxona", "fastfood", "burger", "pizza", "lavash", "kabob",
+        "moshxo'rda", "sho'rva", "manti", "chuchvara", "qazi", "norin"
+    ],
+    "transport": [
+        "taksi", "avtobus", "metro", "benzin", "mashina", "yoqilg'i", "uber", "yandex",
+        "такси", "транспорт", "бензин", "taxi", "transport", "fuel", "yo'l", "yol",
+        "taksida", "avtobusda", "metroda", "bordim", "keldim", "qaytdim", "olib bordim",
+        "olib keldim", "poyezd", "samolyot", "tramvay", "trolleybus", "marshrutka",
+        "pochta", "yetkazib berish", "dostavka", "bolt", "mycar"
+    ],
     "uy_joy": ["ijara", "uy", "kvartira", "remont", "mebel", "аренда", "квартира", "ремонт", "rent", "house"],
-    "kommunal": ["gaz", "suv", "elektr", "tok", "issiqlik", "gas", "вода", "свет", "electricity"],
-    "sog'liq": ["dori", "shifoxona", "doktor", "tibbiy", "apteka", "лекарство", "больница", "врач", "medicine", "doctor"],
-    "kiyim": ["kiyim", "oyoq kiyim", "ko'ylak", "shim", "одежда", "обувь", "clothes", "shoes"],
-    "ta'lim": ["kurs", "kitob", "o'qish", "ta'lim", "maktab", "курсы", "книги", "обучение", "education", "course"],
-    "ko'ngilochar": ["kino", "teatr", "dam olish", "sayohat", "o'yin", "кино", "отдых", "movie", "entertainment"],
-    "aloqa": ["telefon", "internet", "mobil", "связь", "интернет", "phone", "mobile"],
-    "kredit": ["kredit", "qarz", "to'lov", "bank", "кредит", "долг", "платёж", "loan", "credit"],
+    "kommunal": ["gaz", "suv", "elektr", "tok", "issiqlik", "gas", "вода", "свет", "electricity", "hududiy"],
+    "sog'liq": ["dori", "shifoxona", "doktor", "tibbiy", "apteka", "лекарство", "больница", "врач", "medicine", "doctor", "kasalxona", "davolash"],
+    "kiyim": ["kiyim", "oyoq kiyim", "ko'ylak", "shim", "одежда", "обувь", "clothes", "shoes", "kurtka", "palto", "futbolka"],
+    "ta'lim": ["kurs", "kitob", "o'qish", "ta'lim", "maktab", "курсы", "книги", "обучение", "education", "course", "universitet", "kollej"],
+    "ko'ngilochar": ["kino", "teatr", "dam olish", "sayohat", "o'yin", "кино", "отдых", "movie", "entertainment", "konsert", "muzey"],
+    "aloqa": ["telefon", "internet", "mobil", "связь", "интернет", "phone", "mobile", "sim", "tarif", "beeline", "ucell", "mobiuz"],
+    "kredit": ["kredit", "qarz", "to'lov", "bank", "кредит", "долг", "платёж", "loan", "credit", "ipoteka", "nasiya"],
     
     # Daromadlar
-    "ish_haqi": ["maosh", "ish haqi", "oylik", "зарплата", "оклад", "salary", "wage",
-                 "ishlab", "ishladim", "ishlagan", "ishdan", "ish pulim", "topdim",
-                 "работа", "заработал", "earned", "work"],
-    "biznes": ["biznes", "savdo", "daromad", "foyda", "sotdim", "бизнес", "продажа", "прибыль", "business", "profit",
-               "do'kon", "magazin", "savdo qildim"],
-    "investitsiya": ["dividend", "foiz", "aksiya", "дивиденд", "процент", "акции", "dividend", "investment"],
-    "freelance": ["frilanser", "buyurtma", "loyiha", "фриланс", "заказ", "проект", "freelance", "project"],
-    "sovg'a": ["sovg'a", "hadya", "tug'ilgan kun", "подарок", "gift", "present"],
-    "qarz_qaytarish": ["qaytarish", "qarz olish", "возврат", "return", "debt return"]
+    "ish_haqi": [
+        "maosh", "ish haqi", "oylik", "зарплата", "оклад", "salary", "wage",
+        "ishlab", "ishladim", "ishlagan", "ishdan", "ish pulim", "topdim",
+        "работа", "заработал", "earned", "work", "avans", "bonus", "mukofot"
+    ],
+    "biznes": [
+        "biznes", "savdo", "daromad", "foyda", "sotdim", "бизнес", "продажа", "прибыль", "business", "profit",
+        "do'kon", "magazin", "savdo qildim", "tushum", "kassa"
+    ],
+    "investitsiya": ["dividend", "foiz", "aksiya", "дивиденд", "процент", "акции", "dividend", "investment", "depozit"],
+    "freelance": ["frilanser", "buyurtma", "loyiha", "фриланс", "заказ", "проект", "freelance", "project", "ishim", "zakaz"],
+    "sovg'a": ["sovg'a", "hadya", "tug'ilgan kun", "подарок", "gift", "present", "tortiq"],
+    "qarz_qaytarish": ["qaytarish", "qarz olish", "возврат", "return", "debt return", "qarzimni"]
 }
 
 
@@ -603,6 +621,427 @@ async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
         "original_text": text,
         "timestamp": datetime.now().isoformat()
     }
+
+
+# ==================== MULTI-TRANSACTION PARSING ENGINE ====================
+
+def split_into_transaction_segments(text: str) -> List[str]:
+    """
+    Matnni tranzaksiya segmentlariga ajratish.
+    
+    Masalan: "ellik mingga ovqatlandim yigirma taksida bordim o'ttiz taksida qaytdim"
+    Natija: ["ellik mingga ovqatlandim", "yigirma taksida bordim", "o'ttiz taksida qaytdim"]
+    """
+    text_lower = text.lower().strip()
+    
+    print(f"[MULTI] Kirish matni: '{text_lower}'")
+    
+    # Ajratish uchun kalit so'zlar (harakatlar va bog'lovchilar)
+    SEPARATORS = [
+        # Bog'lovchilar
+        r'\bva\b', r'\bham\b', r'\byana\b', r'\bkeyin\b', r'\bundan tashqari\b',
+        r'\bbundan keyin\b', r'\bshundan keyin\b', r'\bso\'ng\b', r'\bso\'ngra\b',
+        r'\band\b', r'\bthen\b', r'\balso\b',
+        r'\bи\b', r'\bтакже\b', r'\bпотом\b', r'\bещё\b',
+    ]
+    
+    # Summani topish uchun pattern
+    AMOUNT_PATTERNS = [
+        # Raqam + ming/million
+        r'(\d+)\s*ming',
+        r'(\d+)\s*(million|mln)',
+        # So'z bilan son + ming
+        r'(bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz)\s+ming',
+        r'(o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)\s+ming',
+        r'(o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)\s*(bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz)?\s+ming',
+        # Qo'shimchali
+        r'mingga', r'mingda', r'mingdan', r'mingni',
+    ]
+    
+    # Agar "va" yoki boshqa ajratuvchi so'zlar bilan ajratilgan bo'lsa
+    for sep in SEPARATORS:
+        if re.search(sep, text_lower):
+            # Ajratib ko'ramiz
+            parts = re.split(sep, text_lower)
+            parts = [p.strip() for p in parts if p.strip()]
+            
+            # Har bir qismda summa borligini tekshiramiz
+            valid_parts = []
+            for part in parts:
+                # Summa bor-yo'qligini tekshirish
+                has_amount = False
+                for pattern in AMOUNT_PATTERNS:
+                    if re.search(pattern, part):
+                        has_amount = True
+                        break
+                
+                # Agar summa topilmasa, raqam borligini tekshirish
+                if not has_amount:
+                    if re.search(r'\d+', part):
+                        has_amount = True
+                
+                if has_amount and len(part) > 5:  # Minimal uzunlik
+                    valid_parts.append(part)
+            
+            if len(valid_parts) > 1:
+                print(f"[MULTI] 'va' bilan ajratildi: {valid_parts}")
+                return valid_parts
+    
+    # Agar ajratilmasa, summa + kontekst patternlarini qidirish
+    # Masalan: "50 mingga ovqatlandim 20 taksida bordim 30 taksida qaytdim"
+    
+    # Barcha summa+kontekst patternlarni topish
+    transaction_patterns = [
+        # summa + ga/da + harakat
+        r'(\d+\s*mingga\s+\w+)',
+        r'(\d+\s*mingda\s+\w+)',
+        r'((?:bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz|o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)(?:\s+(?:bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz))?\s*(?:mingga|mingda|ming)\s+\w+)',
+        # summa + kontekst so'z (taksi, ovqat, etc.)
+        r'(\d+\s*(?:taksida|taksi\s+da|taksiga))',
+        r'((?:bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz|o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)(?:\s+(?:bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz))?\s*(?:taksida|taksi\s+da|taksiga))',
+    ]
+    
+    # Pozitsiya bo'yicha tranzaksiyalarni topish
+    # Har bir summa boshqa tranzaksiya deb hisoblanadi
+    
+    # 1. Barcha summalarni va ularning pozitsiyalarini topish
+    amount_positions = []
+    
+    # So'z + ming patternlari
+    word_amount_pattern = r'((?:bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz|o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)(?:\s+(?:bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz))?)\s*(ming(?:ga|da|dan|ni)?)'
+    
+    for match in re.finditer(word_amount_pattern, text_lower):
+        amount_positions.append({
+            'start': match.start(),
+            'end': match.end(),
+            'text': match.group(0)
+        })
+    
+    # Raqam + ming patternlari
+    digit_amount_pattern = r'(\d+)\s*(ming(?:ga|da|dan|ni)?)'
+    for match in re.finditer(digit_amount_pattern, text_lower):
+        # Overlap qilmasin
+        overlap = False
+        for existing in amount_positions:
+            if (match.start() >= existing['start'] and match.start() < existing['end']) or \
+               (match.end() > existing['start'] and match.end() <= existing['end']):
+                overlap = True
+                break
+        if not overlap:
+            amount_positions.append({
+                'start': match.start(),
+                'end': match.end(),
+                'text': match.group(0)
+            })
+    
+    # Pozitsiya bo'yicha tartiblash
+    amount_positions.sort(key=lambda x: x['start'])
+    
+    print(f"[MULTI] Topilgan summalar: {amount_positions}")
+    
+    if len(amount_positions) <= 1:
+        # Bitta yoki hech qanday summa - oddiy parse
+        return [text]
+    
+    # Bir nechta summa - har birini segment sifatida ajratish
+    segments = []
+    text_len = len(text_lower)
+    
+    for i, pos in enumerate(amount_positions):
+        # Segment boshi
+        if i == 0:
+            start = 0
+        else:
+            # Oldingi segmentning oxiridan
+            start = amount_positions[i-1]['end']
+            # Keraksiz bo'shliqlarni o'tkazib yuborish
+            while start < pos['start'] and text_lower[start] in ' \t\n':
+                start += 1
+        
+        # Segment oxiri
+        if i == len(amount_positions) - 1:
+            end = text_len
+        else:
+            # Keyingi summadan oldin
+            end = amount_positions[i+1]['start']
+            # Keraksiz bo'shliqlarni olib tashlash
+            while end > pos['end'] and text_lower[end-1] in ' \t\n':
+                end -= 1
+        
+        segment = text_lower[start:end].strip()
+        if segment and len(segment) > 3:
+            segments.append(segment)
+    
+    print(f"[MULTI] Ajratilgan segmentlar: {segments}")
+    
+    return segments if segments else [text]
+
+
+def extract_amount_from_segment(segment: str) -> Optional[int]:
+    """
+    Segment ichidan summani ajratib olish - segment uchun optimizatsiya qilingan
+    """
+    segment_lower = segment.lower().strip()
+    
+    # Qo'shimchalarni tozalash
+    segment_lower = re.sub(r'(ming)(ga|da|dan|ni|ning)', r'\1', segment_lower)
+    
+    # O'zbek son so'zlari
+    BIRLIKLAR = {
+        'bir': 1, 'ikki': 2, 'uch': 3, 'tort': 4, "to'rt": 4, 'besh': 5,
+        'olti': 6, 'yetti': 7, 'sakkiz': 8, 'toqqiz': 9, "to'qqiz": 9,
+    }
+    
+    ONLIKLAR = {
+        'on': 10, "o'n": 10, 'yigirma': 20, 'ottiz': 30, "o'ttiz": 30,
+        'qirq': 40, 'ellik': 50, 'oltmish': 60, 'yetmish': 70,
+        'sakson': 80, 'toqson': 90, "to'qson": 90,
+    }
+    
+    # Raqam + ming
+    digit_match = re.search(r'(\d+)\s*ming', segment_lower)
+    if digit_match:
+        return int(digit_match.group(1)) * 1000
+    
+    # So'z + ming pattern
+    # O'nlik + birlik + ming: "yigirma besh ming" = 25000
+    pattern_full = r'(o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)\s+(bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz)\s+ming'
+    match = re.search(pattern_full, segment_lower)
+    if match:
+        onlik = ONLIKLAR.get(match.group(1).replace("'", "'"), 0)
+        birlik = BIRLIKLAR.get(match.group(2).replace("'", "'"), 0)
+        return (onlik + birlik) * 1000
+    
+    # Faqat o'nlik + ming: "ellik ming" = 50000
+    pattern_onlik = r'(o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)\s+ming'
+    match = re.search(pattern_onlik, segment_lower)
+    if match:
+        onlik = ONLIKLAR.get(match.group(1).replace("'", "'"), 0)
+        return onlik * 1000
+    
+    # Faqat birlik + ming: "besh ming" = 5000
+    pattern_birlik = r'(bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz)\s+ming'
+    match = re.search(pattern_birlik, segment_lower)
+    if match:
+        birlik = BIRLIKLAR.get(match.group(1).replace("'", "'"), 0)
+        return birlik * 1000
+    
+    # Oddiy raqam
+    digit_only = re.search(r'\b(\d{4,})\b', segment)
+    if digit_only:
+        return int(digit_only.group(1))
+    
+    return None
+
+
+def detect_category_from_segment(segment: str) -> Tuple[str, str]:
+    """
+    Segment ichidan kategoriya va turni aniqlash.
+    Returns: (category_key, transaction_type)
+    """
+    segment_lower = segment.lower()
+    
+    # Har bir kategoriya uchun ball hisoblash
+    expense_scores = {}
+    income_scores = {}
+    
+    expense_categories = ["oziq_ovqat", "transport", "uy_joy", "kommunal", "sog'liq", 
+                          "kiyim", "ta'lim", "ko'ngilochar", "aloqa", "kredit"]
+    income_categories = ["ish_haqi", "biznes", "investitsiya", "freelance", "sovg'a", "qarz_qaytarish"]
+    
+    for cat in expense_categories:
+        if cat in CATEGORY_KEYWORDS:
+            score = sum(2 if kw in segment_lower else 0 for kw in CATEGORY_KEYWORDS[cat])
+            if score > 0:
+                expense_scores[cat] = score
+    
+    for cat in income_categories:
+        if cat in CATEGORY_KEYWORDS:
+            score = sum(2 if kw in segment_lower else 0 for kw in CATEGORY_KEYWORDS[cat])
+            if score > 0:
+                income_scores[cat] = score
+    
+    # Eng yuqori ball
+    max_expense_score = max(expense_scores.values()) if expense_scores else 0
+    max_income_score = max(income_scores.values()) if income_scores else 0
+    
+    if max_expense_score >= max_income_score and max_expense_score > 0:
+        best_cat = max(expense_scores, key=expense_scores.get)
+        return best_cat, "expense"
+    elif max_income_score > 0:
+        best_cat = max(income_scores, key=income_scores.get)
+        return best_cat, "income"
+    else:
+        # Default - xarajat
+        return "boshqa", "expense"
+
+
+async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]:
+    """
+    ASOSIY MULTI-TRANSACTION PARSING FUNKSIYASI
+    
+    Bir matndan bir nechta tranzaksiyalarni aniqlaydi va parse qiladi.
+    
+    Masalan: "bugun ellik mingga ovqatlandim yigirma taksida bordim va o'ttiz mingda taksida qaytdim"
+    
+    Natija:
+    [
+        {"type": "expense", "category": "oziq_ovqat", "amount": 50000, "description": "ovqatlandim"},
+        {"type": "expense", "category": "transport", "amount": 20000, "description": "taksida bordim"},
+        {"type": "expense", "category": "transport", "amount": 30000, "description": "taksida qaytdim"}
+    ]
+    """
+    print(f"\n{'='*50}")
+    print(f"[MULTI-PARSE] Matn: '{text}'")
+    print(f"{'='*50}")
+    
+    # 1. Matnni segmentlarga ajratish
+    segments = split_into_transaction_segments(text)
+    
+    if len(segments) == 1:
+        # Bitta segment - oddiy parse
+        transaction = await parse_voice_transaction(text, lang)
+        if transaction["amount"]:
+            return [transaction]
+        else:
+            return []
+    
+    # 2. Har bir segmentni alohida parse qilish
+    transactions = []
+    
+    for segment in segments:
+        print(f"[MULTI-PARSE] Segment: '{segment}'")
+        
+        # Summa ajratish
+        amount = extract_amount_from_segment(segment)
+        if not amount:
+            print(f"[MULTI-PARSE] Segment uchun summa topilmadi, o'tkazib yuborildi")
+            continue
+        
+        # Kategoriya va tur aniqlash
+        category, transaction_type = detect_category_from_segment(segment)
+        
+        # Kategoriya nomini olish
+        if transaction_type == "income":
+            category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+        else:
+            category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+        
+        # Tavsif ajratish
+        description = extract_description(segment, amount)
+        
+        transaction = {
+            "type": transaction_type,
+            "category": category,
+            "category_name": category_name,
+            "amount": amount,
+            "description": description,
+            "original_text": segment,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        transactions.append(transaction)
+        print(f"[MULTI-PARSE] Tranzaksiya: {category_name} - {amount:,} so'm")
+    
+    print(f"[MULTI-PARSE] Jami {len(transactions)} ta tranzaksiya topildi")
+    return transactions
+
+
+async def save_multiple_transactions(db, user_id: int, transactions: List[Dict]) -> List[int]:
+    """
+    Bir nechta tranzaksiyalarni bazaga saqlash
+    """
+    transaction_ids = []
+    
+    for transaction in transactions:
+        tx_id = await save_transaction(db, user_id, transaction)
+        transaction_ids.append(tx_id)
+    
+    return transaction_ids
+
+
+def format_multiple_transactions_message(transactions: List[Dict], budget_status: Dict, lang: str = "uz") -> str:
+    """
+    Bir nechta tranzaksiyalar uchun xabar formatlash
+    """
+    if lang == "uz":
+        msg = "✅ *AI yordamchi - Tranzaksiyalar saqlandi*\n\n"
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, tx in enumerate(transactions, 1):
+            type_emoji = "📥" if tx["type"] == "income" else "📤"
+            msg += f"{i}. {type_emoji} {tx['category_name']}\n"
+            msg += f"   💵 {tx['amount']:,} so'm\n"
+            if tx.get('description') and tx['description'] != "Noma'lum":
+                msg += f"   📝 {tx['description']}\n"
+            msg += "\n"
+            
+            if tx["type"] == "expense":
+                total_expense += tx["amount"]
+            else:
+                total_income += tx["amount"]
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━━\n"
+        if total_expense > 0:
+            msg += f"📤 Jami xarajat: *{total_expense:,}* so'm\n"
+        if total_income > 0:
+            msg += f"📥 Jami daromad: *{total_income:,}* so'm\n"
+        
+        # Budget status
+        if budget_status:
+            daily_budget = budget_status.get("daily_budget", 0)
+            spent_today = budget_status.get("spent_today", 0) + total_expense
+            remaining = daily_budget - spent_today
+            
+            msg += f"\n📊 *Bugungi byudjet:*\n"
+            msg += f"├ Kunlik limit: {daily_budget:,} so'm\n"
+            msg += f"├ Sarflangan: {spent_today:,} so'm\n"
+            msg += f"└ Qoldi: {remaining:,} so'm"
+            
+            if remaining < 0:
+                msg += " ⚠️"
+    else:
+        msg = "✅ *AI помощник - Транзакции сохранены*\n\n"
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, tx in enumerate(transactions, 1):
+            type_emoji = "📥" if tx["type"] == "income" else "📤"
+            msg += f"{i}. {type_emoji} {tx['category_name']}\n"
+            msg += f"   💵 {tx['amount']:,} сум\n"
+            if tx.get('description') and tx['description'] != "Noma'lum":
+                msg += f"   📝 {tx['description']}\n"
+            msg += "\n"
+            
+            if tx["type"] == "expense":
+                total_expense += tx["amount"]
+            else:
+                total_income += tx["amount"]
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━━\n"
+        if total_expense > 0:
+            msg += f"📤 Всего расходов: *{total_expense:,}* сум\n"
+        if total_income > 0:
+            msg += f"📥 Всего доходов: *{total_income:,}* сум\n"
+        
+        # Budget status
+        if budget_status:
+            daily_budget = budget_status.get("daily_budget", 0)
+            spent_today = budget_status.get("spent_today", 0) + total_expense
+            remaining = daily_budget - spent_today
+            
+            msg += f"\n📊 *Сегодняшний бюджет:*\n"
+            msg += f"├ Дневной лимит: {daily_budget:,} сум\n"
+            msg += f"├ Потрачено: {spent_today:,} сум\n"
+            msg += f"└ Осталось: {remaining:,} сум"
+            
+            if remaining < 0:
+                msg += " ⚠️"
+    
+    return msg
 
 
 # Database functions for transactions
