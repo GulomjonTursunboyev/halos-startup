@@ -548,13 +548,22 @@ async def send_weekly_progress(bot: Bot, telegram_id: int):
     if not profile:
         return False
     
-    async with db._connection.execute("""
-        SELECT * FROM calculations 
-        WHERE user_id = ? 
-        ORDER BY calculated_at DESC LIMIT 1
-    """, (user["id"],)) as cursor:
-        row = await cursor.fetchone()
-        calc = dict(row) if row else None
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT * FROM calculations 
+                WHERE user_id = $1 
+                ORDER BY calculated_at DESC LIMIT 1
+            """, user["id"])
+            calc = dict(row) if row else None
+    else:
+        async with db._connection.execute("""
+            SELECT * FROM calculations 
+            WHERE user_id = ? 
+            ORDER BY calculated_at DESC LIMIT 1
+        """, (user["id"],)) as cursor:
+            row = await cursor.fetchone()
+            calc = dict(row) if row else None
     
     if not calc:
         return False
@@ -598,13 +607,22 @@ async def send_monthly_countdown(bot: Bot, telegram_id: int):
     if not profile:
         return False
     
-    async with db._connection.execute("""
-        SELECT * FROM calculations 
-        WHERE user_id = ? 
-        ORDER BY calculated_at DESC LIMIT 1
-    """, (user["id"],)) as cursor:
-        row = await cursor.fetchone()
-        calc = dict(row) if row else None
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT * FROM calculations 
+                WHERE user_id = $1 
+                ORDER BY calculated_at DESC LIMIT 1
+            """, user["id"])
+            calc = dict(row) if row else None
+    else:
+        async with db._connection.execute("""
+            SELECT * FROM calculations 
+            WHERE user_id = ? 
+            ORDER BY calculated_at DESC LIMIT 1
+        """, (user["id"],)) as cursor:
+            row = await cursor.fetchone()
+            calc = dict(row) if row else None
     
     if not calc:
         return False
@@ -655,14 +673,24 @@ async def get_debts_due_today(db) -> List[Dict[str, Any]]:
     """Bugun qaytarish sanasi bo'lgan qarzlarni olish"""
     today = datetime.now().strftime("%Y-%m-%d")
     
-    async with db._connection.execute("""
-        SELECT pd.*, u.telegram_id, u.language
-        FROM personal_debts pd
-        JOIN users u ON pd.user_id = u.id
-        WHERE pd.due_date = ? AND pd.status = 'active'
-    """, (today,)) as cursor:
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT pd.*, u.telegram_id, u.language
+                FROM personal_debts pd
+                JOIN users u ON pd.user_id = u.id
+                WHERE pd.due_date = $1 AND pd.status = 'active'
+            """, today)
+            return [dict(row) for row in rows]
+    else:
+        async with db._connection.execute("""
+            SELECT pd.*, u.telegram_id, u.language
+            FROM personal_debts pd
+            JOIN users u ON pd.user_id = u.id
+            WHERE pd.due_date = ? AND pd.status = 'active'
+        """, (today,)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
 
 
 async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
@@ -671,14 +699,24 @@ async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
     target_date = (today + timedelta(days=days)).strftime("%Y-%m-%d")
     today_str = today.strftime("%Y-%m-%d")
     
-    async with db._connection.execute("""
-        SELECT pd.*, u.telegram_id, u.language
-        FROM personal_debts pd
-        JOIN users u ON pd.user_id = u.id
-        WHERE pd.due_date > ? AND pd.due_date <= ? AND pd.status = 'active'
-    """, (today_str, target_date)) as cursor:
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT pd.*, u.telegram_id, u.language
+                FROM personal_debts pd
+                JOIN users u ON pd.user_id = u.id
+                WHERE pd.due_date > $1 AND pd.due_date <= $2 AND pd.status = 'active'
+            """, today_str, target_date)
+            return [dict(row) for row in rows]
+    else:
+        async with db._connection.execute("""
+            SELECT pd.*, u.telegram_id, u.language
+            FROM personal_debts pd
+            JOIN users u ON pd.user_id = u.id
+            WHERE pd.due_date > ? AND pd.due_date <= ? AND pd.status = 'active'
+        """, (today_str, target_date)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
 
 
 async def get_scheduler(bot: Bot) -> ProCareScheduler:
