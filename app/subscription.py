@@ -105,41 +105,6 @@ PROMO_CODES = {
         "current_uses": 0,
         "expires": "2027-12-31",
     },
-    "HALOS2024": {
-        "type": "free_days",
-        "value": 7,
-        "max_uses": 1000,
-        "current_uses": 0,
-        "expires": "2027-12-31",
-    },
-    "LAUNCH50": {
-        "type": "discount",
-        "value": 50,  # 50% discount
-        "max_uses": 100,
-        "current_uses": 0,
-        "expires": "2027-06-30",
-    },
-    "FRIEND20": {
-        "type": "discount",
-        "value": 20,  # 20% discount
-        "max_uses": -1,  # Unlimited
-        "current_uses": 0,
-        "expires": None,
-    },
-    "FREEWEEK": {
-        "type": "free_days",
-        "value": 7,  # 7 days free (100% 1 week)
-        "max_uses": -1,  # Unlimited
-        "current_uses": 0,
-        "expires": "2027-12-31",
-    },
-    "HALOS100": {
-        "type": "free_days",
-        "value": 7,  # 7 days free (100% 1 week)
-        "max_uses": 500,
-        "current_uses": 0,
-        "expires": "2027-12-31",
-    },
 }
 
 
