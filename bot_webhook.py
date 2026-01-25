@@ -317,21 +317,21 @@ def setup_handlers(app: Application) -> None:
         CallbackQueryHandler(ai_debt_delete_callback, pattern="^ai_debt_delete_")
     )
     
-    # Amount input handler for corrections
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_amount_input_handler),
-        group=4
-    )
-    
-    # Smart credit input handler
+    # Smart credit input handler - MUST be before other text handlers
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
-        group=4
+        group=3  # Lower group number = higher priority
     )
     
     # Credit edit handler
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, credit_edit_handler),
+        group=3
+    )
+    
+    # Amount input handler for corrections
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_amount_input_handler),
         group=4
     )
     

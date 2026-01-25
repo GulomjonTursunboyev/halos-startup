@@ -227,6 +227,18 @@ def main() -> None:
         group=3
     )
     
+    # Smart credit input handler - MUST be before other text handlers
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
+        group=2  # Lower group number = higher priority
+    )
+    
+    # Credit edit handler
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, credit_edit_handler),
+        group=2
+    )
+    
     # Menu data input handlers (lower priority)
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_income_handler),
@@ -234,14 +246,6 @@ def main() -> None:
     )
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_partner_income_handler),
-        group=3
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
-        group=3
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, credit_edit_handler),
         group=3
     )
     application.add_handler(
