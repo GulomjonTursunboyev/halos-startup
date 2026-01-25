@@ -143,63 +143,119 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
         # Personalized header if user has debt data
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *HALOS PRO*\n\n"
-                f"Hozirgi yo'lingiz bilan *{simple_months} oy*da yengillik.\n"
-                f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
-                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital.\n\n"
+                f"💎 *HALOS PRO — Moliyaviy erkinlik yo'li*\n\n"
+                f"📍 Hozirgi tezligingiz: *{simple_months} oy*\n"
+                f"🚀 PRO bilan: *{pro_months} oy* — *{months_saved} oy tezroq!*\n"
+                f"💰 Bonus: *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital\n\n"
             )
         else:
-            header = "💎 *HALOS PRO*\n\n"
+            header = "💎 *HALOS PRO — Moliyaviy erkinlik yo'li*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 *PRO BILAN SIZ OLASIZ:*\n"
+            "🎯 *FAQAT PRO FOYDALANUVCHILAR UCHUN:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *HALOS sanangiz* — erkinlik sanasini bilasiz\n"
-            "✅ *Tezroq yengillik* — bir necha oy oldin\n"
-            "✅ *Shaxsiy kapital* — yuk to'layotganda ham\n\n"
-            "📊 *Statistika* — haftalik/oylik/yillik\n"
-            "🔔 *Eslatmalar* — to'lov eslatmalari\n"
-            "📋 *Nazorat* — monitoring\n"
-            "📥 *Excel hisobot* — yuklab olish\n\n"
+            
+            "🗓 *HALOS SANANGIZ*\n"
+            "Qarzlardan qachon xalos bo'lishingizni\n"
+            "aniq sana bilan ko'rasiz\n\n"
+            
+            "⚡ *TEZKOR QUTILISH REJASI*\n"
+            "Maxsus algoritm sizga eng optimal\n"
+            "to'lov strategiyasini tayyorlaydi\n\n"
+            
+            "💰 *SHAXSIY KAPITAL*\n"
+            "Qarz to'layotgan paytda ham\n"
+            "jamg'arma hosil qilasiz\n\n"
+            
+            "🎤 *OVOZLI AI YORDAMCHI*\n"
+            "Ovozingiz bilan xarajat va daromadni\n"
+            "bir zumda kiritasiz\n\n"
+            
+            "📊 *BATAFSIL STATISTIKA*\n"
+            "Haftalik, oylik, yillik hisobotlar\n"
+            "Xarajatlar tahlili va dinamikasi\n\n"
+            
+            "🔔 *AQLLI ESLATMALAR*\n"
+            "To'lov sanasi yaqinlashganda\n"
+            "avtomatik xabar olasiz\n\n"
+            
+            "📥 *EXCEL HISOBOT*\n"
+            "Barcha ma'lumotlaringizni Excel\n"
+            "formatida yuklab oling\n\n"
+            
+            "👨‍👩‍👧 *OILAVIY REJIM*\n"
+            "Oila byudjetini birgalikda boshqaring\n\n"
+            
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `14,990 so'm` — sinab ko'ring\n"
-            "├ ⭐ *1 oy:* `29,990 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `249,990 so'm` (30% tejash)\n\n"
+            "├ ⚡ *1 hafta:* `14,990 so'm`\n"
+            "│   _Sinab ko'ring_\n"
+            "├ ⭐ *1 oy:* `29,990 so'm`\n"
+            "│   _Eng ommabop_\n"
+            "└ 🏆 *1 yil:* `249,990 so'm`\n"
+            "    _30% tejash!_\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *HALOS PRO*\n\n"
-                f"Обычным путём свобода через *{simple_months} мес*.\n"
-                f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
-                f"Плюс *{format_number(int(savings_at_exit))} сум* личного капитала.\n\n"
+                f"💎 *HALOS PRO — Путь к финансовой свободе*\n\n"
+                f"📍 Текущая скорость: *{simple_months} мес*\n"
+                f"🚀 С PRO: *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
+                f"💰 Бонус: *{format_number(int(savings_at_exit))} сум* личный капитал\n\n"
             )
         else:
-            header = "💎 *HALOS PRO*\n\n"
+            header = "💎 *HALOS PRO — Путь к финансовой свободе*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
+            "🎯 *ТОЛЬКО ДЛЯ PRO ПОЛЬЗОВАТЕЛЕЙ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Дата HALOS* — знаете когда станете свободны\n"
-            "✅ *Быстрее к лёгкости* — на несколько мес раньше\n"
-            "✅ *Личный капитал* — растёт даже выплачивая бремя\n\n"
-            "📊 *Статистика* — еженед/ежемес/ежегод\n"
-            "🔔 *Напоминания* — об оплате\n"
-            "📋 *Контроль* — мониторинг\n"
-            "📥 *Excel отчёт* — скачать\n\n"
+            
+            "🗓 *ДАТА HALOS*\n"
+            "Узнайте точную дату освобождения\n"
+            "от долгов\n\n"
+            
+            "⚡ *ПЛАН БЫСТРОГО ОСВОБОЖДЕНИЯ*\n"
+            "Специальный алгоритм создаст\n"
+            "оптимальную стратегию выплат\n\n"
+            
+            "💰 *ЛИЧНЫЙ КАПИТАЛ*\n"
+            "Копите даже пока\n"
+            "выплачиваете долги\n\n"
+            
+            "🎤 *ГОЛОСОВОЙ AI ПОМОЩНИК*\n"
+            "Вносите расходы и доходы\n"
+            "голосом за секунды\n\n"
+            
+            "📊 *ДЕТАЛЬНАЯ СТАТИСТИКА*\n"
+            "Еженедельные, ежемесячные отчёты\n"
+            "Анализ и динамика расходов\n\n"
+            
+            "🔔 *УМНЫЕ НАПОМИНАНИЯ*\n"
+            "Автоматические уведомления\n"
+            "о приближении платежей\n\n"
+            
+            "📥 *EXCEL ОТЧЁТ*\n"
+            "Скачивайте все данные\n"
+            "в формате Excel\n\n"
+            
+            "👨‍👩‍👧 *СЕМЕЙНЫЙ РЕЖИМ*\n"
+            "Управляйте бюджетом семьи вместе\n\n"
+            
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `14,990 сум` — попробуйте\n"
-            "├ ⭐ *1 месяц:* `29,990 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `249,990 сум` (скидка 30%)\n\n"
+            "├ ⚡ *1 неделя:* `14,990 сум`\n"
+            "│   _Попробуйте_\n"
+            "├ ⭐ *1 месяц:* `29,990 сум`\n"
+            "│   _Самый популярный_\n"
+            "└ 🏆 *1 год:* `249,990 сум`\n"
+            "    _Скидка 30%!_\n\n"
             "💳 *Оплата: через Click*"
         )
     
@@ -286,63 +342,119 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
     if lang == "uz":
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *HALOS PRO*\n\n"
-                f"Hozirgi yo'lingiz bilan *{simple_months} oy*da yengillik.\n"
-                f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
-                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital.\n\n"
+                f"💎 *HALOS PRO — Moliyaviy erkinlik yo'li*\n\n"
+                f"📍 Hozirgi tezligingiz: *{simple_months} oy*\n"
+                f"🚀 PRO bilan: *{pro_months} oy* — *{months_saved} oy tezroq!*\n"
+                f"💰 Bonus: *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital\n\n"
             )
         else:
-            header = "💎 *HALOS PRO*\n\n"
+            header = "💎 *HALOS PRO — Moliyaviy erkinlik yo'li*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 *PRO BILAN SIZ OLASIZ:*\n"
+            "🎯 *FAQAT PRO FOYDALANUVCHILAR UCHUN:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *HALOS sanangiz* — erkinlik sanasini bilasiz\n"
-            "✅ *Tezroq yengillik* — bir necha oy oldin\n"
-            "✅ *Shaxsiy kapital* — yuk to'layotganda ham\n\n"
-            "📊 *Statistika* — haftalik/oylik/yillik\n"
-            "🔔 *Eslatmalar* — to'lov eslatmalari\n"
-            "📋 *Nazorat* — monitoring\n"
-            "📥 *Excel hisobot* — yuklab olish\n\n"
+            
+            "🗓 *HALOS SANANGIZ*\n"
+            "Qarzlardan qachon xalos bo'lishingizni\n"
+            "aniq sana bilan ko'rasiz\n\n"
+            
+            "⚡ *TEZKOR QUTILISH REJASI*\n"
+            "Maxsus algoritm sizga eng optimal\n"
+            "to'lov strategiyasini tayyorlaydi\n\n"
+            
+            "💰 *SHAXSIY KAPITAL*\n"
+            "Qarz to'layotgan paytda ham\n"
+            "jamg'arma hosil qilasiz\n\n"
+            
+            "🎤 *OVOZLI AI YORDAMCHI*\n"
+            "Ovozingiz bilan xarajat va daromadni\n"
+            "bir zumda kiritasiz\n\n"
+            
+            "📊 *BATAFSIL STATISTIKA*\n"
+            "Haftalik, oylik, yillik hisobotlar\n"
+            "Xarajatlar tahlili va dinamikasi\n\n"
+            
+            "🔔 *AQLLI ESLATMALAR*\n"
+            "To'lov sanasi yaqinlashganda\n"
+            "avtomatik xabar olasiz\n\n"
+            
+            "📥 *EXCEL HISOBOT*\n"
+            "Barcha ma'lumotlaringizni Excel\n"
+            "formatida yuklab oling\n\n"
+            
+            "👨‍👩‍👧 *OILAVIY REJIM*\n"
+            "Oila byudjetini birgalikda boshqaring\n\n"
+            
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `14,990 so'm` — sinab ko'ring\n"
-            "├ ⭐ *1 oy:* `29,990 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `249,990 so'm` (30% tejash)\n\n"
+            "├ ⚡ *1 hafta:* `14,990 so'm`\n"
+            "│   _Sinab ko'ring_\n"
+            "├ ⭐ *1 oy:* `29,990 so'm`\n"
+            "│   _Eng ommabop_\n"
+            "└ 🏆 *1 yil:* `249,990 so'm`\n"
+            "    _30% tejash!_\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *HALOS PRO*\n\n"
-                f"Обычным путём свобода через *{simple_months} мес*.\n"
-                f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
-                f"Плюс *{format_number(int(savings_at_exit))} сум* личного капитала.\n\n"
+                f"💎 *HALOS PRO — Путь к финансовой свободе*\n\n"
+                f"📍 Текущая скорость: *{simple_months} мес*\n"
+                f"🚀 С PRO: *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
+                f"💰 Бонус: *{format_number(int(savings_at_exit))} сум* личный капитал\n\n"
             )
         else:
-            header = "💎 *HALOS PRO*\n\n"
+            header = "💎 *HALOS PRO — Путь к финансовой свободе*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
+            "🎯 *ТОЛЬКО ДЛЯ PRO ПОЛЬЗОВАТЕЛЕЙ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Дата HALOS* — знаете когда станете свободны\n"
-            "✅ *Быстрее к лёгкости* — на несколько мес раньше\n"
-            "✅ *Личный капитал* — растёт даже выплачивая бремя\n\n"
-            "📊 *Статистика* — еженед/ежемес/ежегод\n"
-            "🔔 *Напоминания* — об оплате\n"
-            "📋 *Контроль* — мониторинг\n"
-            "📥 *Excel отчёт* — скачать\n\n"
+            
+            "🗓 *ДАТА HALOS*\n"
+            "Узнайте точную дату освобождения\n"
+            "от долгов\n\n"
+            
+            "⚡ *ПЛАН БЫСТРОГО ОСВОБОЖДЕНИЯ*\n"
+            "Специальный алгоритм создаст\n"
+            "оптимальную стратегию выплат\n\n"
+            
+            "💰 *ЛИЧНЫЙ КАПИТАЛ*\n"
+            "Копите даже пока\n"
+            "выплачиваете долги\n\n"
+            
+            "🎤 *ГОЛОСОВОЙ AI ПОМОЩНИК*\n"
+            "Вносите расходы и доходы\n"
+            "голосом за секунды\n\n"
+            
+            "📊 *ДЕТАЛЬНАЯ СТАТИСТИКА*\n"
+            "Еженедельные, ежемесячные отчёты\n"
+            "Анализ и динамика расходов\n\n"
+            
+            "🔔 *УМНЫЕ НАПОМИНАНИЯ*\n"
+            "Автоматические уведомления\n"
+            "о приближении платежей\n\n"
+            
+            "📥 *EXCEL ОТЧЁТ*\n"
+            "Скачивайте все данные\n"
+            "в формате Excel\n\n"
+            
+            "👨‍👩‍👧 *СЕМЕЙНЫЙ РЕЖИМ*\n"
+            "Управляйте бюджетом семьи вместе\n\n"
+            
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `14,990 сум` — попробуйте\n"
-            "├ ⭐ *1 месяц:* `29,990 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `249,990 сум` (скидка 30%)\n\n"
+            "├ ⚡ *1 неделя:* `14,990 сум`\n"
+            "│   _Попробуйте_\n"
+            "├ ⭐ *1 месяц:* `29,990 сум`\n"
+            "│   _Самый популярный_\n"
+            "└ 🏆 *1 год:* `249,990 сум`\n"
+            "    _Скидка 30%!_\n\n"
             "💳 *Оплата: через Click*"
         )
     
