@@ -65,12 +65,8 @@ class Database:
             # Parse DATABASE_URL
             params = parse_database_url(DATABASE_URL)
             
-            # Create SSL context for Supabase
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            
             try:
+                # Supabase Pooler requires ssl='require' string, not SSL context
                 self._pool = await asyncpg.create_pool(
                     host=params['host'],
                     port=params['port'],
@@ -80,7 +76,7 @@ class Database:
                     min_size=1, 
                     max_size=5,
                     command_timeout=60,
-                    ssl=ssl_context
+                    ssl='require'  # Simple SSL mode for Supabase pooler
                 )
                 await self._create_tables_postgres()
                 logger.info("PostgreSQL connected and tables created!")
