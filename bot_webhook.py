@@ -1,22 +1,23 @@
 """
 HALOS Telegram Bot - Webhook Mode for Render.com
-With Click Payment Integration
+With Supabase PostgreSQL Database and Click Payment Integration
 """
 import os
+import asyncio
 import logging
-import hashlib
-import sqlite3
-from datetime import datetime, timedelta
-from flask import Flask, request, Response, jsonify
+from aiohttp import web
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from app.config import BOT_TOKEN, ADMIN_IDS
-from app.database import get_database
+from app.database import get_database, close_database
+from app.scheduler import start_scheduler, stop_scheduler
 from app.handlers import (
     get_conversation_handler,
     help_command,
@@ -25,14 +26,67 @@ from app.handlers import (
     change_language_callback,
     error_handler,
     add_trial_handler_to_app,
+    profile_command,
+    show_profile_callback,
+    edit_profile_field_callback,
+    handle_profile_edit_input,
+    profile_mode_callback,
+    get_main_menu_keyboard,
+    menu_plan_handler,
+    menu_profile_handler,
+    menu_subscription_handler,
+    menu_language_handler,
+    menu_help_handler,
+    debt_plan_free_callback,
+    debt_plan_pro_callback,
+    menu_mode_callback,
+    menu_income_handler,
+    menu_partner_income_handler,
+    menu_loan_payment_handler,
+    menu_total_debt_handler,
+    recalculate_callback,
+    menu_credit_choice_callback,
+    menu_credit_file_handler,
+    menu_katm_confirm_callback,
+    # AI Assistant handlers
+    ai_assistant_callback,
+    ai_voice_handler,
+    ai_text_handler,
+    ai_report_callback,
+    ai_recent_callback,
+    ai_budget_callback,
+    # AI Correction handlers
+    ai_confirm_ok_callback,
+    ai_correct_callback,
+    ai_delete_callback,
+    ai_rewrite_callback,
+    ai_edit_amount_callback,
+    ai_amount_input_handler,
+    ai_cancel_correct_callback,
+    # AI Debt handlers
+    ai_debt_list_callback,
+    ai_debt_mark_returned_callback,
+    ai_debt_return_callback,
+    ai_debt_correct_callback,
+    ai_debt_delete_callback,
 )
 from app.subscription_handlers import (
     subscription_command,
     pro_command,
-    show_pricing,
+    show_pricing_callback,
     enter_promo_callback,
     cancel_promo_callback,
     click_buy_callback,
+    handle_promo_code_input,
+)
+from app.pro_features import (
+    show_pro_menu,
+    pro_statistics_callback,
+    pro_reminders_callback,
+    pro_debt_monitor_callback,
+    pro_export_excel_callback,
+    pro_menu_callback,
+    toggle_reminders_callback,
 )
 
 # Configure logging
@@ -42,299 +96,312 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Flask app
-flask_app = Flask(__name__)
-
-# Telegram application (global)
-telegram_app = None
-
-# Webhook URL
+# Configuration
+PORT = int(os.getenv("PORT", 10000))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 WEBHOOK_PATH = "/webhook"
 
-# Click credentials
-CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID", "333605228")
-CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "13464")
-CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "31ACF1A3C571667379481B13BEDCCA774AEBA199")
-DATABASE_PATH = os.getenv("DATABASE_PATH", "data/solvo.db")
-
-# Pricing plans
-PRICING_PLANS = {
-    "pro_monthly": {"days": 30, "price": 15000},
-    "pro_quarterly": {"days": 90, "price": 40500},
-    "pro_yearly": {"days": 365, "price": 135000},
-}
+# Global application
+application = None
 
 
-def create_telegram_app():
-    """Create and configure telegram application"""
-    application = Application.builder().token(BOT_TOKEN).build()
+async def health_handler(request):
+    """Health check endpoint for Render"""
+    return web.Response(text="OK", status=200)
+
+
+async def index_handler(request):
+    """Root endpoint"""
+    return web.Response(text="HALOS Bot is running!", status=200)
+
+
+async def webhook_handler(request):
+    """Handle incoming Telegram updates via webhook"""
+    global application
     
+    try:
+        data = await request.json()
+        update = Update.de_json(data, application.bot)
+        await application.process_update(update)
+        return web.Response(status=200)
+    except Exception as e:
+        logger.error(f"Error processing update: {e}")
+        return web.Response(status=500)
+
+
+def setup_handlers(app: Application) -> None:
+    """Setup all bot handlers"""
     # Add conversation handler
     conv_handler = get_conversation_handler()
-    application.add_handler(conv_handler)
+    app.add_handler(conv_handler)
     
     # Add global trial handler
-    add_trial_handler_to_app(application)
+    add_trial_handler_to_app(app)
     
     # Add standalone command handlers
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(CommandHandler("language", language_command))
-    application.add_handler(CommandHandler("subscription", subscription_command))
-    application.add_handler(CommandHandler("pro", pro_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("language", language_command))
+    app.add_handler(CommandHandler("subscription", subscription_command))
+    app.add_handler(CommandHandler("pro", pro_command))
+    app.add_handler(CommandHandler("profile", profile_command))
     
     # Add callback handlers
-    application.add_handler(
+    app.add_handler(
         CallbackQueryHandler(change_language_callback, pattern="^change_lang_")
     )
-    application.add_handler(
-        CallbackQueryHandler(show_pricing, pattern="^show_pricing$")
+    app.add_handler(
+        CallbackQueryHandler(show_pricing_callback, pattern="^show_pricing$")
     )
-    application.add_handler(
+    app.add_handler(
         CallbackQueryHandler(click_buy_callback, pattern="^click_buy_pro_")
     )
-    application.add_handler(
+    app.add_handler(
         CallbackQueryHandler(enter_promo_callback, pattern="^enter_promo$")
     )
-    application.add_handler(
+    app.add_handler(
         CallbackQueryHandler(cancel_promo_callback, pattern="^cancel_promo$")
     )
     
+    # Profile handlers
+    app.add_handler(
+        CallbackQueryHandler(show_profile_callback, pattern="^show_profile$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(edit_profile_field_callback, pattern="^edit_profile_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_")
+    )
+    
+    # Menu handlers
+    app.add_handler(
+        CallbackQueryHandler(menu_plan_handler, pattern="^menu_plan$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_profile_handler, pattern="^menu_profile$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_subscription_handler, pattern="^menu_subscription$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_language_handler, pattern="^menu_language$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_help_handler, pattern="^menu_help$")
+    )
+    
+    # Debt plan callbacks
+    app.add_handler(
+        CallbackQueryHandler(debt_plan_free_callback, pattern="^debt_plan_free$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(debt_plan_pro_callback, pattern="^debt_plan_pro$")
+    )
+    
+    # Mode callback
+    app.add_handler(
+        CallbackQueryHandler(menu_mode_callback, pattern="^menu_mode$")
+    )
+    
+    # Income/debt handlers
+    app.add_handler(
+        CallbackQueryHandler(menu_income_handler, pattern="^menu_income$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_partner_income_handler, pattern="^menu_partner_income$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_loan_payment_handler, pattern="^menu_loan_payment$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_total_debt_handler, pattern="^menu_total_debt$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(recalculate_callback, pattern="^recalculate$")
+    )
+    
+    # Credit handlers
+    app.add_handler(
+        CallbackQueryHandler(menu_credit_choice_callback, pattern="^menu_credit_choice_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_credit_file_handler, pattern="^menu_credit_file$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(menu_katm_confirm_callback, pattern="^menu_katm_confirm$")
+    )
+    
+    # PRO feature handlers
+    app.add_handler(
+        CallbackQueryHandler(pro_menu_callback, pattern="^pro_menu$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(pro_statistics_callback, pattern="^pro_statistics$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(pro_reminders_callback, pattern="^pro_reminders$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(pro_debt_monitor_callback, pattern="^pro_debt_monitor$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(pro_export_excel_callback, pattern="^pro_export_excel$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(toggle_reminders_callback, pattern="^toggle_reminders_")
+    )
+    
+    # AI Assistant handlers
+    app.add_handler(
+        CallbackQueryHandler(ai_assistant_callback, pattern="^ai_assistant$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_report_callback, pattern="^ai_report$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_recent_callback, pattern="^ai_recent$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_budget_callback, pattern="^ai_budget$")
+    )
+    
+    # AI Correction handlers
+    app.add_handler(
+        CallbackQueryHandler(ai_confirm_ok_callback, pattern="^ai_confirm_ok$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_delete_callback, pattern="^ai_delete_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_rewrite_callback, pattern="^ai_rewrite_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_edit_amount_callback, pattern="^ai_edit_amount_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_cancel_correct_callback, pattern="^ai_cancel_correct$")
+    )
+    
+    # AI Debt handlers
+    app.add_handler(
+        CallbackQueryHandler(ai_debt_list_callback, pattern="^ai_debt_list$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_debt_mark_returned_callback, pattern="^ai_debt_mark_returned$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_debt_return_callback, pattern="^ai_debt_return_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_debt_correct_callback, pattern="^ai_debt_correct_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_debt_delete_callback, pattern="^ai_debt_delete_")
+    )
+    
+    # Amount input handler for corrections
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_amount_input_handler),
+        group=4
+    )
+    
+    # Voice message handler for AI assistant
+    app.add_handler(
+        MessageHandler(filters.VOICE, ai_voice_handler),
+        group=4
+    )
+    
+    # Text message handler for AI assistant
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_text_handler),
+        group=5
+    )
+    
     # Add error handler
-    application.add_error_handler(error_handler)
-    
-    return application
+    app.add_error_handler(error_handler)
 
 
-@flask_app.route("/")
-def index():
-    return "HALOS Bot is running!", 200
-
-
-@flask_app.route("/health")
-def health():
-    return "OK", 200
-
-
-# ============ CLICK PAYMENT WEBHOOKS ============
-
-def get_db_connection():
-    """Get database connection for Click payments"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def activate_pro(telegram_id: int, plan_id: str):
-    """Activate PRO subscription for user"""
-    plan = PRICING_PLANS.get(plan_id)
-    if not plan:
-        logger.error(f"Unknown plan: {plan_id}")
-        return False
+async def on_startup(web_app):
+    """Initialize bot on startup"""
+    global application
     
-    expires_at = datetime.now() + timedelta(days=plan["days"])
+    logger.info("Starting HALOS Bot (Webhook Mode)...")
     
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE users 
-            SET subscription_tier = 'pro', 
-                subscription_expires = ?, 
-                subscription_plan = ?, 
-                updated_at = CURRENT_TIMESTAMP 
-            WHERE telegram_id = ?
-        """, (expires_at.isoformat(), plan_id, telegram_id))
-        conn.commit()
-        conn.close()
-        logger.info(f"PRO activated for user {telegram_id}, plan: {plan_id}, expires: {expires_at}")
-        return True
-    except Exception as e:
-        logger.error(f"Database error activating PRO: {e}")
-        return False
-
-
-@flask_app.route('/click/prepare', methods=['POST'])
-def click_prepare():
-    """Click Prepare endpoint - validates order before payment"""
-    data = request.form.to_dict()
-    logger.info(f"Click Prepare request: {data}")
+    # Initialize database
+    logger.info("Connecting to Supabase database...")
+    await get_database()
+    logger.info("Database connected")
     
-    # Required fields
-    click_trans_id = data.get('click_trans_id', '')
-    service_id = data.get('service_id', '')
-    merchant_trans_id = data.get('merchant_trans_id', '')
-    amount = data.get('amount', '')
-    action = data.get('action', '')
-    sign_time = data.get('sign_time', '')
-    sign_string = data.get('sign_string', '')
+    # Create telegram application
+    application = Application.builder().token(BOT_TOKEN).build()
     
-    # Validate merchant_trans_id format (halos_{telegram_id}_{plan_id})
-    if not merchant_trans_id.startswith('halos_'):
-        return jsonify({
-            "error": "-5",
-            "error_note": "Invalid order format"
-        })
+    # Setup handlers
+    setup_handlers(application)
     
-    # Parse order ID
-    try:
-        parts = merchant_trans_id.split('_')
-        telegram_id = int(parts[1])
-        plan_id = '_'.join(parts[2:])  # pro_monthly, pro_quarterly, pro_yearly
-    except (IndexError, ValueError):
-        return jsonify({
-            "error": "-5",
-            "error_note": "Invalid order ID"
-        })
+    # Initialize application
+    await application.initialize()
     
-    # Validate plan exists
-    if plan_id not in PRICING_PLANS:
-        return jsonify({
-            "error": "-5",
-            "error_note": "Invalid plan"
-        })
+    # Start scheduler
+    logger.info("Starting PRO Care Scheduler...")
+    await start_scheduler(application.bot)
     
-    # Verify signature
-    expected_sign = hashlib.md5(
-        f"{click_trans_id}{service_id}{CLICK_SECRET_KEY}{merchant_trans_id}{amount}{action}{sign_time}".encode()
-    ).hexdigest()
-    
-    if sign_string != expected_sign:
-        logger.warning(f"Invalid signature for order {merchant_trans_id}")
-        # Continue anyway for testing, Click will validate
-    
-    return jsonify({
-        "error": "0",
-        "error_note": "Success",
-        "click_trans_id": click_trans_id,
-        "merchant_trans_id": merchant_trans_id,
-        "merchant_prepare_id": merchant_trans_id
-    })
-
-
-@flask_app.route('/click/complete', methods=['POST'])
-def click_complete():
-    """Click Complete endpoint - called after successful payment"""
-    data = request.form.to_dict()
-    logger.info(f"Click Complete request: {data}")
-    
-    # Required fields
-    click_trans_id = data.get('click_trans_id', '')
-    service_id = data.get('service_id', '')
-    merchant_trans_id = data.get('merchant_trans_id', '')
-    merchant_prepare_id = data.get('merchant_prepare_id', '')
-    amount = data.get('amount', '')
-    action = data.get('action', '')
-    sign_time = data.get('sign_time', '')
-    sign_string = data.get('sign_string', '')
-    error = data.get('error', '0')
-    
-    # If payment failed
-    if error != '0':
-        logger.warning(f"Payment failed for order {merchant_trans_id}: error={error}")
-        return jsonify({
-            "error": error,
-            "error_note": "Payment failed"
-        })
-    
-    # Parse order ID
-    try:
-        parts = merchant_trans_id.split('_')
-        telegram_id = int(parts[1])
-        plan_id = '_'.join(parts[2:])
-    except (IndexError, ValueError):
-        return jsonify({
-            "error": "-5",
-            "error_note": "Invalid order ID"
-        })
-    
-    # Activate PRO subscription
-    if activate_pro(telegram_id, plan_id):
-        logger.info(f"Payment successful! User {telegram_id} upgraded to PRO ({plan_id})")
-        
-        # Send notification to user via Telegram (async)
-        try:
-            import asyncio
-            if telegram_app:
-                async def send_success_message():
-                    await telegram_app.bot.send_message(
-                        chat_id=telegram_id,
-                        text="✅ To'lov muvaffaqiyatli amalga oshirildi!\n\n🎉 Siz endi HALOS PRO foydalanuvchisisiz!\n\n/start buyrug'ini bosing."
-                    )
-                asyncio.get_event_loop().run_until_complete(send_success_message())
-        except Exception as e:
-            logger.error(f"Failed to send success message: {e}")
-        
-        return jsonify({
-            "error": "0",
-            "error_note": "Success",
-            "click_trans_id": click_trans_id,
-            "merchant_trans_id": merchant_trans_id,
-            "merchant_confirm_id": merchant_trans_id
-        })
+    # Set webhook
+    if RENDER_EXTERNAL_URL:
+        webhook_url = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
+        await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+        logger.info(f"Webhook set: {webhook_url}")
     else:
-        return jsonify({
-            "error": "-8",
-            "error_note": "Failed to activate subscription"
-        })
+        logger.warning("RENDER_EXTERNAL_URL not set - webhook not configured!")
+    
+    # Start application
+    await application.start()
+    logger.info("Bot started successfully!")
 
 
-@flask_app.route(WEBHOOK_PATH, methods=["POST"])
-async def webhook():
-    """Handle incoming Telegram updates"""
-    global telegram_app
+async def on_shutdown(web_app):
+    """Cleanup on shutdown"""
+    global application
     
-    if telegram_app is None:
-        return Response(status=500)
+    logger.info("Shutting down...")
     
-    try:
-        update = Update.de_json(request.get_json(force=True), telegram_app.bot)
-        await telegram_app.process_update(update)
-        return Response(status=200)
-    except Exception as e:
-        logger.error(f"Error processing update: {e}")
-        return Response(status=500)
-
-
-async def setup_webhook():
-    """Setup webhook with Telegram"""
-    global telegram_app
+    if application:
+        # Stop scheduler
+        await stop_scheduler()
+        
+        # Stop application
+        await application.stop()
+        await application.shutdown()
     
-    if not RENDER_EXTERNAL_URL:
-        logger.error("RENDER_EXTERNAL_URL not set!")
-        return
+    # Close database
+    await close_database()
     
-    webhook_url = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
-    
-    await telegram_app.bot.set_webhook(url=webhook_url)
-    logger.info(f"Webhook set to: {webhook_url}")
+    logger.info("Shutdown complete")
 
 
 def main():
     """Main entry point"""
-    global telegram_app
-    
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN not found!")
         return
     
-    # Initialize database
-    import asyncio
-    asyncio.get_event_loop().run_until_complete(get_database())
-    logger.info("Database initialized")
+    # Create aiohttp web app
+    web_app = web.Application()
     
-    # Create telegram app
-    telegram_app = create_telegram_app()
+    # Add routes
+    web_app.router.add_get("/", index_handler)
+    web_app.router.add_get("/health", health_handler)
+    web_app.router.add_post(WEBHOOK_PATH, webhook_handler)
     
-    # Setup webhook
-    asyncio.get_event_loop().run_until_complete(setup_webhook())
+    # Add startup/shutdown handlers
+    web_app.on_startup.append(on_startup)
+    web_app.on_shutdown.append(on_shutdown)
     
-    # Get port from environment
-    port = int(os.getenv("PORT", 10000))
-    
-    logger.info(f"Starting Flask server on port {port}")
-    flask_app.run(host="0.0.0.0", port=port)
+    logger.info(f"Starting web server on port {PORT}")
+    web.run_app(web_app, host="0.0.0.0", port=PORT)
 
 
 if __name__ == "__main__":

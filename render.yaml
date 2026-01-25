@@ -1,18 +1,11 @@
-databases:
-  # PostgreSQL Database (Free tier - 90 days)
-  - name: halos-db
-    databaseName: halos_production
-    user: halos_user
-    plan: free
-    region: frankfurt
-
+# HALOS Bot - Render.com Configuration with Supabase
 services:
   # HALOS Telegram Bot Web Service (Webhook mode)
   - type: web
     name: halos-bot
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn bot_webhook:flask_app --bind 0.0.0.0:$PORT --worker-class gthread --threads 4
+    startCommand: python bot_webhook.py
     plan: free
     region: frankfurt
     healthCheckPath: /health
@@ -22,9 +15,7 @@ services:
       - key: ADMIN_IDS
         value: "7152317007"
       - key: DATABASE_URL
-        fromDatabase:
-          name: halos-db
-          property: connectionString
+        sync: false
       - key: CLICK_SERVICE_ID
         value: "13464"
       - key: CLICK_MERCHANT_ID
