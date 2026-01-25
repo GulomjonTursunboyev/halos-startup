@@ -3392,8 +3392,7 @@ async def save_and_show_menu_results(message, context: ContextTypes.DEFAULT_TYPE
             income_self=context.user_data.get("income_self", 0),
             income_partner=context.user_data.get("income_partner", 0),
             loan_payment=context.user_data.get("loan_payment", 0),
-            total_debt=context.user_data.get("total_debt", 0),
-            mode=context.user_data.get("mode", "solo")
+            total_debt=context.user_data.get("total_debt", 0)
         )
     
     total_debt = context.user_data.get("total_debt", 0)
@@ -3599,8 +3598,7 @@ async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_
             income_self=context.user_data.get("income_self", 0),
             income_partner=context.user_data.get("income_partner", 0),
             loan_payment=context.user_data.get("loan_payment", 0),
-            total_debt=debt,
-            mode=context.user_data.get("mode", "solo")
+            total_debt=debt
         )
     
     # Show results
