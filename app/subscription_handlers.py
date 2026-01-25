@@ -166,9 +166,9 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `4,990 so'm` — sinab ko'ring\n"
-            "├ ⭐ *1 oy:* `14,990 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `119,990 so'm` (33% tejash)\n\n"
+            "├ ⚡ *1 hafta:* `14,990 so'm` — sinab ko'ring\n"
+            "├ ⭐ *1 oy:* `29,990 so'm` — tavsiya etiladi\n"
+            "└ 🏆 *1 yil:* `249,990 so'm` (30% tejash)\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
@@ -197,24 +197,24 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `4,990 сум` — попробуйте\n"
-            "├ ⭐ *1 месяц:* `14,990 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `119,990 сум` (скидка 33%)\n\n"
+            "├ ⚡ *1 неделя:* `14,990 сум` — попробуйте\n"
+            "├ ⭐ *1 месяц:* `29,990 сум` — рекомендуем\n"
+            "└ 🏆 *1 год:* `249,990 сум` (скидка 30%)\n\n"
             "💳 *Оплата: через Click*"
         )
     
     # Click Payment buttons
     keyboard = [
         [InlineKeyboardButton(
-            "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+            "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
             callback_data="click_buy_pro_weekly"
         )],
         [InlineKeyboardButton(
-            "⭐ 1 oy - 15,000 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 15,000 сум (реком.)",
+            "⭐ 1 oy - 29,990 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 29,990 сум (реком.)",
             callback_data="click_buy_pro_monthly"
         )],
         [InlineKeyboardButton(
-            "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+            "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
             callback_data="click_buy_pro_yearly"
         )],
         [InlineKeyboardButton(
@@ -309,9 +309,9 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `4,990 so'm` — sinab ko'ring\n"
-            "├ ⭐ *1 oy:* `14,990 so'm` — tavsiya etiladi\n"
-            "└ 🏆 *1 yil:* `119,990 so'm` (33% tejash)\n\n"
+            "├ ⚡ *1 hafta:* `14,990 so'm` — sinab ko'ring\n"
+            "├ ⭐ *1 oy:* `29,990 so'm` — tavsiya etiladi\n"
+            "└ 🏆 *1 yil:* `249,990 so'm` (30% tejash)\n\n"
             "💳 *To'lov: Click orqali*"
         )
     else:
@@ -340,24 +340,24 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `4,990 сум` — попробуйте\n"
-            "├ ⭐ *1 месяц:* `14,990 сум` — рекомендуем\n"
-            "└ 🏆 *1 год:* `119,990 сум` (скидка 33%)\n\n"
+            "├ ⚡ *1 неделя:* `14,990 сум` — попробуйте\n"
+            "├ ⭐ *1 месяц:* `29,990 сум` — рекомендуем\n"
+            "└ 🏆 *1 год:* `249,990 сум` (скидка 30%)\n\n"
             "💳 *Оплата: через Click*"
         )
     
     # Click Payment buttons
     keyboard = [
         [InlineKeyboardButton(
-            "⚡ 1 hafta - 4,990 so'm" if lang == "uz" else "⚡ 1 нед - 4,990 сум",
+            "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
             callback_data="click_buy_pro_weekly"
         )],
         [InlineKeyboardButton(
-            "⭐ 1 oy - 14,990 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 14,990 сум (реком.)",
+            "⭐ 1 oy - 29,990 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 29,990 сум (реком.)",
             callback_data="click_buy_pro_monthly"
         )],
         [InlineKeyboardButton(
-            "🏆 1 yil - 119,990 so'm (-33%)" if lang == "uz" else "🏆 1 год - 119,990 сум (-33%)",
+            "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
             callback_data="click_buy_pro_yearly"
         )],
         [InlineKeyboardButton(
@@ -498,9 +498,42 @@ async def handle_promo_code_input(update: Update, context: ContextTypes.DEFAULT_
     promo = validate_promo_code(code)
     
     if not promo:
-        await update.message.reply_text(
-            "❌ Noto'g'ri promo-kod" if lang == "uz" else "❌ Неверный промо-код"
-        )
+        # Promo code invalid - show error and redirect to pricing
+        if lang == "uz":
+            error_msg = (
+                "❌ *Promo-kod xato!*\n\n"
+                f"Kiritilgan kod: `{code}`\n"
+                "Iltimos, to'g'ri promo-kodni kiriting yoki tarif tanlang:"
+            )
+        else:
+            error_msg = (
+                "❌ *Промо-код неверный!*\n\n"
+                f"Введённый код: `{code}`\n"
+                "Пожалуйста, введите правильный код или выберите тариф:"
+            )
+        
+        # Show pricing buttons
+        keyboard = [
+            [InlineKeyboardButton(
+                "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                "⭐ 1 oy - 29,990 so'm" if lang == "uz" else "⭐ 1 мес - 29,990 сум",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
+                callback_data="click_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "🎁 Boshqa promo-kod" if lang == "uz" else "🎁 Другой промо-код",
+                callback_data="enter_promo"
+            )],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(error_msg, parse_mode="Markdown", reply_markup=reply_markup)
         return True
     
     if promo["type"] == "discount":
@@ -523,15 +556,15 @@ async def handle_promo_code_input(update: Update, context: ContextTypes.DEFAULT_
         
         keyboard = [
             [InlineKeyboardButton(
-                "📅 1 oy" if lang == "uz" else "📅 1 мес",
+                "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                "⭐ 1 oy - 29,990 so'm" if lang == "uz" else "⭐ 1 мес - 29,990 сум",
                 callback_data="click_buy_pro_monthly"
             )],
             [InlineKeyboardButton(
-                "📅 3 oy" if lang == "uz" else "📅 3 мес",
-                callback_data="click_buy_pro_quarterly"
-            )],
-            [InlineKeyboardButton(
-                "📅 1 yil" if lang == "uz" else "📅 1 год",
+                "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
                 callback_data="click_buy_pro_yearly"
             )]
         ]

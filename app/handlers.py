@@ -1713,15 +1713,15 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
     if not is_pro:
         offer_keyboard = [
             [InlineKeyboardButton(
-                "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+                "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
                 callback_data="click_buy_pro_weekly"
             )],
             [InlineKeyboardButton(
-                "⭐ 1 oy - 15,000 so'm" if lang == "uz" else "⭐ 1 мес - 15,000 сум",
+                "⭐ 1 oy - 29,990 so'm" if lang == "uz" else "⭐ 1 мес - 29,990 сум",
                 callback_data="click_buy_pro_monthly"
             )],
             [InlineKeyboardButton(
-                "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+                "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
                 callback_data="click_buy_pro_yearly"
             )],
         ]
@@ -1829,15 +1829,15 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
     if not is_pro:
         offer_keyboard = [
             [InlineKeyboardButton(
-                "⚡ 1 hafta - 5,000 so'm" if lang == "uz" else "⚡ 1 нед - 5,000 сум",
+                "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
                 callback_data="click_buy_pro_weekly"
             )],
             [InlineKeyboardButton(
-                "⭐ 1 oy - 15,000 so'm" if lang == "uz" else "⭐ 1 мес - 15,000 сум",
+                "⭐ 1 oy - 29,990 so'm" if lang == "uz" else "⭐ 1 мес - 29,990 сум",
                 callback_data="click_buy_pro_monthly"
             )],
             [InlineKeyboardButton(
-                "🏆 1 yil - 120,000 so'm (-33%)" if lang == "uz" else "🏆 1 год - 120,000 сум (-33%)",
+                "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
                 callback_data="click_buy_pro_yearly"
             )],
         ]
