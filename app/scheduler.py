@@ -63,42 +63,76 @@ class ProCareScheduler:
     async def _get_pro_users(self) -> List[Dict[str, Any]]:
         """Get all PRO users with active subscriptions"""
         db = await get_database()
-        async with db._connection.execute("""
-            SELECT u.*, fp.* 
-            FROM users u
-            LEFT JOIN financial_profiles fp ON fp.user_id = u.id
-            WHERE u.subscription_tier = 'pro'
-            AND (u.subscription_expires IS NULL OR u.subscription_expires > datetime('now'))
-        """) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+        
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT u.*, fp.monthly_income, fp.partner_income, fp.loan_payment, fp.total_debt
+                    FROM users u
+                    LEFT JOIN financial_profiles fp ON fp.user_id = u.id
+                    WHERE u.subscription_tier = 'pro'
+                    AND (u.subscription_expires IS NULL OR u.subscription_expires > NOW())
+                """)
+                return [dict(row) for row in rows]
+        else:
+            async with db._connection.execute("""
+                SELECT u.*, fp.* 
+                FROM users u
+                LEFT JOIN financial_profiles fp ON fp.user_id = u.id
+                WHERE u.subscription_tier = 'pro'
+                AND (u.subscription_expires IS NULL OR u.subscription_expires > datetime('now'))
+            """) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
     
     async def _get_inactive_pro_users(self, days: int = 3) -> List[Dict[str, Any]]:
         """Get PRO users who haven't been active for N days"""
         db = await get_database()
         cutoff = datetime.now() - timedelta(days=days)
         
-        async with db._connection.execute("""
-            SELECT u.*, fp.*
-            FROM users u
-            LEFT JOIN financial_profiles fp ON fp.user_id = u.id
-            WHERE u.subscription_tier = 'pro'
-            AND (u.subscription_expires IS NULL OR u.subscription_expires > datetime('now'))
-            AND (u.last_active IS NULL OR u.last_active < ?)
-        """, (cutoff.isoformat(),)) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT u.*, fp.monthly_income, fp.partner_income, fp.loan_payment, fp.total_debt
+                    FROM users u
+                    LEFT JOIN financial_profiles fp ON fp.user_id = u.id
+                    WHERE u.subscription_tier = 'pro'
+                    AND (u.subscription_expires IS NULL OR u.subscription_expires > NOW())
+                    AND (u.last_active IS NULL OR u.last_active < $1)
+                """, cutoff)
+                return [dict(row) for row in rows]
+        else:
+            async with db._connection.execute("""
+                SELECT u.*, fp.*
+                FROM users u
+                LEFT JOIN financial_profiles fp ON fp.user_id = u.id
+                WHERE u.subscription_tier = 'pro'
+                AND (u.subscription_expires IS NULL OR u.subscription_expires > datetime('now'))
+                AND (u.last_active IS NULL OR u.last_active < ?)
+            """, (cutoff.isoformat(),)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
     
     async def _get_user_latest_calculation(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get user's latest calculation result"""
         db = await get_database()
-        async with db._connection.execute("""
-            SELECT * FROM calculations 
-            WHERE user_id = ? 
-            ORDER BY calculated_at DESC LIMIT 1
-        """, (user_id,)) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
+        
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                row = await conn.fetchrow("""
+                    SELECT * FROM calculations 
+                    WHERE user_id = $1 
+                    ORDER BY calculated_at DESC LIMIT 1
+                """, user_id)
+                return dict(row) if row else None
+        else:
+            async with db._connection.execute("""
+                SELECT * FROM calculations 
+                WHERE user_id = ? 
+                ORDER BY calculated_at DESC LIMIT 1
+            """, (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
     
     async def _send_message_safe(self, telegram_id: int, text: str, parse_mode: str = "Markdown"):
         """Send message with error handling"""
@@ -133,7 +167,10 @@ class ProCareScheduler:
                     
                     # Mark as notified (update last_active to prevent spam)
                     db = await get_database()
-                    await db.update_user(user["telegram_id"], last_active=datetime.now().isoformat())
+                    if db.is_postgres:
+                        await db.update_user(user["telegram_id"], last_active=datetime.now())
+                    else:
+                        await db.update_user(user["telegram_id"], last_active=datetime.now().isoformat())
                     
                     # Small delay between messages
                     await asyncio.sleep(1)
@@ -166,7 +203,10 @@ class ProCareScheduler:
                             # Check if we already sent today
                             last_salary_msg = user.get("last_salary_message")
                             if last_salary_msg:
-                                last_date = datetime.fromisoformat(last_salary_msg).date()
+                                if isinstance(last_salary_msg, str):
+                                    last_date = datetime.fromisoformat(last_salary_msg).date()
+                                else:
+                                    last_date = last_salary_msg.date() if hasattr(last_salary_msg, 'date') else last_salary_msg
                                 if last_date == now.date():
                                     continue
                             
@@ -176,10 +216,16 @@ class ProCareScheduler:
                             if await self._send_message_safe(user["telegram_id"], message):
                                 # Mark as sent
                                 db = await get_database()
-                                await db.update_user(
-                                    user["telegram_id"], 
-                                    last_salary_message=now.isoformat()
-                                )
+                                if db.is_postgres:
+                                    await db.update_user(
+                                        user["telegram_id"], 
+                                        last_salary_message=now
+                                    )
+                                else:
+                                    await db.update_user(
+                                        user["telegram_id"], 
+                                        last_salary_message=now.isoformat()
+                                    )
                             
                             await asyncio.sleep(0.5)
                         

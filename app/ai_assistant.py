@@ -822,15 +822,26 @@ async def get_current_month_expenses(db, user_id: int) -> int:
     """
     Joriy oydagi jami xarajatlarni olish (AI orqali yozilgan)
     """
-    cursor = await db._connection.execute("""
-        SELECT COALESCE(SUM(amount), 0) as total
-        FROM transactions
-        WHERE user_id = ? 
-        AND type = 'expense'
-        AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
-    """, (user_id,))
-    row = await cursor.fetchone()
-    return row[0] if row else 0
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT COALESCE(SUM(amount), 0) as total
+                FROM transactions
+                WHERE user_id = $1 
+                AND type = 'expense'
+                AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+            """, user_id)
+            return row['total'] if row else 0
+    else:
+        cursor = await db._connection.execute("""
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE user_id = ? 
+            AND type = 'expense'
+            AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+        """, (user_id,))
+        row = await cursor.fetchone()
+        return row[0] if row else 0
 
 
 async def get_budget_status(db, user_id: int) -> Dict:

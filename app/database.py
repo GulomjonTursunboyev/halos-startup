@@ -604,7 +604,12 @@ class Database:
     
     async def update_user_activity(self, telegram_id: int) -> bool:
         """Update user's last_active timestamp"""
-        return await self.update_user(telegram_id, last_active=datetime.now().isoformat())
+        if self.is_postgres:
+            # PostgreSQL: use datetime object directly
+            return await self.update_user(telegram_id, last_active=datetime.now())
+        else:
+            # SQLite: use ISO format string
+            return await self.update_user(telegram_id, last_active=datetime.now().isoformat())
     
     async def user_exists(self, telegram_id: int) -> bool:
         """Check if user exists"""
