@@ -48,6 +48,9 @@ from app.handlers import (
     menu_credit_choice_callback,
     menu_credit_file_handler,
     menu_katm_confirm_callback,
+    smart_credit_input_handler,
+    credit_confirm_callback,
+    credit_edit_handler,
     # AI Assistant handlers
     ai_assistant_callback,
     ai_voice_handler,
@@ -234,13 +237,13 @@ def setup_handlers(app: Application) -> None:
     
     # Credit handlers
     app.add_handler(
-        CallbackQueryHandler(menu_credit_choice_callback, pattern="^menu_credit_choice_")
+        CallbackQueryHandler(menu_credit_choice_callback, pattern="^menu_credit_(upload|manual|none)$")
     )
     app.add_handler(
-        CallbackQueryHandler(menu_credit_file_handler, pattern="^menu_credit_file$")
+        CallbackQueryHandler(credit_confirm_callback, pattern="^credit_confirm_(yes|no)$")
     )
     app.add_handler(
-        CallbackQueryHandler(menu_katm_confirm_callback, pattern="^menu_katm_confirm$")
+        CallbackQueryHandler(menu_katm_confirm_callback, pattern="^menu_katm_confirm_(yes|no)$")
     )
     
     # PRO feature handlers
@@ -317,6 +320,24 @@ def setup_handlers(app: Application) -> None:
     # Amount input handler for corrections
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, ai_amount_input_handler),
+        group=4
+    )
+    
+    # Smart credit input handler
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
+        group=4
+    )
+    
+    # Credit edit handler
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, credit_edit_handler),
+        group=4
+    )
+    
+    # Credit file handler
+    app.add_handler(
+        MessageHandler(filters.Document.ALL, menu_credit_file_handler),
         group=4
     )
     

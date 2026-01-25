@@ -46,6 +46,9 @@ from app.handlers import (
     menu_credit_choice_callback,
     menu_credit_file_handler,
     menu_katm_confirm_callback,
+    smart_credit_input_handler,
+    credit_confirm_callback,
+    credit_edit_handler,
     # AI Assistant handlers
     ai_assistant_callback,
     ai_voice_handler,
@@ -208,6 +211,11 @@ def main() -> None:
         CallbackQueryHandler(menu_credit_choice_callback, pattern="^menu_credit_(upload|manual|none)$")
     )
     
+    # Credit confirmation callbacks
+    application.add_handler(
+        CallbackQueryHandler(credit_confirm_callback, pattern="^credit_confirm_(yes|no)$")
+    )
+    
     # Menu KATM confirm callbacks
     application.add_handler(
         CallbackQueryHandler(menu_katm_confirm_callback, pattern="^menu_katm_confirm_(yes|no)$")
@@ -226,6 +234,14 @@ def main() -> None:
     )
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, menu_partner_income_handler),
+        group=3
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, smart_credit_input_handler),
+        group=3
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, credit_edit_handler),
         group=3
     )
     application.add_handler(

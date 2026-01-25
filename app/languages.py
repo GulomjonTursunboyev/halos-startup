@@ -641,25 +641,35 @@ MESSAGES = {
     "credit_history_choice": {
         "uz": (
             "🏦 *Kredit ma'lumotlari*\n\n"
-            "Kredit tarixingizni qanday kiritmoqchisiz?\n\n"
-            "📄 *Kredit tarixi* — infokredit.uz dan yuklab olingan HTML/PDF fayl\n"
-            "✏️ *Qo'lda kiritish* — ma'lumotlarni o'zingiz yozasiz\n"
-            "0️⃣ *Kreditim yo'q* — 0 yuboring yoki tugmani bosing\n\n"
-            "💡 _Agar kredit bo'lmasa, 0 yuborish yoki \"Kreditim yo'q\" tugmasini bosish tavsiya etiladi._"
+            "Kredit haqida ma'lumot yuboring:\n\n"
+            "📄 *Fayl* — infokredit.uz dan HTML/PDF yuklang\n"
+            "✏️ *Matn* — istalgan formatda yozing\n"
+            "0️⃣ *Yo'q* — kredit yo'q bo'lsa 0 yuboring\n\n"
+            "💡 *Misollar:*\n"
+            "• `0` — kreditim yo'q\n"
+            "• `2 000 000` — oylik to'lov\n"
+            "• `Oyiga 2 mln, jami 30 mln qarz`\n"
+            "• `Ipoteka 15 mln/oy, avto 3 mln/oy`\n\n"
+            "_Istalgan formatda yozing — tizim avtomatik tahlil qiladi_"
         ),
         "ru": (
             "🏦 *Данные о кредитах*\n\n"
-            "Как хотите ввести кредитную историю?\n\n"
-            "📄 *Кредитная история* — HTML/PDF файл с infokredit.uz\n"
-            "✏️ *Ввести вручную* — введёте данные сами\n"
-            "0️⃣ *Нет кредитов* — отправьте 0 или нажмите кнопку\n\n"
-            "💡 _Если кредитов нет, рекомендуем отправить 0 или нажать \"Нет кредитов\"._"
+            "Отправьте информацию о кредитах:\n\n"
+            "📄 *Файл* — загрузите HTML/PDF с infokredit.uz\n"
+            "✏️ *Текст* — напишите в любом формате\n"
+            "0️⃣ *Нет* — отправьте 0 если нет кредитов\n\n"
+            "💡 *Примеры:*\n"
+            "• `0` — нет кредитов\n"
+            "• `2 000 000` — ежемесячный платёж\n"
+            "• `В месяц 2 млн, всего 30 млн долга`\n"
+            "• `Ипотека 15 млн/мес, авто 3 млн/мес`\n\n"
+            "_Пишите как удобно — система сама проанализирует_"
         )
     },
     
     "btn_upload_credit": {
-        "uz": "📄 Kredit tarixi yuklash",
-        "ru": "📄 Загрузить кредитную историю"
+        "uz": "📄 Fayl yuklash",
+        "ru": "📄 Загрузить файл"
     },
     
     "btn_manual_credit": {
@@ -729,6 +739,50 @@ MESSAGES = {
     "debt_saved": {
         "uz": "✅ Qarz ma'lumotlari saqlandi",
         "ru": "✅ Данные о долге сохранены"
+    },
+    
+    "credit_parsed_result": {
+        "uz": (
+            "✅ *Ma'lumotlar tahlil qilindi*\n\n"
+            "📊 *Natija:*\n"
+            "├ 💳 Oylik to'lov: *{monthly_payment} so'm*\n"
+            "└ 📉 Jami qarz: *{total_debt} so'm*\n\n"
+            "To'g'rimi?"
+        ),
+        "ru": (
+            "✅ *Данные проанализированы*\n\n"
+            "📊 *Результат:*\n"
+            "├ 💳 Ежемесячный платёж: *{monthly_payment} сум*\n"
+            "└ 📉 Общий долг: *{total_debt} сум*\n\n"
+            "Верно?"
+        )
+    },
+    
+    "credit_confirm_yes": {
+        "uz": "✅ To'g'ri",
+        "ru": "✅ Верно"
+    },
+    
+    "credit_confirm_no": {
+        "uz": "❌ O'zgartirish",
+        "ru": "❌ Изменить"
+    },
+    
+    "credit_edit_prompt": {
+        "uz": (
+            "✏️ *Qaysi qiymatni o'zgartirasiz?*\n\n"
+            "Yangi qiymatni yuboring:\n"
+            "• `oylik 2000000` — oylik to'lovni o'zgartirish\n"
+            "• `jami 30000000` — jami qarzni o'zgartirish\n"
+            "• Yoki ikkalasini: `2 mln/oy, 30 mln jami`"
+        ),
+        "ru": (
+            "✏️ *Какое значение изменить?*\n\n"
+            "Отправьте новое значение:\n"
+            "• `ежемесячно 2000000` — изменить платёж\n"
+            "• `всего 30000000` — изменить общий долг\n"
+            "• Или оба: `2 млн/мес, 30 млн всего`"
+        )
     },
     
     # ==================== VALIDATION ====================
