@@ -1,5 +1,5 @@
 """
-SOLVO Telegram Bot
+HALOS Telegram Bot
 Main entry point - Click Payment Integration
 """
 import os
@@ -37,6 +37,36 @@ from app.handlers import (
     menu_help_handler,
     debt_plan_free_callback,
     debt_plan_pro_callback,
+    menu_mode_callback,
+    menu_income_handler,
+    menu_partner_income_handler,
+    menu_loan_payment_handler,
+    menu_total_debt_handler,
+    recalculate_callback,
+    menu_credit_choice_callback,
+    menu_credit_file_handler,
+    menu_katm_confirm_callback,
+    # AI Assistant handlers
+    ai_assistant_callback,
+    ai_voice_handler,
+    ai_text_handler,
+    ai_report_callback,
+    ai_recent_callback,
+    ai_budget_callback,
+    # AI Correction handlers
+    ai_confirm_ok_callback,
+    ai_correct_callback,
+    ai_delete_callback,
+    ai_rewrite_callback,
+    ai_edit_amount_callback,
+    ai_amount_input_handler,
+    ai_cancel_correct_callback,
+    # AI Debt handlers
+    ai_debt_list_callback,
+    ai_debt_mark_returned_callback,
+    ai_debt_return_callback,
+    ai_debt_correct_callback,
+    ai_debt_delete_callback,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -45,6 +75,7 @@ from app.subscription_handlers import (
     enter_promo_callback,
     cancel_promo_callback,
     click_buy_callback,
+    handle_promo_code_input,
 )
 from app.pro_features import (
     show_pro_menu,
@@ -92,7 +123,7 @@ def main() -> None:
         logger.error("Please create a .env file with BOT_TOKEN=your_token")
         return
     
-    logger.info("Starting SOLVO Bot...")
+    logger.info("Starting HALOS Bot...")
     
     # Create application
     application = (
@@ -133,6 +164,12 @@ def main() -> None:
         CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_")
     )
     
+    # Promo code input handler (must be before profile edit handler)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_promo_code_input),
+        group=0
+    )
+    
     # Profile edit text input handler (must be before other message handlers)
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_profile_edit_input),
@@ -141,7 +178,7 @@ def main() -> None:
     
     # Main menu button handlers
     application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(� Qarzdan chiqish|🚀 Выйти из долга)$"), menu_plan_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlarim|📊 Мои отчёты)$"), menu_plan_handler),
         group=2
     )
     application.add_handler(
@@ -149,7 +186,7 @@ def main() -> None:
         group=2
     )
     application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(💎 PRO|💎 PRO)$"), menu_subscription_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^(💎 PRO)$"), menu_subscription_handler),
         group=2
     )
     application.add_handler(
@@ -159,6 +196,45 @@ def main() -> None:
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
         group=2
+    )
+    
+    # Menu mode selection callback (from main menu flow)
+    application.add_handler(
+        CallbackQueryHandler(menu_mode_callback, pattern="^mode_(solo|family)$")
+    )
+    
+    # Menu credit history choice callbacks
+    application.add_handler(
+        CallbackQueryHandler(menu_credit_choice_callback, pattern="^menu_credit_(upload|manual|none)$")
+    )
+    
+    # Menu KATM confirm callbacks
+    application.add_handler(
+        CallbackQueryHandler(menu_katm_confirm_callback, pattern="^menu_katm_confirm_(yes|no)$")
+    )
+    
+    # Menu credit file upload handler
+    application.add_handler(
+        MessageHandler(filters.Document.ALL, menu_credit_file_handler),
+        group=3
+    )
+    
+    # Menu data input handlers (lower priority)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, menu_income_handler),
+        group=3
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, menu_partner_income_handler),
+        group=3
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, menu_loan_payment_handler),
+        group=3
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, menu_total_debt_handler),
+        group=3
     )
     
     # Add subscription/payment handlers
@@ -205,6 +281,81 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(debt_plan_pro_callback, pattern="^debt_plan_pro$")
+    )
+    
+    # Recalculate handler
+    application.add_handler(
+        CallbackQueryHandler(recalculate_callback, pattern="^recalculate$")
+    )
+    
+    # AI Assistant handlers
+    application.add_handler(
+        CallbackQueryHandler(ai_assistant_callback, pattern="^ai_assistant$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_report_callback, pattern="^ai_report$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_recent_callback, pattern="^ai_recent$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_budget_callback, pattern="^ai_budget$")
+    )
+    
+    # AI Correction handlers
+    application.add_handler(
+        CallbackQueryHandler(ai_confirm_ok_callback, pattern="^ai_confirm_ok$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_delete_callback, pattern="^ai_delete_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_rewrite_callback, pattern="^ai_rewrite_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_edit_amount_callback, pattern="^ai_edit_amount_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_cancel_correct_callback, pattern="^ai_cancel_correct$")
+    )
+    
+    # AI Debt handlers
+    application.add_handler(
+        CallbackQueryHandler(ai_debt_list_callback, pattern="^ai_debt_list$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_debt_mark_returned_callback, pattern="^ai_debt_mark_returned$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_debt_return_callback, pattern="^ai_debt_return_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_debt_correct_callback, pattern="^ai_debt_correct_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_debt_delete_callback, pattern="^ai_debt_delete_")
+    )
+    
+    # Amount input handler for corrections (before AI text handler)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_amount_input_handler),
+        group=4
+    )
+    
+    # Voice message handler for AI assistant
+    application.add_handler(
+        MessageHandler(filters.VOICE, ai_voice_handler),
+        group=4
+    )
+    
+    # Text message handler for AI assistant (lowest priority - group 5)
+    # This catches any text that looks like expense/income and auto-saves it
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, ai_text_handler),
+        group=5
     )
     
     # Add error handler

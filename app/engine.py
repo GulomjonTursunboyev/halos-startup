@@ -1,5 +1,5 @@
 """
-SOLVO Financial Engine
+HALOS Financial Engine
 Core calculation logic for debt freedom and wealth building
 """
 import math
@@ -76,7 +76,7 @@ class NegativeCashResult:
 
 class FinancialEngine:
     """
-    SOLVO Financial Calculation Engine
+    HALOS Financial Calculation Engine
     
     Handles all financial calculations for:
     - Debt mode: Users with loans

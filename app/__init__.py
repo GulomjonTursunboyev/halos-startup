@@ -1,3 +1,3 @@
 """
-SOLVO App Package
+HALOS App Package
 """

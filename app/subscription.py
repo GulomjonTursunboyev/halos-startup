@@ -1,5 +1,5 @@
 """
-SOLVO Subscription & Monetization System
+HALOS Subscription & Monetization System
 P2P Card-to-Card Payment Integration
 """
 from enum import Enum
@@ -45,8 +45,8 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.WEEKLY,
         price_uzs=4990,
-        description_uz="SOLVO PRO - 1 haftalik",
-        description_ru="SOLVO PRO - 1 неделя",
+        description_uz="HALOS PRO - 1 haftalik",
+        description_ru="HALOS PRO - 1 неделя",
         is_recommended=False,
     ),
     "pro_monthly": PricingPlan(
@@ -54,8 +54,8 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.MONTHLY,
         price_uzs=14990,
-        description_uz="SOLVO PRO - 1 oylik",
-        description_ru="SOLVO PRO - 1 месяц",
+        description_uz="HALOS PRO - 1 oylik",
+        description_ru="HALOS PRO - 1 месяц",
         is_recommended=True,
     ),
     "pro_yearly": PricingPlan(
@@ -63,8 +63,8 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.YEARLY,
         price_uzs=119990,  # 33% discount
-        description_uz="SOLVO PRO - 1 yillik (33% tejash)",
-        description_ru="SOLVO PRO - 1 год (скидка 33%)",
+        description_uz="HALOS PRO - 1 yillik (33% tejash)",
+        description_ru="HALOS PRO - 1 год (скидка 33%)",
         is_recommended=False,
     ),
 }
@@ -98,14 +98,14 @@ FEATURE_LIMITS = {
 # ==================== PROMO CODES ====================
 
 PROMO_CODES = {
-    "SOLVOWEEK": {
+    "HALOSWEEK": {
         "type": "free_days",
         "value": 7,  # 7 days free (1 week PRO)
         "max_uses": -1,  # Unlimited
         "current_uses": 0,
         "expires": "2027-12-31",
     },
-    "SOLVO2024": {
+    "HALOS2024": {
         "type": "free_days",
         "value": 7,
         "max_uses": 1000,
@@ -133,7 +133,7 @@ PROMO_CODES = {
         "current_uses": 0,
         "expires": "2027-12-31",
     },
-    "SOLVO100": {
+    "HALOS100": {
         "type": "free_days",
         "value": 7,  # 7 days free (100% 1 week)
         "max_uses": 500,

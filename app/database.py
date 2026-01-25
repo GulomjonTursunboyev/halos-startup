@@ -1,5 +1,5 @@
 """
-SOLVO Database Module
+HALOS Database Module
 SQLite database with async support for user data and financial plans
 """
 import aiosqlite
@@ -170,6 +170,59 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_transaction_history_user_id ON transaction_history(user_id);
             CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
             CREATE INDEX IF NOT EXISTS idx_feature_usage_user_id ON feature_usage(user_id);
+            
+            -- Voice transactions table (AI yordamchi)
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount REAL DEFAULT 0,
+                description TEXT,
+                original_text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
+            CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
+            
+            -- Voice usage tracking (monthly limit)
+            CREATE TABLE IF NOT EXISTS voice_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                month TEXT NOT NULL,
+                voice_count INTEGER DEFAULT 0,
+                total_duration INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, month)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_voice_usage_user_month ON voice_usage(user_id, month);
+            
+            -- Personal debts table (qarz munosabatlari)
+            CREATE TABLE IF NOT EXISTS personal_debts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                debt_type TEXT NOT NULL,  -- 'lent' (bergan) / 'borrowed' (olgan)
+                person_name TEXT NOT NULL,  -- Kim bilan
+                amount REAL NOT NULL,
+                description TEXT,
+                original_text TEXT,
+                given_date DATE NOT NULL,  -- Berilgan/olingan sana
+                due_date DATE,  -- Qaytarish sanasi (ixtiyoriy)
+                returned_date DATE,  -- Qaytarilgan sana
+                status TEXT DEFAULT 'active',  -- 'active' / 'returned' / 'partial'
+                returned_amount REAL DEFAULT 0,  -- Qisman qaytarilgan summa
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_personal_debts_user_id ON personal_debts(user_id);
+            CREATE INDEX IF NOT EXISTS idx_personal_debts_status ON personal_debts(status);
+            CREATE INDEX IF NOT EXISTS idx_personal_debts_type ON personal_debts(debt_type);
         """)
         await self._connection.commit()
         

@@ -1,5 +1,5 @@
 """
-SOLVO Subscription Handlers
+HALOS Subscription Handlers
 Click Payment Integration
 """
 import logging
@@ -143,25 +143,25 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
         # Personalized header if user has debt data
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *SOLVO PRO*\n\n"
-                f"Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
+                f"💎 *HALOS PRO*\n\n"
+                f"Hozirgi yo'lingiz bilan *{simple_months} oy*da yengillik.\n"
                 f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
-                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* boylik ortirasiz.\n\n"
+                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO*\n\n"
+            header = "💎 *HALOS PRO*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *PRO BILAN SIZ OLASIZ:*\n"
+            "🌟 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Aniq sana* — qachon qarzsiz bo'lishingiz\n"
-            "✅ *Tezkor chiqish* — bir necha oy oldin\n"
-            "✅ *Boylik* — qarz to'lab ham pul yig'asiz\n\n"
+            "✅ *HALOS sanangiz* — erkinlik sanasini bilasiz\n"
+            "✅ *Tezroq yengillik* — bir necha oy oldin\n"
+            "✅ *Shaxsiy kapital* — yuk to'layotganda ham\n\n"
             "📊 *Statistika* — haftalik/oylik/yillik\n"
             "🔔 *Eslatmalar* — to'lov eslatmalari\n"
-            "📋 *Qarz nazorati* — monitoring\n"
+            "📋 *Nazorat* — monitoring\n"
             "📥 *Excel hisobot* — yuklab olish\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
@@ -174,25 +174,25 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
     else:
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *SOLVO PRO*\n\n"
-                f"Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
+                f"💎 *HALOS PRO*\n\n"
+                f"Обычным путём свобода через *{simple_months} мес*.\n"
                 f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
-                f"Плюс накопите *{format_number(int(savings_at_exit))} сум*.\n\n"
+                f"Плюс *{format_number(int(savings_at_exit))} сум* личного капитала.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO*\n\n"
+            header = "💎 *HALOS PRO*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
+            "🌟 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Точная дата* — когда станете свободны\n"
-            "✅ *Быстрый выход* — на несколько мес раньше\n"
-            "✅ *Богатство* — копите выплачивая долг\n\n"
+            "✅ *Дата HALOS* — знаете когда станете свободны\n"
+            "✅ *Быстрее к лёгкости* — на несколько мес раньше\n"
+            "✅ *Личный капитал* — растёт даже выплачивая бремя\n\n"
             "📊 *Статистика* — еженед/ежемес/ежегод\n"
             "🔔 *Напоминания* — об оплате\n"
-            "📋 *Контроль долгов* — мониторинг\n"
+            "📋 *Контроль* — мониторинг\n"
             "📥 *Excel отчёт* — скачать\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
@@ -286,25 +286,25 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
     if lang == "uz":
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *SOLVO PRO*\n\n"
-                f"Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
+                f"💎 *HALOS PRO*\n\n"
+                f"Hozirgi yo'lingiz bilan *{simple_months} oy*da yengillik.\n"
                 f"PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n"
-                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* boylik ortirasiz.\n\n"
+                f"Bundan tashqari *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO*\n\n"
+            header = "💎 *HALOS PRO*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *PRO BILAN SIZ OLASIZ:*\n"
+            "🌟 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Aniq sana* — qachon qarzsiz bo'lishingiz\n"
-            "✅ *Tezkor chiqish* — bir necha oy oldin\n"
-            "✅ *Boylik* — qarz to'lab ham pul yig'asiz\n\n"
+            "✅ *HALOS sanangiz* — erkinlik sanasini bilasiz\n"
+            "✅ *Tezroq yengillik* — bir necha oy oldin\n"
+            "✅ *Shaxsiy kapital* — yuk to'layotganda ham\n\n"
             "📊 *Statistika* — haftalik/oylik/yillik\n"
             "🔔 *Eslatmalar* — to'lov eslatmalari\n"
-            "📋 *Qarz nazorati* — monitoring\n"
+            "📋 *Nazorat* — monitoring\n"
             "📥 *Excel hisobot* — yuklab olish\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
@@ -317,25 +317,25 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
     else:
         if simple_months > 0 and months_saved > 0:
             header = (
-                f"💎 *SOLVO PRO*\n\n"
-                f"Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
+                f"💎 *HALOS PRO*\n\n"
+                f"Обычным путём свобода через *{simple_months} мес*.\n"
                 f"С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
-                f"Плюс *{format_number(int(savings_at_exit))} сум* богатства.\n\n"
+                f"Плюс *{format_number(int(savings_at_exit))} сум* личного капитала.\n\n"
             )
         else:
-            header = "💎 *SOLVO PRO*\n\n"
+            header = "💎 *HALOS PRO*\n\n"
         
         msg = (
             f"{header}"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
+            "🌟 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Точная дата* — когда станете свободны\n"
-            "✅ *Быстрый выход* — на несколько мес раньше\n"
-            "✅ *Богатство* — копите выплачивая долг\n\n"
+            "✅ *Дата HALOS* — знаете когда станете свободны\n"
+            "✅ *Быстрее к лёгкости* — на несколько мес раньше\n"
+            "✅ *Личный капитал* — растёт даже выплачивая бремя\n\n"
             "📊 *Статистика* — еженед/ежемес/ежегод\n"
             "🔔 *Напоминания* — об оплате\n"
-            "📋 *Контроль долгов* — мониторинг\n"
+            "📋 *Контроль* — мониторинг\n"
             "📥 *Excel отчёт* — скачать\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
@@ -404,8 +404,8 @@ async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     plan = PRICING_PLANS[plan_id]
     amount = plan.price_uzs
-    order_id = f"solvo_{update.effective_user.id}_{plan_id}"
-    return_url = "https://t.me/solvo_bot"  # Redirect back to bot after payment
+    order_id = f"halos_{update.effective_user.id}_{plan_id}"
+    return_url = "https://t.me/HalosRobot"  # Redirect back to bot after payment
     
     click_url = generate_click_payment_url(
         amount=amount, 
@@ -464,13 +464,13 @@ async def enter_promo_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         msg = (
             "🎁 *Promo-kod kiritish*\n\n"
             "Agar sizda promo-kod bo'lsa, uni kiriting:\n\n"
-            "Misol: `SOLVO2024`"
+            "Misol: `HALOS2024`"
         )
     else:
         msg = (
             "🎁 *Ввод промо-кода*\n\n"
             "Если у вас есть промо-код, введите его:\n\n"
-            "Пример: `SOLVO2024`"
+            "Пример: `HALOS2024`"
         )
     
     keyboard = [

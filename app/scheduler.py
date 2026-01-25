@@ -1,5 +1,5 @@
 """
-SOLVO PRO Care Scheduler
+HALOS PRO Care Scheduler
 Wolt-style caring messages and progress notifications
 """
 import asyncio
@@ -45,9 +45,10 @@ class ProCareScheduler:
             asyncio.create_task(self._salary_day_job()),
             asyncio.create_task(self._weekly_progress_job()),
             asyncio.create_task(self._monthly_countdown_job()),
+            asyncio.create_task(self._debt_reminder_job()),  # Qarz eslatmalari
         ]
         
-        logger.info("PRO Care Scheduler started with 4 jobs")
+        logger.info("PRO Care Scheduler started with 5 jobs")
     
     async def stop(self):
         """Stop all scheduled jobs"""
@@ -305,6 +306,145 @@ class ProCareScheduler:
             
             # Check every hour
             await asyncio.sleep(60 * 60)
+    
+    async def _debt_reminder_job(self):
+        """
+        Job: Qarz qaytarish eslatmalari
+        Har kuni ertalab 9:00 da tekshiradi
+        - Bugun qaytarish sanasi bo'lganlar uchun eslatma
+        - 3 kun ichida qaytarish sanasi kelayotganlar uchun oldindan ogohlantirish
+        """
+        while self._running:
+            try:
+                now = datetime.now()
+                
+                # Faqat ertalab 9-10 oralig'ida ishlaydi
+                if 9 <= now.hour < 10:
+                    logger.info("Running debt reminder check...")
+                    db = await get_database()
+                    
+                    # ==================== BUGUNGI QARZLAR ====================
+                    today_debts = await get_debts_due_today(db)
+                    
+                    for debt in today_debts:
+                        try:
+                            lang = debt.get("language", "uz")
+                            person = debt.get("person_name", "Noma'lum")
+                            amount = debt.get("amount", 0)
+                            debt_type = debt.get("debt_type")
+                            
+                            if lang == "uz":
+                                if debt_type == "lent":
+                                    # Men qarz berganman, menga qaytarilishi kerak
+                                    message = (
+                                        "🔔 *QARZ ESLATMASI*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📤 Bugun *{person}* sizga qarz qaytarishi kerak!\n\n"
+                                        f"💵 Summa: *{amount:,.0f}* so'm\n\n"
+                                        "💡 _Agar qaytarilgan bo'lsa, AI yordamchiga yozing:_\n"
+                                        f"_\"{person} qarzni qaytardi\"_"
+                                    )
+                                else:
+                                    # Men qarz olganman, men qaytarishim kerak
+                                    message = (
+                                        "🔔 *QARZ ESLATMASI*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📥 Bugun *{person}*ga qarzni qaytarishingiz kerak!\n\n"
+                                        f"💵 Summa: *{amount:,.0f}* so'm\n\n"
+                                        "💡 _Qaytarganingizdan keyin AI yordamchiga yozing:_\n"
+                                        f"_\"{person}ga qarzni qaytardim\"_"
+                                    )
+                            else:
+                                if debt_type == "lent":
+                                    message = (
+                                        "🔔 *НАПОМИНАНИЕ О ДОЛГЕ*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📤 Сегодня *{person}* должен вернуть вам долг!\n\n"
+                                        f"💵 Сумма: *{amount:,.0f}* сум\n\n"
+                                        "💡 _Если вернул, напишите AI помощнику:_\n"
+                                        f"_\"{person} вернул долг\"_"
+                                    )
+                                else:
+                                    message = (
+                                        "🔔 *НАПОМИНАНИЕ О ДОЛГЕ*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📥 Сегодня вы должны вернуть долг *{person}*!\n\n"
+                                        f"💵 Сумма: *{amount:,.0f}* сум\n\n"
+                                        "💡 _После возврата напишите AI помощнику:_\n"
+                                        f"_\"Вернул долг {person}\"_"
+                                    )
+                            
+                            await self._send_message_safe(debt["telegram_id"], message)
+                            await asyncio.sleep(0.5)
+                            
+                        except Exception as e:
+                            logger.error(f"Error sending debt reminder: {e}")
+                    
+                    logger.info(f"Sent {len(today_debts)} debt due today reminders")
+                    
+                    # ==================== 3 KUN ICHIDAGI QARZLAR ====================
+                    upcoming_debts = await get_debts_due_soon(db, days=3)
+                    
+                    for debt in upcoming_debts:
+                        try:
+                            lang = debt.get("language", "uz")
+                            person = debt.get("person_name", "Noma'lum")
+                            amount = debt.get("amount", 0)
+                            debt_type = debt.get("debt_type")
+                            due_date = debt.get("due_date", "")
+                            
+                            # Kun hisoblash
+                            due_dt = datetime.strptime(due_date, "%Y-%m-%d")
+                            days_left = (due_dt - now).days
+                            
+                            if lang == "uz":
+                                if debt_type == "lent":
+                                    message = (
+                                        "⏰ *QARZ OGOHLANTIRISHI*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📤 *{person}* {days_left} kunda sizga qarz qaytarishi kerak.\n\n"
+                                        f"💵 Summa: *{amount:,.0f}* so'm\n"
+                                        f"📅 Sana: *{due_date}*"
+                                    )
+                                else:
+                                    message = (
+                                        "⏰ *QARZ OGOHLANTIRISHI*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📥 {days_left} kunda *{person}*ga qarzni qaytarishingiz kerak.\n\n"
+                                        f"💵 Summa: *{amount:,.0f}* so'm\n"
+                                        f"📅 Sana: *{due_date}*"
+                                    )
+                            else:
+                                if debt_type == "lent":
+                                    message = (
+                                        "⏰ *ПРЕДУПРЕЖДЕНИЕ О ДОЛГЕ*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📤 *{person}* должен вернуть вам долг через {days_left} дней.\n\n"
+                                        f"💵 Сумма: *{amount:,.0f}* сум\n"
+                                        f"📅 Дата: *{due_date}*"
+                                    )
+                                else:
+                                    message = (
+                                        "⏰ *ПРЕДУПРЕЖДЕНИЕ О ДОЛГЕ*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"📥 Через {days_left} дней вы должны вернуть долг *{person}*.\n\n"
+                                        f"💵 Сумма: *{amount:,.0f}* сум\n"
+                                        f"📅 Дата: *{due_date}*"
+                                    )
+                            
+                            await self._send_message_safe(debt["telegram_id"], message)
+                            await asyncio.sleep(0.5)
+                            
+                        except Exception as e:
+                            logger.error(f"Error sending upcoming debt reminder: {e}")
+                    
+                    logger.info(f"Sent {len(upcoming_debts)} upcoming debt reminders")
+                
+            except Exception as e:
+                logger.error(f"Error in debt reminder job: {e}")
+            
+            # Har 1 soatda tekshirish
+            await asyncio.sleep(60 * 60)
 
 
 # ==================== MANUAL TRIGGER FUNCTIONS ====================
@@ -465,6 +605,36 @@ async def send_monthly_countdown(bot: Bot, telegram_id: int):
 
 # Global scheduler instance
 _scheduler: Optional[ProCareScheduler] = None
+
+
+async def get_debts_due_today(db) -> List[Dict[str, Any]]:
+    """Bugun qaytarish sanasi bo'lgan qarzlarni olish"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    async with db._connection.execute("""
+        SELECT pd.*, u.telegram_id, u.language
+        FROM personal_debts pd
+        JOIN users u ON pd.user_id = u.id
+        WHERE pd.due_date = ? AND pd.status = 'active'
+    """, (today,)) as cursor:
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
+    """N kun ichida qaytarish sanasi keladigan qarzlarni olish"""
+    today = datetime.now()
+    target_date = (today + timedelta(days=days)).strftime("%Y-%m-%d")
+    today_str = today.strftime("%Y-%m-%d")
+    
+    async with db._connection.execute("""
+        SELECT pd.*, u.telegram_id, u.language
+        FROM personal_debts pd
+        JOIN users u ON pd.user_id = u.id
+        WHERE pd.due_date > ? AND pd.due_date <= ? AND pd.status = 'active'
+    """, (today_str, target_date)) as cursor:
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
 
 async def get_scheduler(bot: Bot) -> ProCareScheduler:

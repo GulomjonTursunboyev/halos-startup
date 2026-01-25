@@ -1,5 +1,5 @@
 """
-SOLVO PRO Features Module
+HALOS PRO Features Module
 Statistics, Reminders, Debt Monitoring, Excel Export
 """
 import logging
@@ -95,6 +95,13 @@ async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     monthly_expense = mandatory + loan_payment + living
     yearly_expense = monthly_expense * 12
     
+    # Get AI transaction summary
+    from app.ai_assistant import get_transaction_summary
+    ai_summary = await get_transaction_summary(db, user["id"], days=30)
+    ai_income = ai_summary.get("total_income", 0)
+    ai_expense = ai_summary.get("total_expense", 0)
+    ai_balance = ai_income - ai_expense
+    
     if lang == "uz":
         msg = (
             "📊 *SIZNING STATISTIKANGIZ*\n"
@@ -114,6 +121,13 @@ async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"├ 💰 Daromad: {format_number(int(yearly_income))} so'm\n"
             f"├ 💸 Xarajat: {format_number(int(yearly_expense))} so'm\n"
             f"└ 🏦 Boylik: +{format_number(int(yearly_savings))} so'm\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 *AI YORDAMCHI (30 kun):*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ 💰 Daromadlar: +{format_number(int(ai_income))} so'm\n"
+            f"├ 💸 Xarajatlar: -{format_number(int(ai_expense))} so'm\n"
+            f"└ 📊 Balans: {'+' if ai_balance >= 0 else ''}{format_number(int(ai_balance))} so'm\n\n"
             
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"💳 Umumiy qarz: {format_number(int(total_debt))} so'm"
@@ -137,6 +151,13 @@ async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"├ 💰 Доход: {format_number(int(yearly_income))} сум\n"
             f"├ 💸 Расход: {format_number(int(yearly_expense))} сум\n"
             f"└ 🏦 Богатство: +{format_number(int(yearly_savings))} сум\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 *AI ПОМОЩНИК (30 дней):*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ 💰 Доходы: +{format_number(int(ai_income))} сум\n"
+            f"├ 💸 Расходы: -{format_number(int(ai_expense))} сум\n"
+            f"└ 📊 Баланс: {'+' if ai_balance >= 0 else ''}{format_number(int(ai_balance))} сум\n\n"
             
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"💳 Общий долг: {format_number(int(total_debt))} сум"
@@ -194,7 +215,7 @@ async def show_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "🔔 *TO'LOV ESLATMALARI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "SOLVO sizga quyidagilarni eslatib turadi:\n\n"
+            "HALOS sizga quyidagilarni eslatib turadi:\n\n"
             
             "✅ *Oylik to'lov* — har oy 1-sanada\n"
             "✅ *Haftalik hisobot* — har dushanba\n"
@@ -210,7 +231,7 @@ async def show_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "🔔 *НАПОМИНАНИЯ ОБ ОПЛАТЕ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "SOLVO напомнит вам о:\n\n"
+            "HALOS напомнит вам о:\n\n"
             
             "✅ *Ежемесячный платёж* — 1-го числа\n"
             "✅ *Еженедельный отчёт* — каждый понедельник\n"
@@ -327,10 +348,10 @@ async def show_debt_monitoring(update: Update, context: ContextTypes.DEFAULT_TYP
         
         if lang == "uz":
             msg = (
-                "📋 *QARZ NAZORATI*\n"
+                "📋 *YO'LINGIZ NAZORATI*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
                 
-                f"💳 *Umumiy qarz:* {format_number(int(total_debt))} so'm\n"
+                f"💳 *Umumiy yuk:* {format_number(int(total_debt))} so'm\n"
                 f"📅 *Oylik to'lov:* {format_number(int(loan_payment))} so'm\n"
                 f"⚡ *Qo'shimcha:* +{format_number(int(extra_debt))} so'm\n\n"
                 
@@ -338,20 +359,20 @@ async def show_debt_monitoring(update: Update, context: ContextTypes.DEFAULT_TYP
                 
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "📊 *PROGNOZ:*\n"
-                f"├ Oddiy usul: {simple_exit.strftime('%B %Y')}\n"
-                f"└ SOLVO bilan: {pro_exit.strftime('%B %Y')}\n\n"
+                f"├ Oddiy yo'l: {simple_exit.strftime('%B %Y')}\n"
+                f"└ HALOS PRO bilan: {pro_exit.strftime('%B %Y')}\n\n"
                 
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "💡 *MASLAHAT:*\n"
                 "Har oyda qo'shimcha to'lov qilsangiz,\n"
-                f"*{simple_months - pro_months} oy* oldin erkinlikka chiqasiz!"
+                f"*{simple_months - pro_months} oy* oldin yengillikka erishasiz!"
             )
         else:
             msg = (
-                "📋 *КОНТРОЛЬ ДОЛГОВ*\n"
+                "📋 *КОНТРОЛЬ ВАШЕГО ПУТИ*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
                 
-                f"💳 *Общий долг:* {format_number(int(total_debt))} сум\n"
+                f"💳 *Общее бремя:* {format_number(int(total_debt))} сум\n"
                 f"📅 *Ежемесячно:* {format_number(int(loan_payment))} сум\n"
                 f"⚡ *Дополнительно:* +{format_number(int(extra_debt))} сум\n\n"
                 
@@ -359,13 +380,13 @@ async def show_debt_monitoring(update: Update, context: ContextTypes.DEFAULT_TYP
                 
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "📊 *ПРОГНОЗ:*\n"
-                f"├ Обычный способ: {simple_exit.strftime('%B %Y')}\n"
-                f"└ С SOLVO: {pro_exit.strftime('%B %Y')}\n\n"
+                f"├ Обычный путь: {simple_exit.strftime('%B %Y')}\n"
+                f"└ С HALOS PRO: {pro_exit.strftime('%B %Y')}\n\n"
                 
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "💡 *СОВЕТ:*\n"
                 "Делая дополнительные платежи,\n"
-                f"выйдете из долга на *{simple_months - pro_months} мес* раньше!"
+                f"достигнете свободы на *{simple_months - pro_months} мес* раньше!"
             )
     else:
         if lang == "uz":
@@ -466,9 +487,9 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             data = {
                 "Ko'rsatkich": [
                     "Daromad (shaxsiy)", "Daromad (sherik)", "Umumiy daromad",
-                    "Ijara", "Bog'cha", "Kommunal", "Qarz to'lovi", "Majburiy xarajatlar",
-                    "Bo'sh pul", "Boylik (10%)", "Qo'shimcha qarz (20%)", "Yashash (70%)",
-                    "Umumiy qarz", "Oddiy chiqish (oy)", "SOLVO bilan (oy)"
+                    "Ijara", "Bog'cha", "Kommunal", "Yuk to'lovi", "Majburiy xarajatlar",
+                    "Bo'sh pul", "Boylik uchun", "Kredit to'lovi", "Yashash",
+                    "Umumiy yuk", "Oddiy yo'l (oy)", "HALOS bilan (oy)"
                 ],
                 "Qiymat (so'm)": [
                     profile.get("income_self", 0), profile.get("income_partner", 0), income,
@@ -482,9 +503,9 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             data = {
                 "Показатель": [
                     "Доход (личный)", "Доход (партнёр)", "Общий доход",
-                    "Аренда", "Детсад", "Коммуналка", "Платёж по долгу", "Обязательные расходы",
-                    "Свободные деньги", "Богатство (10%)", "Доп. долг (20%)", "Жизнь (70%)",
-                    "Общий долг", "Обычный выход (мес)", "С SOLVO (мес)"
+                    "Аренда", "Детсад", "Коммуналка", "Платёж по бремени", "Обязательные расходы",
+                    "Свободные средства", "Для богатства", "Платёж по кредиту", "Жизнь",
+                    "Общее бремя", "Обычный путь (мес)", "С HALOS (мес)"
                 ],
                 "Значение (сум)": [
                     profile.get("income_self", 0), profile.get("income_partner", 0), income,
@@ -500,11 +521,11 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # Create Excel file in memory
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='SOLVO Report', index=False)
+            df.to_excel(writer, sheet_name='HALOS Report', index=False)
         output.seek(0)
         
         # Send file
-        filename = f"SOLVO_Report_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        filename = f"HALOS_Report_{datetime.now().strftime('%Y%m%d')}.xlsx"
         
         if query:
             chat_id = query.message.chat_id
@@ -515,7 +536,7 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             chat_id=chat_id,
             document=output,
             filename=filename,
-            caption="📊 SOLVO Report" if lang == "uz" else "📊 Отчёт SOLVO"
+            caption="📊 HALOS Report" if lang == "uz" else "📊 Отчёт HALOS"
         )
         
         if lang == "uz":
@@ -563,30 +584,36 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     if lang == "uz":
         msg = (
-            "💎 *SOLVO PRO FUNKSIYALARI*\n"
+            "💎 *HALOS PRO*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "Quyidagi PRO imkoniyatlardan foydalaning:\n\n"
+            "PRO imkoniyatlaringiz:\n\n"
             
+            "🤖 *AI yordamchi* — ovozli xarajat/daromad yozish\n"
             "📊 *Statistika* — haftalik/oylik/yillik\n"
             "🔔 *Eslatmalar* — to'lov eslatmalari\n"
-            "📋 *Qarz nazorati* — monitoring va maslahatlar\n"
+            "📋 *Yuk nazorati* — monitoring va maslahatlar\n"
             "📥 *Excel hisobot* — yuklab olish\n"
         )
     else:
         msg = (
-            "💎 *ФУНКЦИИ SOLVO PRO*\n"
+            "💎 *HALOS PRO*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "Используйте PRO возможности:\n\n"
+            "Ваши PRO возможности:\n\n"
             
+            "🤖 *AI помощник* — голосовая запись расходов/доходов\n"
             "📊 *Статистика* — еженедельно/ежемесячно/ежегодно\n"
             "🔔 *Напоминания* — напоминания об оплате\n"
-            "📋 *Контроль долгов* — мониторинг и советы\n"
+            "📋 *Контроль нагрузки* — мониторинг и советы\n"
             "📥 *Excel отчёт* — скачать\n"
         )
     
     keyboard = [
+        [InlineKeyboardButton(
+            "🤖 AI yordamchi" if lang == "uz" else "🤖 AI помощник",
+            callback_data="ai_assistant"
+        )],
         [InlineKeyboardButton(
             "📊 Statistika" if lang == "uz" else "📊 Статистика",
             callback_data="pro_statistics"
@@ -596,7 +623,7 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             callback_data="pro_reminders"
         )],
         [InlineKeyboardButton(
-            "📋 Qarz nazorati" if lang == "uz" else "📋 Контроль долгов",
+            "📋 Yuk nazorati" if lang == "uz" else "📋 Контроль нагрузки",
             callback_data="pro_debt_monitor"
         )],
         [InlineKeyboardButton(

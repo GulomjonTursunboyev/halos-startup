@@ -1,5 +1,5 @@
 """
-SOLVO Language Dictionaries
+HALOS Language Dictionaries
 Uzbek and Russian translations for all bot messages
 """
 
@@ -11,44 +11,44 @@ MESSAGES = {
     # ==================== WELCOME & REGISTRATION ====================
     "welcome": {
         "uz": (
-            "🌟 *SOLVO* ga xush kelibsiz!\n\n"
-            "Men sizning shaxsiy *moliyaviy maslahatchingizman*.\n\n"
+            "✨ *HALOS* ga xush kelibsiz\n\n"
+            "Sizni moliyaviy yukdan xalos bo'lib, o'z boyligingizni qurish yo'liga olib chiqaman.\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *SOLVO sizga yordam beradi:*\n\n"
-            "💰 Qarzlardan *qachon* xalos bo'lishni ko'rsatadi\n"
-            "📈 Oylik *qancha* boylik ortira olishingizni hisoblaydi\n"
-            "🎯 Moliyaviy *erkinlik* rejasini tuzadi\n"
-            "📊 Statistika va *Excel hisobotlar*\n"
+            "🌟 *HALOS sizga yordam beradi:*\n\n"
+            "🕊 Moliyaviy yukdan *qachon* xalos bo'lishni ko'rsatadi\n"
+            "💎 Oylik *qancha* shaxsiy kapital ortira olishingizni hisoblaydi\n"
+            "🌅 *Moliyaviy tinchlik* yo'lingizni tuzadi\n"
+            "📊 Statistika va *batafsil hisobotlar*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Ro'yxatdan o'tish uchun* telefon raqamingizni ulashing 👇"
+            "✅ *Boshlash uchun* ro'yxatdan o'ting 👇"
         ),
         "ru": (
-            "🌟 Добро пожаловать в *SOLVO*!\n\n"
-            "Я ваш персональный *финансовый консультант*.\n\n"
+            "✨ Добро пожаловать в *HALOS*\n\n"
+            "Помогу вам выйти из финансового бремени и начать строить собственный капитал.\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *SOLVO поможет вам:*\n\n"
-            "💰 Показать *когда* вы избавитесь от долгов\n"
-            "📈 Рассчитать *сколько* богатства сможете накопить\n"
-            "🎯 Построить план *финансовой свободы*\n"
-            "📊 Статистика и *Excel отчёты*\n"
+            "🌟 *HALOS поможет вам:*\n\n"
+            "🕊 Показать *когда* вы освободитесь от бремени\n"
+            "💎 Рассчитать *сколько* личного капитала сможете создать\n"
+            "🌅 Построить путь к *финансовому спокойствию*\n"
+            "📊 Статистика и *детальные отчёты*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Для регистрации* поделитесь номером телефона 👇"
+            "✅ *Чтобы начать* зарегистрируйтесь 👇"
         )
     },
     
     "share_contact_button": {
-        "uz": "📱 Telefon raqamni ulashish",
-        "ru": "📱 Поделиться номером"
+        "uz": "📱 Ro'yxatdan o'tish",
+        "ru": "📱 Зарегистрироваться"
     },
     
     "contact_received": {
-        "uz": "✅ Rahmat! Telefon raqamingiz saqlandi.",
-        "ru": "✅ Спасибо! Ваш номер сохранён."
+        "uz": "✅ Rahmat! Ro'yxatdan muvaffaqiyatli o'tdingiz.",
+        "ru": "✅ Спасибо! Вы успешно зарегистрированы."
     },
     
     "contact_required": {
-        "uz": "📱 Iltimos, davom etish uchun telefon raqamingizni ulashing.",
-        "ru": "📱 Пожалуйста, поделитесь номером телефона для продолжения."
+        "uz": "📱 Iltimos, davom etish uchun ro'yxatdan o'ting.",
+        "ru": "📱 Пожалуйста, зарегистрируйтесь для продолжения."
     },
     
     # ==================== LANGUAGE SELECTION ====================
@@ -637,6 +637,50 @@ MESSAGES = {
         "ru": "⏭ Пропустить"
     },
     
+    # ==================== CREDIT HISTORY CHOICE ====================
+    "credit_history_choice": {
+        "uz": (
+            "🏦 *Kredit ma'lumotlari*\n\n"
+            "Kredit tarixingizni qanday kiritmoqchisiz?\n\n"
+            "📄 *Kredit tarixi* — infokredit.uz dan yuklab olingan HTML/PDF fayl\n"
+            "✏️ *Qo'lda kiritish* — ma'lumotlarni o'zingiz yozasiz"
+        ),
+        "ru": (
+            "🏦 *Данные о кредитах*\n\n"
+            "Как хотите ввести кредитную историю?\n\n"
+            "📄 *Кредитная история* — HTML/PDF файл с infokredit.uz\n"
+            "✏️ *Ввести вручную* — введёте данные сами"
+        )
+    },
+    
+    "btn_upload_credit": {
+        "uz": "📄 Kredit tarixi yuklash",
+        "ru": "📄 Загрузить кредитную историю"
+    },
+    
+    "btn_manual_credit": {
+        "uz": "✏️ Qo'lda kiritish",
+        "ru": "✏️ Ввести вручную"
+    },
+    
+    "btn_no_credit": {
+        "uz": "✨ Kreditim yo'q",
+        "ru": "✨ Нет кредитов"
+    },
+    
+    "upload_credit_file": {
+        "uz": (
+            "📄 *Kredit tarixini yuklang*\n\n"
+            "infokredit.uz dan olingan HTML yoki PDF faylni yuboring.\n\n"
+            "💡 Fayl avtomatik tahlil qilinadi va ma'lumotlar olinadi."
+        ),
+        "ru": (
+            "📄 *Загрузите кредитную историю*\n\n"
+            "Отправьте HTML или PDF файл с infokredit.uz.\n\n"
+            "💡 Файл будет автоматически проанализирован."
+        )
+    },
+    
     # ==================== LOAN INPUT ====================
     "input_loan_payment": {
         "uz": (
@@ -703,40 +747,40 @@ MESSAGES = {
     
     "result_debt_mode": {
         "uz": (
-            "� *SIZNING ERKINLIK YO'LINGIZ*\n\n"
-            "Siz *{exit_date}* da qarzsiz bo'lasiz.\n\n"
-            "Agar shu rejaga amal qilsangiz, {exit_months} oy ichida\n"
-            "*{savings_exit}* so'm jamg'arasiz.\n\n"
+            "🌟 *SIZNING HALOS SANANGIZ*\n\n"
+            "Siz *{exit_date}* da moliyaviy erkinlikka erishasiz.\n\n"
+            "Shu yo'lda davom etsangiz, {exit_months} oy ichida\n"
+            "*{savings_exit}* so'm shaxsiy kapital qurasiz.\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Oylik taqsimot:*\n\n"
-            "💳 Qarz to'lovi: *{debt_payment}* so'm\n"
-            "💰 Jamg'arma: *{savings}* so'm\n"
-            "🏠 Yashash uchun: *{living}* so'm\n\n"
+            "📊 *Oylik balans:*\n\n"
+            "💳 Yukni to'lash: *{debt_payment}* so'm\n"
+            "💎 Kapital qurish: *{savings}* so'm\n"
+            "🏠 Xotirjam yashash: *{living}* so'm\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "📈 *Sizning yutuqlaringiz:*\n\n"
-            "• 12 oyda jamg'arma: *{savings_12}* so'm\n"
-            "• Erkinlikka yetganda: *{savings_exit}* so'm\n\n"
+            "📈 *Sizning yo'lingiz:*\n\n"
+            "• 12 oyda kapital: *{savings_12}* so'm\n"
+            "• HALOS sanangizda: *{savings_exit}* so'm\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "✨ Siz hozirdan boshlab qarz yukidan qutulmoqdasiz.\n"
-            "Har bir to'lov — erkinlikka qadam."
+            "✨ Har bir qadam sizni yengillikka yaqinlashtiradi.\n"
+            "Tinch nafas oling — siz to'g'ri yo'ldasiz."
         ),
         "ru": (
-            "🌟 *ВАШ ПУТЬ К СВОБОДЕ*\n\n"
-            "Вы станете свободны от долгов *{exit_date}*.\n\n"
-            "Если будете следовать плану, за {exit_months} мес\n"
-            "накопите *{savings_exit}* сум.\n\n"
+            "🌟 *ВАША ДАТА HALOS*\n\n"
+            "Вы достигнете финансовой свободы *{exit_date}*.\n\n"
+            "Следуя этому пути, за {exit_months} мес\n"
+            "создадите *{savings_exit}* сум личного капитала.\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Ежемесячное распределение:*\n\n"
-            "💳 Платёж по долгу: *{debt_payment}* сум\n"
-            "💰 Накопления: *{savings}* сум\n"
-            "🏠 На жизнь: *{living}* сум\n\n"
+            "📊 *Ежемесячный баланс:*\n\n"
+            "💳 Погашение бремени: *{debt_payment}* сум\n"
+            "💎 Рост капитала: *{savings}* сум\n"
+            "🏠 Спокойная жизнь: *{living}* сум\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "📈 *Ваши достижения:*\n\n"
-            "• За 12 месяцев: *{savings_12}* сум\n"
-            "• К моменту свободы: *{savings_exit}* сум\n\n"
+            "📈 *Ваш путь:*\n\n"
+            "• Капитал за 12 мес: *{savings_12}* сум\n"
+            "• К дате HALOS: *{savings_exit}* сум\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "✨ Вы уже начинаете освобождаться от долгов.\n"
-            "Каждый платёж — шаг к свободе."
+            "✨ Каждый шаг приближает вас к лёгкости.\n"
+            "Вдохните спокойно — вы на верном пути."
         )
     },
     
@@ -769,46 +813,40 @@ MESSAGES = {
     
     "result_debt_mode_free": {
         "uz": (
-            "⚠️ *SIZNING QARZ HOLATI*\n\n"
+            "📋 *HOZIRGI YO'LINGIZ*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📅 *HOZIRGI YO'L*\n"
+            "📅 *ODDIY YO'L*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Bank minimal to'lovi bilan davom etsangiz:\n\n"
-            "🗓 Qarzdan chiqish: *{simple_exit_date}*\n"
+            "Faqat minimal to'lov bilan davom etsangiz:\n\n"
+            "🗓 Yengillik sanasi: *{simple_exit_date}*\n"
             "⏱ Qolgan vaqt: *{simple_exit_months} oy*\n"
             "💳 Oylik to'lov: *{monthly_payment}* so'm\n\n"
-            "😟 _Bu juda uzoq..._\n\n"
-            "❌ Jamg'arma: *0 so'm*\n"
-            "❌ Tezlashtirish: *yo'q*\n"
-            "❌ Optimizatsiya: *yo'q*\n\n"
+            "📍 Kapital qurilmaydi\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💎 *SOLVO PRO BILAN*\n"
+            "💎 *HALOS PRO BILAN*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *{pro_exit_date}* da qarzsiz bo'lardingiz\n"
-            "✅ *{months_saved} oy* tezroq qutulardingiz\n"
-            "✅ *{savings_at_exit}* so'm boylik ortirasiz\n\n"
-            "👇 _PRO ga o'ting va tezroq erkinlikka chiqing_"
+            "✅ HALOS sanangiz: *{pro_exit_date}*\n"
+            "✅ *{months_saved} oy* tezroq yengillik\n"
+            "✅ *{savings_at_exit}* so'm shaxsiy kapital\n\n"
+            "👇 _Tezroq erkinlik va kapital qurish uchun PRO_"
         ),
         "ru": (
-            "⚠️ *ВАШ ДОЛГОВОЙ СТАТУС*\n\n"
+            "📋 *ВАШ ТЕКУЩИЙ ПУТЬ*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "📅 *ТЕКУЩИЙ ПУТЬ*\n"
+            "📅 *ОБЫЧНЫЙ ПУТЬ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Если продолжить минимальные платежи:\n\n"
-            "🗓 Выход из долга: *{simple_exit_date}*\n"
+            "При минимальных платежах:\n\n"
+            "🗓 Дата свободы: *{simple_exit_date}*\n"
             "⏱ Осталось: *{simple_exit_months} мес*\n"
             "💳 Ежемес. платёж: *{monthly_payment}* сум\n\n"
-            "😟 _Это слишком долго..._\n\n"
-            "❌ Накопления: *0 сум*\n"
-            "❌ Ускорение: *нет*\n"
-            "❌ Оптимизация: *нет*\n\n"
+            "📍 Капитал не создаётся\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💎 *С SOLVO PRO*\n"
+            "💎 *С HALOS PRO*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ Стали бы свободны *{pro_exit_date}*\n"
-            "✅ На *{months_saved} мес* быстрее\n"
-            "✅ Накопите *{savings_at_exit}* сум богатства\n\n"
-            "👇 _Перейдите на PRO и выйдите из долга быстрее_"
+            "✅ Дата HALOS: *{pro_exit_date}*\n"
+            "✅ На *{months_saved} мес* быстрее к свободе\n"
+            "✅ *{savings_at_exit}* сум личного капитала\n\n"
+            "👇 _Быстрее к свободе и росту капитала с PRO_"
         )
     },
     
@@ -816,63 +854,63 @@ MESSAGES = {
         "uz": (
             "\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💎 *PRO GA O'TISH*\n"
+            "💎 *HALOS PRO*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "PRO bilan siz olasiz:\n\n"
-            "✓ Qarzdan *tezroq* chiqish\n"
-            "✓ *Jamg'arma* yig'ish\n"
-            "✓ Moliyaviy *stress* dan xalos bo'lish\n"
-            "✓ *Haqiqiy reja* olish\n\n"
-            "👇 Hoziroq boshlang!"
+            "✓ *Tezroq* moliyaviy yengillik\n"
+            "✓ Shaxsiy *kapital qurish*\n"
+            "✓ Moliyaviy *xotirjamlik*\n"
+            "✓ *Aniq yo'l* — HALOS sanangiz\n\n"
+            "👇 Tinch kelajak uchun boshlang"
         ),
         "ru": (
             "\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💎 *ПЕРЕЙТИ НА PRO*\n"
+            "💎 *HALOS PRO*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "С PRO вы получите:\n\n"
-            "✓ Выйти из долга *быстрее*\n"
-            "✓ Начать *копить*\n"
-            "✓ Избавиться от *финансового стресса*\n"
-            "✓ Получить *реальный план*\n\n"
-            "👇 Начните сейчас!"
+            "✓ *Быстрее* к финансовой лёгкости\n"
+            "✓ Рост личного *капитала*\n"
+            "✓ Финансовое *спокойствие*\n"
+            "✓ *Точный путь* — ваша дата HALOS\n\n"
+            "👇 Начните путь к спокойствию"
         )
     },
     
     "result_wealth_mode": {
         "uz": (
-            "� *TABRIKLAYMIZ!*\n\n"
-            "Siz qarzsiz — endi boylik yaratish vaqti keldi.\n\n"
+            "🌟 *TABRIKLAYMIZ — SIZ ERKINLIKDASIZ!*\n\n"
+            "Moliyaviy yuk ortda qoldi. Endi boylik qurish vaqti.\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Oylik taqsimot:*\n\n"
-            "📈 Investitsiya: *{invest}* so'm\n"
-            "💰 Jamg'arma: *{savings}* so'm\n"
-            "🏠 Yashash uchun: *{living}* so'm\n\n"
+            "📊 *Oylik balans:*\n\n"
+            "📈 Kelajak kapitali: *{invest}* so'm\n"
+            "💎 Moliyaviy aktiv: *{savings}* so'm\n"
+            "🏠 Xotirjam yashash: *{living}* so'm\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "🚀 *12 oyda sizning yutuqlaringiz:*\n\n"
-            "• Jamg'arma: *{savings_12}* so'm\n"
-            "• Investitsiya: *{invest_12}* so'm\n"
+            "🚀 *12 oyda sizning kapitalingiz:*\n\n"
+            "• Moliyaviy aktiv: *{savings_12}* so'm\n"
+            "• Kelajak kapitali: *{invest_12}* so'm\n"
             "• Jami boylik: *{total_12}* so'm\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
             "✨ Har oyda pulingiz siz uchun ishlaydi.\n"
-            "Siz erkin — endi boylik qurasiz."
+            "Siz erkin — endi shaxsiy kapital qurasiz."
         ),
         "ru": (
-            "🎉 *ПОЗДРАВЛЯЕМ!*\n\n"
-            "Вы свободны от долгов — пора создавать богатство.\n\n"
+            "🌟 *ПОЗДРАВЛЯЕМ — ВЫ СВОБОДНЫ!*\n\n"
+            "Финансовое бремя позади. Время строить капитал.\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Ежемесячное распределение:*\n\n"
-            "📈 Инвестиции: *{invest}* сум\n"
-            "💰 Накопления: *{savings}* сум\n"
-            "🏠 На жизнь: *{living}* сум\n\n"
+            "📊 *Ежемесячный баланс:*\n\n"
+            "📈 Будущий капитал: *{invest}* сум\n"
+            "💎 Финансовые активы: *{savings}* сум\n"
+            "🏠 Спокойная жизнь: *{living}* сум\n\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "🚀 *Ваши достижения за 12 месяцев:*\n\n"
-            "• Накопления: *{savings_12}* сум\n"
-            "• Инвестиции: *{invest_12}* сум\n"
+            "🚀 *Ваш капитал за 12 месяцев:*\n\n"
+            "• Финансовые активы: *{savings_12}* сум\n"
+            "• Будущий капитал: *{invest_12}* сум\n"
             "• Всего капитал: *{total_12}* сум\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
             "✨ Каждый месяц ваши деньги работают на вас.\n"
-            "Вы свободны — теперь строите богатство."
+            "Вы свободны — теперь строите личный капитал."
         )
     },
     
@@ -937,28 +975,28 @@ MESSAGES = {
     
     "help": {
         "uz": (
-            "ℹ️ *SOLVO yordam*\n\n"
+            "ℹ️ *HALOS yordam*\n\n"
             "*Buyruqlar:*\n"
             "/start — Qayta boshlash\n"
             "/help — Yordam\n"
-            "/status — Joriy rejangiz\n"
+            "/status — Joriy yo'lingiz\n"
             "/language — Tilni o'zgartirish\n\n"
-            "*SOLVO nima?*\n"
-            "SOLVO — qarzdan erkinlikka, erkinlikdan boylikka yo'l.\n\n"
+            "*HALOS nima?*\n"
+            "HALOS — moliyaviy yukdan xalos bo'lib, shaxsiy kapital qurish yo'li.\n\n"
             "*Savollar bo'lsa:*\n"
-            "Telegram: @solvo_support"
+            "Telegram: @halos_support"
         ),
         "ru": (
-            "ℹ️ *Помощь SOLVO*\n\n"
+            "ℹ️ *Помощь HALOS*\n\n"
             "*Команды:*\n"
             "/start — Перезапуск\n"
             "/help — Помощь\n"
-            "/status — Ваш текущий план\n"
+            "/status — Ваш текущий путь\n"
             "/language — Сменить язык\n\n"
-            "*Что такое SOLVO?*\n"
-            "SOLVO — путь от долгов к свободе, от свободы к богатству.\n\n"
+            "*Что такое HALOS?*\n"
+            "HALOS — путь от финансового бремени к свободе и личному капиталу.\n\n"
             "*Есть вопросы?*\n"
-            "Telegram: @solvo_support"
+            "Telegram: @halos_support"
         )
     },
     
@@ -979,8 +1017,8 @@ MESSAGES = {
     },
     
     "error_contact_mismatch": {
-        "uz": "❌ Iltimos, o'zingizning telefon raqamingizni ulashing.",
-        "ru": "❌ Пожалуйста, поделитесь своим собственным номером телефона."
+        "uz": "❌ Iltimos, o'zingizning raqamingiz bilan ro'yxatdan o'ting.",
+        "ru": "❌ Пожалуйста, зарегистрируйтесь со своим номером."
     },
     
     # ==================== BUTTONS ====================
@@ -1089,33 +1127,33 @@ MESSAGES = {
     
     "premium_pricing": {
         "uz": (
-            "💎 *SOLVO PRO*\n\n"
-            "Siz hozir *{simple_months} oy*da qarzdan chiqasiz.\n"
+            "💎 *HALOS PRO*\n\n"
+            "Hozirgi yo'lingiz bilan *{simple_months} oy*da yengillik.\n"
             "PRO bilan *{pro_months} oy*da — *{months_saved} oy tezroq!*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *PRO BILAN SIZ OLASIZ:*\n"
+            "🌟 *PRO BILAN SIZ OLASIZ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Aniq sana* — qachon qarzsiz bo'lishingizni bilasiz\n"
-            "✅ *Tezkor chiqish* — bir necha oy oldin erkinlikka\n"
-            "✅ *Jamg'arma* — qarz to'layotganda ham pul yig'asiz\n"
-            "✅ *Oylik reja* — qancha sarflash, qancha yig'ish\n"
-            "✅ *12 oylik prognoz* — kelajakni ko'rasiz\n\n"
+            "✅ *HALOS sanangiz* — erkinlik sanasini bilasiz\n"
+            "✅ *Tezroq yengillik* — bir necha oy oldin erkinlikka\n"
+            "✅ *Shaxsiy kapital* — yuk to'layotganda ham kapital qurasiz\n"
+            "✅ *Oylik balans* — qancha sarflash, qancha yig'ish\n"
+            "✅ *12 oylik yo'l* — kelajakni ko'rasiz\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━"
         ),
         "ru": (
-            "💎 *SOLVO PRO*\n\n"
-            "Сейчас вы выйдете из долга за *{simple_months} мес*.\n"
+            "💎 *HALOS PRO*\n\n"
+            "Обычным путём свобода через *{simple_months} мес*.\n"
             "С PRO за *{pro_months} мес* — *на {months_saved} мес быстрее!*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
+            "🌟 *С PRO ВЫ ПОЛУЧИТЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Точная дата* — знаете когда станете свободны\n"
-            "✅ *Быстрый выход* — на несколько месяцев раньше\n"
-            "✅ *Накопления* — копите даже выплачивая долг\n"
-            "✅ *Месячный план* — сколько тратить, сколько копить\n"
-            "✅ *Прогноз на 12 мес* — видите будущее\n\n"
+            "✅ *Дата HALOS* — знаете когда станете свободны\n"
+            "✅ *Быстрее к лёгкости* — на несколько мес раньше\n"
+            "✅ *Личный капитал* — создаёте даже выплачивая бремя\n"
+            "✅ *Баланс месяца* — сколько тратить, сколько растить\n"
+            "✅ *Путь на 12 мес* — видите будущее\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━"
@@ -1174,18 +1212,18 @@ MESSAGES = {
     
     "payment_success": {
         "uz": (
-            "🎉 *Tabriklaymiz!*\n\n"
-            "Siz endi *SOLVO PRO* foydalanuvchisisiz!\n\n"
+            "� *Tabriklaymiz!*\n\n"
+            "Siz endi *HALOS PRO* foydalanuvchisisiz.\n\n"
             "✅ Obunangiz {days} kunga faollashtirildi.\n"
             "⏳ Amal qilish muddati: {date}\n\n"
-            "Barcha PRO imkoniyatlardan foydalaning! 💎"
+            "Tezroq erkinlik va kapital qurish yo'lida!"
         ),
         "ru": (
-            "🎉 *Поздравляем!*\n\n"
-            "Теперь вы пользователь *SOLVO PRO*!\n\n"
+            "🌟 *Поздравляем!*\n\n"
+            "Теперь вы пользователь *HALOS PRO*.\n\n"
             "✅ Подписка активирована на {days} дней.\n"
             "⏳ Действует до: {date}\n\n"
-            "Пользуйтесь всеми PRO возможностями! 💎"
+            "На пути к свободе и росту капитала!"
         )
     },
     
@@ -1363,18 +1401,18 @@ MESSAGES = {
     
     "why_pro_stats": {
         "uz": (
-            "📊 *SOLVO PRO foydalanuvchilari statistikasi:*\n\n"
-            "• 📉 O'rtacha *47%* tezroq qarzdan chiqishadi\n"
-            "• 💰 Oyiga *300,000+* so'm tejashadi\n"
-            "• 🎯 *89%* maqsadlariga erishishadi\n\n"
-            "Siz ham ulardan biri bo'ling! 💎"
+            "📊 *HALOS PRO foydalanuvchilari statistikasi:*\n\n"
+            "• 🕊 O'rtacha *47%* tezroq yengillikka erishadilar\n"
+            "• 💎 Oyiga *300,000+* so'm kapital qurishadi\n"
+            "• 🌟 *89%* moliyaviy tinchlikka erishadilar\n\n"
+            "Siz ham ulardan biri bo'ling!"
         ),
         "ru": (
-            "📊 *Статистика пользователей SOLVO PRO:*\n\n"
-            "• 📉 Выходят из долгов в среднем на *47%* быстрее\n"
-            "• 💰 Экономят *300,000+* сум в месяц\n"
-            "• 🎯 *89%* достигают своих целей\n\n"
-            "Станьте одним из них! 💎"
+            "📊 *Статистика пользователей HALOS PRO:*\n\n"
+            "• 🕊 Достигают свободы в среднем на *47%* быстрее\n"
+            "• 💎 Создают *300,000+* сум капитала в месяц\n"
+            "• 🌟 *89%* достигают финансового спокойствия\n\n"
+            "Станьте одним из них!"
         )
     },
     
@@ -1502,16 +1540,16 @@ MESSAGES = {
     
     "debt_free_message": {
         "uz": (
-            "🎉 *TABRIKLAYMIZ!*\n\n"
-            "Sizda qarz yo'q!\n\n"
-            "Endi boylik rejimiga o'tish vaqti.\n"
-            "Jamg'arish va investitsiya qilishni boshlang! 🚀"
+            "✨ *SIZ ERKINLIKDASIZ!*\n\n"
+            "Sizda moliyaviy yuk yo'q.\n\n"
+            "Endi shaxsiy kapital qurish vaqti.\n"
+            "Kelajak kapitalingizni boshlang! 🌟"
         ),
         "ru": (
-            "🎉 *ПОЗДРАВЛЯЕМ!*\n\n"
-            "У вас нет долгов!\n\n"
-            "Пора переходить в режим богатства.\n"
-            "Начните копить и инвестировать! 🚀"
+            "✨ *ВЫ СВОБОДНЫ!*\n\n"
+            "У вас нет финансового бремени.\n\n"
+            "Теперь время строить личный капитал.\n"
+            "Начните создавать будущий капитал! 🌟"
         )
     },
     
@@ -1851,20 +1889,20 @@ MESSAGES = {
     # Celebration messages
     "debt_free_congrats": {
         "uz": (
-            "🎉🎉🎉\n\n"
-            "*TABRIKLAYMIZ!*\n\n"
-            "Siz qarzdan *OZOD* bo'ldingiz!\n\n"
-            "Bu — sizning qattiq mehnatingiz natijasi.\n"
-            "Endi boylik rejimiga o'tish vaqti!\n\n"
-            "🚀 Yangi bosqichga tayyormisiz?"
+            "✨✨✨\n\n"
+            "*SIZ ERKINLIKKA ERISHDINGIZ!*\n\n"
+            "Moliyaviy yuk ortda qoldi.\n\n"
+            "Bu sizning mehnatingiz natijasi.\n"
+            "Endi shaxsiy kapital qurish vaqti!\n\n"
+            "🌟 Yangi bosqichga tayyormisiz?"
         ),
         "ru": (
-            "🎉🎉🎉\n\n"
-            "*ПОЗДРАВЛЯЕМ!*\n\n"
-            "Вы *СВОБОДНЫ* от долгов!\n\n"
-            "Это результат вашего упорного труда.\n"
-            "Теперь время перейти к режиму богатства!\n\n"
-            "🚀 Готовы к новому этапу?"
+            "✨✨✨\n\n"
+            "*ВЫ ДОСТИГЛИ СВОБОДЫ!*\n\n"
+            "Финансовое бремя позади.\n\n"
+            "Это результат вашего труда.\n"
+            "Теперь время строить личный капитал!\n\n"
+            "🌟 Готовы к новому этапу?"
         )
     },
 }

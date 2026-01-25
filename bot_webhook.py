@@ -1,5 +1,5 @@
 """
-SOLVO Telegram Bot - Webhook Mode for Render.com
+HALOS Telegram Bot - Webhook Mode for Render.com
 With Click Payment Integration
 """
 import os
@@ -109,7 +109,7 @@ def create_telegram_app():
 
 @flask_app.route("/")
 def index():
-    return "SOLVO Bot is running!", 200
+    return "HALOS Bot is running!", 200
 
 
 @flask_app.route("/health")
@@ -170,8 +170,8 @@ def click_prepare():
     sign_time = data.get('sign_time', '')
     sign_string = data.get('sign_string', '')
     
-    # Validate merchant_trans_id format (solvo_{telegram_id}_{plan_id})
-    if not merchant_trans_id.startswith('solvo_'):
+    # Validate merchant_trans_id format (halos_{telegram_id}_{plan_id})
+    if not merchant_trans_id.startswith('halos_'):
         return jsonify({
             "error": "-5",
             "error_note": "Invalid order format"
@@ -260,7 +260,7 @@ def click_complete():
                 async def send_success_message():
                     await telegram_app.bot.send_message(
                         chat_id=telegram_id,
-                        text="✅ To'lov muvaffaqiyatli amalga oshirildi!\n\n🎉 Siz endi SOLVO PRO foydalanuvchisisiz!\n\n/start buyrug'ini bosing."
+                        text="✅ To'lov muvaffaqiyatli amalga oshirildi!\n\n🎉 Siz endi HALOS PRO foydalanuvchisisiz!\n\n/start buyrug'ini bosing."
                     )
                 asyncio.get_event_loop().run_until_complete(send_success_message())
         except Exception as e:

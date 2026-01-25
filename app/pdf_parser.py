@@ -1,5 +1,5 @@
 """
-SOLVO KATM PDF Parser
+HALOS KATM PDF Parser
 Parses credit history PDFs from infokredit.uz
 """
 import re
@@ -316,6 +316,44 @@ class KATMPDFParser:
             return 0
 
 
+def _extract_amount(text: str) -> float:
+    """Extract numeric amount from text"""
+    if not text:
+        return 0
+    
+    # Remove non-numeric characters except dots, commas, and spaces
+    cleaned = re.sub(r'[^\d,\.\s]', '', str(text))
+    cleaned = cleaned.strip()
+    
+    if not cleaned:
+        return 0
+    
+    # Handle different number formats
+    # Remove spaces (thousand separators)
+    cleaned = cleaned.replace(' ', '')
+    
+    # Handle comma as thousand separator or decimal
+    if ',' in cleaned and '.' in cleaned:
+        # Both present - comma is thousand sep, dot is decimal
+        cleaned = cleaned.replace(',', '')
+    elif cleaned.count(',') > 1:
+        # Multiple commas - they are thousand separators
+        cleaned = cleaned.replace(',', '')
+    elif ',' in cleaned:
+        # Single comma - check if it's decimal (2 digits after) or thousand sep
+        parts = cleaned.split(',')
+        if len(parts[-1]) == 2:
+            # Likely decimal
+            cleaned = cleaned.replace(',', '.')
+        else:
+            cleaned = cleaned.replace(',', '')
+    
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0
+
+
 def parse_katm_pdf(pdf_path: str) -> KATMParseResult:
     """
     Convenience function to parse KATM PDF
@@ -332,7 +370,13 @@ def parse_katm_pdf(pdf_path: str) -> KATMParseResult:
 
 def parse_katm_html(html_path: str) -> KATMParseResult:
     """
-    Parse KATM credit history from HTML file
+    Parse KATM credit history from HTML file (infokredit.uz format)
+    
+    Structure of infokredit.uz HTML:
+    - Section "AMALDAGI SHARTNOMALAR" (Active contracts)
+    - Table columns: №, QARZ BERUVCHI, SHARTNOMA RAQAMI, VALYUTA, 
+                     UMUMIY QARZ QOLDIG'I, MUDDATI O'TGAN QISMI, O'RTACHA OYLIK TO'LOV
+    - Last row "Jami" contains totals
     
     Args:
         html_path: Path to the HTML file
@@ -352,95 +396,175 @@ def parse_katm_html(html_path: str) -> KATMParseResult:
         total_debt = 0
         total_monthly = 0
         
-        # Common bank names
-        bank_names = [
-            "XALQ BANKI", "AGROBANK", "ASAKA BANK", "IPOTEKA BANK", 
-            "HAMKORBANK", "KAPITALBANK", "UZPROMSTROYBANK", "ALOQABANK",
-            "INFINBANK", "TURKISTON BANK", "ANOR BANK", "IPAK YO'LI",
-            "НАРОДНЫЙ БАНК", "АГРОБАНК", "ИПОТЕКА БАНК"
-        ]
+        # Find "AMALDAGI SHARTNOMALAR" section (Active contracts)
+        # This section contains current active loans
+        active_section = None
         
-        # Try to find tables with loan data
-        tables = soup.find_all('table')
+        # Look for text containing "AMALDAGI" or "AMALDAGI SHARTNOMALAR"
+        for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'td', 'th', 'strong', 'b']):
+            text = element.get_text(strip=True).upper()
+            if 'AMALDAGI SHARTNOMALAR' in text or 'AMALDAGI' in text:
+                active_section = element
+                break
         
-        for table in tables:
-            rows = table.find_all('tr')
+        # Find the table after "AMALDAGI SHARTNOMALAR"
+        target_table = None
+        if active_section:
+            # Look for next table after this element
+            next_elem = active_section.find_next('table')
+            if next_elem:
+                target_table = next_elem
+        
+        # If no active section found, try to find table with correct headers
+        if not target_table:
+            for table in soup.find_all('table'):
+                table_text = table.get_text().upper()
+                if ('QARZ BERUVCHI' in table_text or 'КРЕДИТОР' in table_text) and \
+                   ('OYLIK TO\'LOV' in table_text or 'ЕЖЕМЕС' in table_text or 'O\'RTACHA' in table_text):
+                    target_table = table
+                    break
+        
+        if target_table:
+            rows = target_table.find_all('tr')
+            
+            # Find column indices from headers
+            headers = []
+            header_row = None
             
             for row in rows:
-                cells = row.find_all(['td', 'th'])
+                cells = row.find_all(['th', 'td'])
                 row_text = ' '.join(cell.get_text(strip=True) for cell in cells).upper()
                 
-                # Check if this row contains bank info
-                bank_found = None
-                for bank in bank_names:
-                    if bank.upper() in row_text:
-                        bank_found = bank
-                        break
-                
-                if bank_found:
-                    # Try to extract amounts from this row
-                    amounts = []
-                    for cell in cells:
-                        cell_text = cell.get_text(strip=True)
-                        # Look for numeric values
-                        amount_match = re.findall(r'[\d\s,\.]+', cell_text)
-                        for match in amount_match:
-                            cleaned = re.sub(r'[^\d]', '', match)
-                            if cleaned and len(cleaned) >= 4:  # At least 1000
-                                try:
-                                    amounts.append(float(cleaned))
-                                except:
-                                    pass
-                    
-                    if amounts:
-                        loan = ParsedLoan(
-                            bank_name=bank_found,
-                            remaining_balance=max(amounts),
-                            status="active"
-                        )
-                        
-                        # Try to estimate monthly payment (assume 3% of balance)
-                        loan.monthly_payment = loan.remaining_balance * 0.03
-                        
-                        loans.append(loan)
-                        total_debt += loan.remaining_balance
-                        total_monthly += loan.monthly_payment
-        
-        # If no tables, try to parse raw text
-        if not loans:
-            text = soup.get_text()
+                if 'QARZ BERUVCHI' in row_text or 'SHARTNOMA' in row_text or '№' in row_text:
+                    header_row = row
+                    headers = [cell.get_text(strip=True).upper() for cell in cells]
+                    break
             
-            # Find bank mentions and nearby amounts
-            for bank in bank_names:
-                if bank.upper() in text.upper():
-                    # Find amounts near bank name
-                    pattern = rf'{re.escape(bank)}[^0-9]*?([\d\s,\.]+)'
-                    matches = re.findall(pattern, text, re.IGNORECASE)
+            # Identify column indices
+            bank_col = None  # QARZ BERUVCHI
+            balance_col = None  # UMUMIY QARZ QOLDIG'I
+            monthly_col = None  # O'RTACHA OYLIK TO'LOV
+            
+            for i, header in enumerate(headers):
+                if 'QARZ BERUVCHI' in header or 'КРЕДИТОР' in header:
+                    bank_col = i
+                elif 'QARZ QOLDIG' in header or 'UMUMIY QARZ' in header or 'ОСТАТОК' in header:
+                    balance_col = i
+                elif 'OYLIK TO\'LOV' in header or 'O\'RTACHA OYLIK' in header or 'ЕЖЕМЕС' in header:
+                    monthly_col = i
+            
+            logger.info(f"Found columns: bank={bank_col}, balance={balance_col}, monthly={monthly_col}")
+            
+            # Parse data rows
+            for row in rows:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) < 3:
+                    continue
+                
+                row_text = ' '.join(cell.get_text(strip=True) for cell in cells).upper()
+                
+                # Skip header row
+                if 'QARZ BERUVCHI' in row_text and 'SHARTNOMA' in row_text:
+                    continue
+                
+                # Check for "Jami" (total) row
+                if 'JAMI' in row_text or 'ИТОГО' in row_text or 'TOTAL' in row_text:
+                    # Extract totals from Jami row
+                    if balance_col is not None and balance_col < len(cells):
+                        jami_debt = _extract_amount(cells[balance_col].get_text(strip=True))
+                        if jami_debt > 0:
+                            total_debt = jami_debt
                     
-                    for match in matches:
-                        cleaned = re.sub(r'[^\d]', '', match)
-                        if cleaned and len(cleaned) >= 6:  # At least 100,000
-                            try:
-                                balance = float(cleaned)
-                                loan = ParsedLoan(
-                                    bank_name=bank,
-                                    remaining_balance=balance,
-                                    monthly_payment=balance * 0.03,
-                                    status="active"
-                                )
-                                loans.append(loan)
-                                total_debt += balance
-                                total_monthly += loan.monthly_payment
-                                break  # One loan per bank mention
-                            except:
-                                pass
+                    if monthly_col is not None and monthly_col < len(cells):
+                        jami_monthly = _extract_amount(cells[monthly_col].get_text(strip=True))
+                        if jami_monthly > 0:
+                            total_monthly = jami_monthly
+                    continue
+                
+                # Extract bank name
+                bank_name = ""
+                if bank_col is not None and bank_col < len(cells):
+                    bank_text = cells[bank_col].get_text(strip=True)
+                    # Extract bank name (usually contains "BANK" or ends with bank identifier)
+                    bank_name = bank_text
+                    # Clean up bank name - get the main part
+                    if '(' in bank_name:
+                        bank_name = bank_name.split('(')[0].strip()
+                
+                if not bank_name:
+                    continue
+                
+                # Extract balance (UMUMIY QARZ QOLDIG'I)
+                balance = 0
+                if balance_col is not None and balance_col < len(cells):
+                    balance = _extract_amount(cells[balance_col].get_text(strip=True))
+                
+                # Extract monthly payment (O'RTACHA OYLIK TO'LOV)
+                monthly = 0
+                if monthly_col is not None and monthly_col < len(cells):
+                    monthly = _extract_amount(cells[monthly_col].get_text(strip=True))
+                
+                if balance > 0:
+                    loan = ParsedLoan(
+                        bank_name=bank_name,
+                        remaining_balance=balance,
+                        monthly_payment=monthly,
+                        status="active"
+                    )
+                    loans.append(loan)
+                    
+                    # If Jami row wasn't found, sum up manually
+                    if total_debt == 0:
+                        total_debt += balance
+                    if total_monthly == 0:
+                        total_monthly += monthly
         
-        if loans:
+        # Fallback: try to find any table with numeric data
+        if not loans:
+            for table in soup.find_all('table'):
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    row_text = ' '.join(cell.get_text(strip=True) for cell in cells).upper()
+                    
+                    # Look for "JAMI" row with totals
+                    if 'JAMI' in row_text:
+                        amounts = []
+                        for cell in cells:
+                            amount = _extract_amount(cell.get_text(strip=True))
+                            if amount >= 10000:
+                                amounts.append(amount)
+                        
+                        if len(amounts) >= 2:
+                            # Usually: larger is total debt, smaller is monthly
+                            amounts.sort(reverse=True)
+                            total_debt = amounts[0]
+                            total_monthly = amounts[-1]  # Last one is usually monthly
+                            
+                            # Create a single loan entry
+                            loans.append(ParsedLoan(
+                                bank_name="KATM",
+                                remaining_balance=total_debt,
+                                monthly_payment=total_monthly,
+                                status="active"
+                            ))
+                            break
+        
+        if loans or (total_debt > 0 and total_monthly > 0):
+            # If we have totals but no individual loans, create summary loan
+            if not loans and total_debt > 0:
+                loans.append(ParsedLoan(
+                    bank_name="Jami kreditlar",
+                    remaining_balance=total_debt,
+                    monthly_payment=total_monthly,
+                    status="active"
+                ))
+            
             return KATMParseResult(
                 success=True,
                 loans=loans,
-                total_remaining_debt=total_debt,
-                total_monthly_payment=total_monthly,
+                total_remaining_debt=total_debt if total_debt > 0 else sum(l.remaining_balance for l in loans),
+                total_monthly_payment=total_monthly if total_monthly > 0 else sum(l.monthly_payment for l in loans),
                 raw_text=soup.get_text()[:1000]
             )
         else:

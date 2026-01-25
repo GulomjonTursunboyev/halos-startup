@@ -1,5 +1,5 @@
 """
-SOLVO Bank Transaction Parser
+HALOS Bank Transaction Parser
 Parses bank card transaction history from various file formats
 Supports: PDF, HTML, Excel (XLSX/XLS), TXT, CSV
 Banks: Click, Payme, Uzcard, Humo, and other Uzbek banks

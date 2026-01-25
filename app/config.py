@@ -1,5 +1,5 @@
 """
-SOLVO Bot Configuration
+HALOS Bot Configuration
 """
 import os
 from pathlib import Path

@@ -1,5 +1,5 @@
 """
-SOLVO Bot Handlers
+HALOS Bot Handlers
 All conversation handlers and command handlers
 """
 import logging
@@ -60,13 +60,13 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Get persistent main menu keyboard"""
     if lang == "ru":
         keyboard = [
-            ["� Выйти из долга"],
+            ["📊 Мои отчёты"],
             ["👤 Профиль", "💎 PRO"],
             ["🌐 Язык", "❓ Помощь"]
         ]
     else:
         keyboard = [
-            ["🚀 Qarzdan chiqish"],
+            ["📊 Hisobotlarim"],
             ["👤 Profil", "💎 PRO"],
             ["🌐 Til", "❓ Yordam"]
         ]
@@ -75,7 +75,7 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
 
 # Main menu button texts for matching
 MENU_BUTTONS = {
-    "plan": ["� Qarzdan chiqish", "🚀 Выйти из долга"],
+    "plan": ["📊 Hisobotlarim", "📊 Мои отчёты"],
     "profile": ["👤 Profil", "👤 Профиль"],
     "subscription": ["💎 PRO", "💎 PRO"],
     "language": ["🌐 Til", "🌐 Язык"],
@@ -247,25 +247,24 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except:
         pass
     
-    # Go directly to mode selection - subscription check will be after results
-    # Ask for mode
-    keyboard = [
-        [
-            InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
-            InlineKeyboardButton(get_message("mode_family", lang), callback_data="mode_family")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Registration complete - show main menu
+    welcome_msg = (
+        "✅ *Ro'yxatdan muvaffaqiyatli o'tdingiz!*\n\n"
+        "Endi quyidagi menyudan foydalanishingiz mumkin 👇"
+    ) if lang == "uz" else (
+        "✅ *Вы успешно зарегистрированы!*\n\n"
+        "Теперь вы можете использовать меню ниже 👇"
+    )
     
     chat_id = update.effective_chat.id
     await context.bot.send_message(
         chat_id=chat_id,
-        text=get_message("select_mode", lang),
+        text=welcome_msg,
         parse_mode="Markdown",
-        reply_markup=reply_markup
+        reply_markup=get_main_menu_keyboard(lang)
     )
     
-    return States.MODE
+    return ConversationHandler.END
 
 
 # ==================== MODE SELECTION ====================
@@ -1725,12 +1724,6 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
             reply_markup=offer_markup
         )
     
-    # Show main menu keyboard
-    await update.message.reply_text(
-        "⬇️" if lang == "uz" else "⬇️",
-        reply_markup=get_main_menu_keyboard(lang)
-    )
-    
     return ConversationHandler.END
 
 
@@ -1847,12 +1840,6 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
             reply_markup=offer_markup
         )
     
-    # Show main menu keyboard
-    await query.message.reply_text(
-        "⬇️",
-        reply_markup=get_main_menu_keyboard(lang)
-    )
-    
     return ConversationHandler.END
 
 
@@ -1960,12 +1947,6 @@ async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
     
-    # Show main menu keyboard
-    await query.message.reply_text(
-        "⬇️",
-        reply_markup=get_main_menu_keyboard(lang)
-    )
-    
     return ConversationHandler.END
 
 
@@ -2021,7 +2002,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # ==================== PROFILE MANAGEMENT ====================
 
 async def build_profile_content(user: dict, profile: dict, lang: str, telegram_id: int) -> tuple:
-    """Build profile text and keyboard for display - shows user info and subscription status"""
+    """Build profile text and keyboard for display - shows user info, financial data and subscription status"""
     from datetime import datetime
     
     # Get user personal info - only first name, ignore last name
@@ -2030,6 +2011,7 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     first_name = first_name if first_name and first_name != "None" else ""
     display_name = first_name.strip() or ("Foydalanuvchi" if lang == "uz" else "Пользователь")
     phone = user.get("phone_number", "")
+    mode = user.get("mode", "solo")
     
     # Get subscription status
     is_pro = await get_user_subscription_status(telegram_id)
@@ -2052,21 +2034,82 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     else:
         sub_status = "🆓 Bepul" if lang == "uz" else "🆓 Бесплатный"
     
-    # Build profile header with personal info
+    # Get financial data from profile
+    income_self = profile.get("income_self", 0) if profile else 0
+    income_partner = profile.get("income_partner", 0) if profile else 0
+    rent = profile.get("rent", 0) if profile else 0
+    kindergarten = profile.get("kindergarten", 0) if profile else 0
+    utilities = profile.get("utilities", 0) if profile else 0
+    loan_payment = profile.get("loan_payment", 0) if profile else 0
+    total_debt = profile.get("total_debt", 0) if profile else 0
+    
+    # Mode text
+    if lang == "uz":
+        mode_text = "👤 Yolg'iz" if mode == "solo" else "👥 Oila"
+    else:
+        mode_text = "👤 Один" if mode == "solo" else "👥 Семья"
+    
+    # Build profile with all financial data
     if lang == "uz":
         profile_text = (
             f"👤 *{display_name}*\n"
             f"📱 {phone}\n"
             f"📊 Obuna: {sub_status}\n"
+            f"🏠 Rejim: {mode_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *DAROMADLAR:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Mening daromadim: *{format_number(income_self)} so'm*\n"
+        )
+        if mode == "family" or income_partner > 0:
+            profile_text += f"└ Sherik daromadi: *{format_number(income_partner)} so'm*\n"
+        else:
+            profile_text = profile_text.replace("├ Mening", "└ Mening")
+        
+        profile_text += (
+            f"\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"📋 *XARAJATLAR:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Ijara: *{format_number(rent)} so'm*\n"
+            f"├ Majburiy to'lovlar: *{format_number(kindergarten)} so'm*\n"
+            f"└ Kommunal: *{format_number(utilities)} so'm*\n"
+            f"\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"🏦 *KREDIT:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Oylik to'lov: *{format_number(loan_payment)} so'm*\n"
+            f"└ Umumiy qarz: *{format_number(total_debt)} so'm*\n"
         )
     else:
         profile_text = (
             f"👤 *{display_name}*\n"
             f"📱 {phone}\n"
             f"📊 Подписка: {sub_status}\n"
+            f"🏠 Режим: {mode_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *ДОХОДЫ:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Мой доход: *{format_number(income_self)} сум*\n"
+        )
+        if mode == "family" or income_partner > 0:
+            profile_text += f"└ Доход партнёра: *{format_number(income_partner)} сум*\n"
+        else:
+            profile_text = profile_text.replace("├ Мой", "└ Мой")
+        
+        profile_text += (
+            f"\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"📋 *РАСХОДЫ:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Аренда: *{format_number(rent)} сум*\n"
+            f"├ Обязат. платежи: *{format_number(kindergarten)} сум*\n"
+            f"└ Коммунальные: *{format_number(utilities)} сум*\n"
+            f"\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"🏦 *КРЕДИТ:*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"├ Ежемес. платёж: *{format_number(loan_payment)} сум*\n"
+            f"└ Общий долг: *{format_number(total_debt)} сум*\n"
         )
     
-    # Create keyboard - only edit buttons for financial data
+    # Create keyboard - edit buttons for financial data
     keyboard = [
         [
             InlineKeyboardButton(get_message("btn_edit_income_self", lang), callback_data="edit_income_self"),
@@ -2116,15 +2159,8 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     profile = await db.get_financial_profile(user["id"])
     
-    if not profile:
-        await update.message.reply_text(
-            get_message("profile_no_data", lang),
-            parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(lang)
-        )
-        return
-    
-    # Build profile content
+    # Build profile content even if no financial profile yet
+    # profile can be None, build_profile_content handles it
     full_text, keyboard = await build_profile_content(user, profile, lang, telegram_id)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -2152,11 +2188,7 @@ async def show_profile_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     profile = await db.get_financial_profile(user["id"])
     
-    if not profile:
-        await query.edit_message_text(get_message("profile_no_data", lang))
-        return
-    
-    # Build profile content using shared helper
+    # Build profile content even if no financial profile yet
     full_text, keyboard = await build_profile_content(user, profile, lang, telegram_id)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -2503,7 +2535,7 @@ def add_trial_handler_to_app(application):
 # ==================== MAIN MENU HANDLERS ====================
 
 async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 🚀 Qarzdan chiqish button - show FREE vs PRO debt exit options"""
+    """Handle 📊 Hisobotlarim button - show comprehensive financial report"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -2511,143 +2543,333 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     db = await get_database()
     user = await db.get_user(telegram_id)
     
-    # Update activity for PRO care scheduler
-    await db.update_user_activity(telegram_id)
-    
-    if not user:
+    # Check if user is registered
+    if not user or not user.get("phone_number"):
         await update.message.reply_text(
-            get_message("debt_no_data", lang),
-            parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(lang)
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
         )
         return
     
-    profile = await db.get_financial_profile(user["id"])
+    # Update activity for PRO care scheduler
+    await db.update_user_activity(telegram_id)
     
-    if not profile or profile.get("total_debt", 0) == 0:
-        # No debt - show congratulations
+    profile = await db.get_financial_profile(user["id"]) if user else None
+    
+    # If no profile yet, start the data collection flow
+    if not profile:
+        # Ask for mode (solo/family)
+        keyboard = [
+            [
+                InlineKeyboardButton(get_message("mode_solo", lang), callback_data="mode_solo"),
+                InlineKeyboardButton(get_message("mode_family", lang), callback_data="mode_family")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await update.message.reply_text(
-            get_message("debt_free_message", lang),
+            get_message("select_mode", lang),
             parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(lang)
+            reply_markup=reply_markup
         )
         return
     
     # Check PRO status
     is_pro = await is_user_pro(telegram_id)
     
-    # Get debt info for preview
-    total_debt = profile.get("total_debt", 0)
-    loan_payment = profile.get("loan_payment", 0)
+    # ==================== MA'LUMOTLARNI YIGISH ====================
+    income_self = profile.get("income_self", 0) or 0
+    income_partner = profile.get("income_partner", 0) or 0
+    total_income = income_self + income_partner
     
+    rent = profile.get("rent", 0) or 0
+    kindergarten = profile.get("kindergarten", 0) or 0
+    utilities = profile.get("utilities", 0) or 0
+    loan_payment = profile.get("loan_payment", 0) or 0
+    total_debt = profile.get("total_debt", 0) or 0
+    
+    mandatory_total = rent + kindergarten + utilities + loan_payment
+    free_cash = total_income - mandatory_total
+    
+    # ==================== QARZDAN CHIQISH HISOBLASH ====================
     import math
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
-    from app.engine import FinancialInput, format_exit_date
+    from app.engine import format_exit_date
     
-    # Calculate simple exit (FREE)
-    simple_exit_months = math.ceil(total_debt / loan_payment) if loan_payment > 0 else 0
-    simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
+    # Oddiy usul (faqat minimal to'lov)
+    if loan_payment > 0 and total_debt > 0:
+        simple_exit_months = math.ceil(total_debt / loan_payment)
+        simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
+        simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
+    else:
+        simple_exit_months = 0
+        simple_exit_formatted = "-"
     
-    # Calculate PRO exit
-    income = profile.get("income_self", 0) + profile.get("income_partner", 0)
-    mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
-    free_cash = income - mandatory - loan_payment
-    
-    if free_cash > 0:
+    # PRO usul (aqlli taqsimlash)
+    if free_cash > 0 and total_debt > 0:
+        # 70% yashash, 20% qo'shimcha qarz, 10% boylik
         extra_debt = free_cash * 0.2
-        total_payment = loan_payment + extra_debt
-        pro_exit_months = math.ceil(total_debt / total_payment)
         savings_monthly = free_cash * 0.1
+        total_payment = loan_payment + extra_debt
+        pro_exit_months = math.ceil(total_debt / total_payment) if total_payment > 0 else 0
+        pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
+        pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
         savings_at_exit = savings_monthly * pro_exit_months
+        months_saved = simple_exit_months - pro_exit_months
+        
+        # Aqlli taqsimlash
+        living_budget = free_cash * 0.7
     else:
         pro_exit_months = simple_exit_months
+        pro_exit_formatted = simple_exit_formatted
         savings_at_exit = 0
+        months_saved = 0
+        extra_debt = 0
+        savings_monthly = 0
+        living_budget = 0
     
-    months_saved = simple_exit_months - pro_exit_months
-    pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
+    # ==================== AI TRANZAKSIYALAR ====================
+    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES, INCOME_CATEGORIES, get_debt_summary
     
-    # Format dates
-    simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
-    pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
+    try:
+        ai_summary = await get_transaction_summary(db, user["id"], days=30)
+    except:
+        ai_summary = {"total_income": 0, "total_expense": 0, "income_by_category": {}, "expense_by_category": {}}
     
+    ai_income = ai_summary.get("total_income", 0)
+    ai_expense = ai_summary.get("total_expense", 0)
+    
+    # ==================== SHAXSIY QARZLAR ====================
+    try:
+        debt_summary = await get_debt_summary(db, user["id"])
+    except:
+        debt_summary = {"total_lent": 0, "total_borrowed": 0, "net_balance": 0, "lent_count": 0, "borrowed_count": 0}
+    
+    # ==================== HISOBOT FORMATLASH ====================
     if lang == "uz":
         msg = (
-            "🚀 *QARZDAN CHIQISH USULLARINI TANLANG*\n"
+            "📊 *MENING HISOBOTLARIM*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"💳 Sizning qarzingiz: *{format_number(total_debt)} so'm*\n\n"
             
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🆓 *BEPUL USUL:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📅 Chiqish muddati: *{simple_exit_months} oy*\n"
-            f"📆 Sana: *{simple_exit_formatted}*\n"
-            "💰 Boylik: *0 so'm* (yig'ilmaydi)\n"
-            "📊 Usul: Faqat minimal to'lov\n\n"
-            
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💎 *PRO USUL (Tavsiya):*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📅 Chiqish muddati: *{pro_exit_months} oy*\n"
-            f"📆 Sana: *{pro_exit_formatted}*\n"
-            f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
-            f"💰 Boylik: *{format_number(int(savings_at_exit))} so'm*\n"
-            "📊 Usul: Aqlli taqsimlash\n"
-            "📋 Qarz nazorati, statistika, Excel\n\n"
-            
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "👇 *Qaysi usulni tanlaysiz?*"
+            "💰 *DAROMADLAR:*\n"
+            f"├ Shaxsiy: *{income_self:,}* so'm\n"
         )
+        if income_partner > 0:
+            msg += f"├ Sherik: *{income_partner:,}* so'm\n"
+        msg += f"└ Jami: *{total_income:,}* so'm\n\n"
+        
+        msg += (
+            "📌 *MAJBURIY TO'LOVLAR:*\n"
+            f"├ 🏠 Ijara: *{rent:,}* so'm\n"
+            f"├ 👶 Bog'cha: *{kindergarten:,}* so'm\n"
+            f"├ 💡 Kommunal: *{utilities:,}* so'm\n"
+            f"├ 💳 Kredit to'lovi: *{loan_payment:,}* so'm\n"
+            f"└ Jami majburiy: *{mandatory_total:,}* so'm\n\n"
+        )
+        
+        if total_debt > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "💳 *QARZ HOLATI:*\n"
+                f"├ Umumiy qarz: *{total_debt:,}* so'm\n"
+                f"└ Bo'sh pul: *{free_cash:,}* so'm\n\n"
+                
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🌿 *ODDIY USUL:*\n"
+                f"├ Muddat: *{simple_exit_months}* oy\n"
+                f"├ Sana: *{simple_exit_formatted}*\n"
+                f"└ Usul: Faqat minimal to'lov\n\n"
+            )
+            
+            if is_pro:
+                msg += (
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "🌟 *HALOS PRO USULI:*\n"
+                    f"├ Muddat: *{pro_exit_months}* oy\n"
+                    f"├ Sana: *{pro_exit_formatted}*\n"
+                    f"├ ⏱ *{months_saved}* oy tezroq\n"
+                    f"├ 💎 Kapital: *{savings_at_exit:,.0f}* so'm\n"
+                    f"├ Oylik qo'shimcha: *{extra_debt:,.0f}* so'm\n"
+                    f"└ Oylik jamg'arma: *{savings_monthly:,.0f}* so'm\n\n"
+                    
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "📋 *AQLLI TAQSIMLASH:*\n"
+                    f"├ 🏠 Yashash (70%): *{living_budget:,.0f}* so'm\n"
+                    f"├ ⚡ Qarz (20%): *{extra_debt:,.0f}* so'm\n"
+                    f"└ 🏦 Boylik (10%): *{savings_monthly:,.0f}* so'm\n\n"
+                )
+            else:
+                msg += (
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "🔒 *HALOS PRO USULI:*\n"
+                    f"├ Muddat: *{pro_exit_months}* oy\n"
+                    f"├ ⏱ *{months_saved}* oy tezroq\n"
+                    f"├ 💎 Kapital: *{savings_at_exit:,.0f}* so'm\n"
+                    f"└ _PRO obuna bilan ochiladi_\n\n"
+                )
+        
+        # AI tracking data (if available)
+        if ai_income > 0 or ai_expense > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🤖 *AI YORDAMCHI (30 kun):*\n"
+                f"├ 💰 Kirim: *{ai_income:,}* so'm\n"
+                f"├ 💸 Chiqim: *{ai_expense:,}* so'm\n"
+                f"└ 📈 Balans: *{ai_income - ai_expense:,}* so'm\n"
+            )
+            
+            # Show expense breakdown
+            if ai_summary.get("expense_by_category"):
+                msg += "\n💸 *Xarajatlar taqsimoti:*\n"
+                for cat, amount in ai_summary["expense_by_category"].items():
+                    cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
+                    msg += f"├ {cat_name}: *{amount:,}* so'm\n"
+        
+        # Shaxsiy qarzlar bo'limi
+        if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
+            msg += (
+                "\n━━━━━━━━━━━━━━━━━━━━\n"
+                "🤝 *SHAXSIY QARZLAR:*\n"
+                f"├ 📤 Bergan: *{debt_summary['total_lent']:,}* so'm ({debt_summary['lent_count']} ta)\n"
+                f"├ 📥 Olgan: *{debt_summary['total_borrowed']:,}* so'm ({debt_summary['borrowed_count']} ta)\n"
+            )
+            net = debt_summary['net_balance']
+            if net > 0:
+                msg += f"└ 💚 Sof: *+{net:,}* so'm _(sizga qaytariladi)_\n"
+            elif net < 0:
+                msg += f"└ 🔴 Sof: *{net:,}* so'm _(siz qaytarasiz)_\n"
+            else:
+                msg += "└ ⚪ Sof: *0* so'm\n"
     else:
+        # Russian version
         msg = (
-            "🚀 *ВЫБЕРИТЕ СПОСОБ ВЫХОДА ИЗ ДОЛГА*\n"
+            "📊 *МОИ ОТЧЁТЫ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"💳 Ваш долг: *{format_number(total_debt)} сум*\n\n"
             
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🆓 *БЕСПЛАТНЫЙ СПОСОБ:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📅 Срок выхода: *{simple_exit_months} мес*\n"
-            f"📆 Дата: *{simple_exit_formatted}*\n"
-            "💰 Богатство: *0 сум* (не копится)\n"
-            "📊 Метод: Только минимальный платёж\n\n"
-            
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💎 *PRO СПОСОБ (Рекомендуем):*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📅 Срок выхода: *{pro_exit_months} мес*\n"
-            f"📆 Дата: *{pro_exit_formatted}*\n"
-            f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
-            f"💰 Богатство: *{format_number(int(savings_at_exit))} сум*\n"
-            "📊 Метод: Умное распределение\n"
-            "📋 Контроль долгов, статистика, Excel\n\n"
-            
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "👇 *Какой способ выберете?*"
+            "💰 *ДОХОДЫ:*\n"
+            f"├ Личный: *{income_self:,}* сум\n"
         )
+        if income_partner > 0:
+            msg += f"├ Партнёр: *{income_partner:,}* сум\n"
+        msg += f"└ Всего: *{total_income:,}* сум\n\n"
+        
+        msg += (
+            "📌 *ОБЯЗАТЕЛЬНЫЕ ПЛАТЕЖИ:*\n"
+            f"├ 🏠 Аренда: *{rent:,}* сум\n"
+            f"├ 👶 Детсад: *{kindergarten:,}* сум\n"
+            f"├ 💡 Коммунальные: *{utilities:,}* сум\n"
+            f"├ 💳 Платёж по кредиту: *{loan_payment:,}* сум\n"
+            f"└ Всего обязательных: *{mandatory_total:,}* сум\n\n"
+        )
+        
+        if total_debt > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "💳 *СОСТОЯНИЕ ДОЛГА:*\n"
+                f"├ Общий долг: *{total_debt:,}* сум\n"
+                f"└ Свободные: *{free_cash:,}* сум\n\n"
+                
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🌿 *ОБЫЧНЫЙ СПОСОБ:*\n"
+                f"├ Срок: *{simple_exit_months}* мес\n"
+                f"├ Дата: *{simple_exit_formatted}*\n"
+                f"└ Метод: Только минимальный платёж\n\n"
+            )
+            
+            if is_pro:
+                msg += (
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "🌟 *СПОСОБ HALOS PRO:*\n"
+                    f"├ Срок: *{pro_exit_months}* мес\n"
+                    f"├ Дата: *{pro_exit_formatted}*\n"
+                    f"├ ⏱ На *{months_saved}* мес быстрее\n"
+                    f"├ 💎 Капитал: *{savings_at_exit:,.0f}* сум\n"
+                    f"├ Доп. платёж: *{extra_debt:,.0f}* сум\n"
+                    f"└ Ежемесячные накопления: *{savings_monthly:,.0f}* сум\n\n"
+                    
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "📋 *УМНОЕ РАСПРЕДЕЛЕНИЕ:*\n"
+                    f"├ 🏠 Жизнь (70%): *{living_budget:,.0f}* сум\n"
+                    f"├ ⚡ Долг (20%): *{extra_debt:,.0f}* сум\n"
+                    f"└ 🏦 Богатство (10%): *{savings_monthly:,.0f}* сум\n\n"
+                )
+            else:
+                msg += (
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "🔒 *СПОСОБ HALOS PRO:*\n"
+                    f"├ Срок: *{pro_exit_months}* мес\n"
+                    f"├ ⏱ На *{months_saved}* мес быстрее\n"
+                    f"├ 💎 Капитал: *{savings_at_exit:,.0f}* сум\n"
+                    f"└ _Доступно с PRO подпиской_\n\n"
+                )
+        
+        # AI tracking data
+        if ai_income > 0 or ai_expense > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🤖 *AI ПОМОЩНИК (30 дней):*\n"
+                f"├ 💰 Приход: *{ai_income:,}* сум\n"
+                f"├ 💸 Расход: *{ai_expense:,}* сум\n"
+                f"└ 📈 Баланс: *{ai_income - ai_expense:,}* сум\n"
+            )
+            
+            if ai_summary.get("expense_by_category"):
+                msg += "\n💸 *Распределение расходов:*\n"
+                for cat, amount in ai_summary["expense_by_category"].items():
+                    cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
+                    msg += f"├ {cat_name}: *{amount:,}* сум\n"
+        
+        # Shaxsiy qarzlar bo'limi (rus)
+        if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
+            msg += (
+                "\n━━━━━━━━━━━━━━━━━━━━\n"
+                "🤝 *ЛИЧНЫЕ ДОЛГИ:*\n"
+                f"├ 📤 Дал: *{debt_summary['total_lent']:,}* сум ({debt_summary['lent_count']})\n"
+                f"├ 📥 Взял: *{debt_summary['total_borrowed']:,}* сум ({debt_summary['borrowed_count']})\n"
+            )
+            net = debt_summary['net_balance']
+            if net > 0:
+                msg += f"└ 💚 Чистый: *+{net:,}* сум _(вернут вам)_\n"
+            elif net < 0:
+                msg += f"└ 🔴 Чистый: *{net:,}* сум _(вернёте вы)_\n"
+            else:
+                msg += "└ ⚪ Чистый: *0* сум\n"
     
-    # Buttons
+    # ==================== TUGMALAR ====================
     if is_pro:
         keyboard = [
             [InlineKeyboardButton(
-                "🆓 Bepul usul" if lang == "uz" else "🆓 Бесплатный",
-                callback_data="debt_plan_free"
+                "📈 Batafsil statistika" if lang == "uz" else "📈 Подробная статистика",
+                callback_data="pro_statistics"
             )],
             [InlineKeyboardButton(
-                "💎 PRO usul (Tavsiya)" if lang == "uz" else "💎 PRO способ (Реком.)",
-                callback_data="debt_plan_pro"
+                "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
+                callback_data="pro_export_excel"
             )],
+            [InlineKeyboardButton(
+                "✏️ Ma'lumotlarni o'zgartirish" if lang == "uz" else "✏️ Изменить данные",
+                callback_data="recalculate"
+            )],
+            [InlineKeyboardButton(
+                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                callback_data="ai_debt_list"
+            )]
         ]
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "🆓 Bepul usul" if lang == "uz" else "🆓 Бесплатный",
-                callback_data="debt_plan_free"
-            )],
-            [InlineKeyboardButton(
-                "💎 PRO olish - " + (f"{months_saved} oy tezroq" if lang == "uz" else f"{months_saved} мес быстрее"),
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
                 callback_data="show_pricing"
             )],
+            [InlineKeyboardButton(
+                "✏️ Ma'lumotlarni o'zgartirish" if lang == "uz" else "✏️ Изменить данные",
+                callback_data="recalculate"
+            )],
+            [InlineKeyboardButton(
+                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                callback_data="ai_debt_list"
+            )]
         ]
     
     await update.message.reply_text(
@@ -2657,11 +2879,649 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
 
+async def menu_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle mode selection from main menu (solo/family) - global callback handler"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    mode = query.data.replace("mode_", "")
+    context.user_data["mode"] = mode
+    
+    # Update user mode in database
+    db = await get_database()
+    await db.update_user(telegram_id, mode=mode)
+    
+    # Confirm mode and ask for income
+    if mode == "solo":
+        confirm_msg = get_message("mode_set_solo", lang)
+    else:
+        confirm_msg = get_message("mode_set_family", lang)
+    
+    await query.edit_message_text(confirm_msg)
+    
+    # Wait a moment then ask for income
+    await asyncio.sleep(1)
+    
+    # Ask for income input
+    await query.message.reply_text(
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
+    )
+    
+    # Set state for income input
+    context.user_data["awaiting_income"] = True
+
+
+async def menu_income_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle income input from main menu flow"""
+    if not context.user_data.get("awaiting_income"):
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    text = update.message.text.strip()
+    
+    # Parse income amount
+    income = parse_number(text)
+    if income <= 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    context.user_data["income_self"] = income
+    context.user_data["awaiting_income"] = False
+    
+    mode = context.user_data.get("mode", "solo")
+    
+    if mode == "family":
+        # Ask for partner income
+        context.user_data["awaiting_partner_income"] = True
+        await update.message.reply_text(
+            get_message("input_income_partner", lang),
+            parse_mode="Markdown"
+        )
+    else:
+        # Skip to credit history choice
+        context.user_data["income_partner"] = 0
+        await ask_credit_history_choice(update, context, lang)
+
+
+async def ask_credit_history_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str) -> None:
+    """Ask user how they want to input credit data"""
+    keyboard = [
+        [InlineKeyboardButton(
+            get_message("btn_upload_credit", lang),
+            callback_data="menu_credit_upload"
+        )],
+        [InlineKeyboardButton(
+            get_message("btn_manual_credit", lang),
+            callback_data="menu_credit_manual"
+        )],
+        [InlineKeyboardButton(
+            get_message("btn_no_credit", lang),
+            callback_data="menu_credit_none"
+        )]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("credit_history_choice", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+
+async def menu_credit_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle credit history choice from menu"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    choice = query.data
+    
+    if choice == "menu_credit_upload":
+        # Ask for file upload
+        context.user_data["awaiting_credit_file"] = True
+        await query.edit_message_text(
+            get_message("upload_credit_file", lang),
+            parse_mode="Markdown"
+        )
+    
+    elif choice == "menu_credit_manual":
+        # Manual entry - ask for loan payment
+        context.user_data["awaiting_loan_payment"] = True
+        await query.edit_message_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown"
+        )
+    
+    elif choice == "menu_credit_none":
+        # No credits - save and show results
+        context.user_data["loan_payment"] = 0
+        context.user_data["total_debt"] = 0
+        await query.edit_message_text("✅")
+        await save_and_show_menu_results(query.message, context, telegram_id, lang)
+
+
+async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle credit history file upload from menu flow"""
+    if not context.user_data.get("awaiting_credit_file"):
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    document = update.message.document
+    if not document:
+        return
+    
+    # Check file extension
+    file_ext = Path(document.file_name).suffix.lower()
+    if file_ext not in ['.pdf', '.html', '.htm']:
+        await update.message.reply_text(
+            get_message("katm_not_pdf", lang)
+        )
+        return
+    
+    # Show processing message
+    processing_msg = await update.message.reply_text(
+        get_message("katm_processing", lang)
+    )
+    
+    try:
+        # Create upload directory
+        PDF_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Download file
+        file = await document.get_file()
+        file_name = f"{telegram_id}_{document.file_name}"
+        file_path = PDF_UPLOAD_DIR / file_name
+        
+        await file.download_to_drive(str(file_path))
+        
+        # Parse file
+        from app.pdf_parser import parse_katm_file
+        result = parse_katm_file(str(file_path))
+        
+        # Delete processing message
+        await processing_msg.delete()
+        
+        if result.success and result.loans:
+            # Store parsed data
+            context.user_data["loan_payment"] = result.total_monthly_payment
+            context.user_data["total_debt"] = result.total_remaining_debt
+            context.user_data["katm_loans"] = result.loans
+            context.user_data["awaiting_credit_file"] = False
+            
+            # Save to database
+            db = await get_database()
+            user = await db.get_user(telegram_id)
+            if user:
+                await db.delete_user_katm_loans(user["id"])
+                await db.save_katm_loans(
+                    user_id=user["id"],
+                    loans=result.loans,
+                    pdf_filename=file_name
+                )
+            
+            # Format loans list
+            loans_list = "\n".join([
+                get_message("katm_loan_item", lang).format(
+                    bank=loan.bank_name,
+                    amount=format_number(loan.remaining_balance)
+                )
+                for loan in result.loans
+            ])
+            
+            # Show success message with parsed data
+            success_msg = get_message("katm_success", lang).format(
+                loans_list=loans_list,
+                total_debt=format_number(result.total_remaining_debt),
+                monthly_payment=format_number(result.total_monthly_payment)
+            )
+            
+            # Add confirmation buttons
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        get_message("katm_confirm_yes", lang), 
+                        callback_data="menu_katm_confirm_yes"
+                    ),
+                    InlineKeyboardButton(
+                        get_message("katm_confirm_no", lang), 
+                        callback_data="menu_katm_confirm_no"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                success_msg + "\n\n" + get_message("katm_confirm", lang),
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        
+        else:
+            # Parsing failed - fallback to manual
+            context.user_data["awaiting_credit_file"] = False
+            context.user_data["awaiting_loan_payment"] = True
+            
+            await update.message.reply_text(
+                get_message("katm_failed", lang),
+                parse_mode="Markdown"
+            )
+            
+            await update.message.reply_text(
+                get_message("input_loan_payment", lang),
+                parse_mode="Markdown"
+            )
+    
+    except Exception as e:
+        logger.error(f"Credit file processing error: {e}")
+        await processing_msg.delete()
+        
+        context.user_data["awaiting_credit_file"] = False
+        context.user_data["awaiting_loan_payment"] = True
+        
+        await update.message.reply_text(
+            get_message("katm_failed", lang),
+            parse_mode="Markdown"
+        )
+        
+        await update.message.reply_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown"
+        )
+
+
+async def menu_katm_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle KATM confirmation from menu flow"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    choice = query.data
+    
+    if choice == "menu_katm_confirm_yes":
+        # Data confirmed - save and show results
+        await query.edit_message_text(get_message("debt_saved", lang))
+        await save_and_show_menu_results(query.message, context, telegram_id, lang)
+    
+    else:  # menu_katm_confirm_no - manual entry
+        context.user_data["awaiting_loan_payment"] = True
+        await query.edit_message_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown"
+        )
+
+
+async def save_and_show_menu_results(message, context: ContextTypes.DEFAULT_TYPE, telegram_id: int, lang: str) -> None:
+    """Save profile and show results from menu flow"""
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if user:
+        await db.create_financial_profile(
+            user_id=user["id"],
+            income_self=context.user_data.get("income_self", 0),
+            income_partner=context.user_data.get("income_partner", 0),
+            loan_payment=context.user_data.get("loan_payment", 0),
+            total_debt=context.user_data.get("total_debt", 0),
+            mode=context.user_data.get("mode", "solo")
+        )
+    
+    total_debt = context.user_data.get("total_debt", 0)
+    
+    if total_debt == 0:
+        # Wealth mode - no debt
+        await message.reply_text(
+            get_message("debt_free_message", lang),
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+    else:
+        # Show debt results
+        import math
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+        
+        loan_payment = context.user_data.get("loan_payment", 0)
+        if loan_payment > 0:
+            months = math.ceil(total_debt / loan_payment)
+            exit_date = datetime.now() + relativedelta(months=months)
+            exit_str = exit_date.strftime("%B %Y")
+            
+            # Calculate PRO benefits
+            income_self = context.user_data.get('income_self', 0)
+            income_partner = context.user_data.get('income_partner', 0)
+            total_income = income_self + income_partner
+            free_cash = total_income - loan_payment
+            
+            if free_cash > 0:
+                extra_payment = free_cash * 0.2  # 20% extra to debt
+                savings_monthly = free_cash * 0.1  # 10% savings
+                total_payment_pro = loan_payment + extra_payment
+                pro_months = math.ceil(total_debt / total_payment_pro)
+                months_saved = months - pro_months
+                pro_exit_date = datetime.now() + relativedelta(months=pro_months)
+                pro_exit_str = pro_exit_date.strftime("%B %Y")
+                savings_at_exit = savings_monthly * pro_months
+            else:
+                months_saved = 0
+                pro_exit_str = exit_str
+                savings_at_exit = 0
+            
+            if lang == "uz":
+                msg = (
+                    f"✅ *Ma'lumotlar saqlandi!*\n\n"
+                    f"📊 *Sizning yo'lingiz:*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Daromad: *{format_number(income_self)} so'm*\n"
+                    f"💳 Yuk: *{format_number(total_debt)} so'm*\n"
+                    f"📅 To'lov: *{format_number(loan_payment)} so'm/oy*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"🗓 *Taxminiy HALOS sanangiz:* {exit_str}\n"
+                    f"📆 *Qolgan muddat:* {months} oy\n\n"
+                )
+                
+                if months_saved > 0:
+                    msg += (
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"💎 *PRO YECHIM:*\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"📊 *Aqlli taqsimlash:*\n"
+                        f"├ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
+                        f"├ ⚡ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
+                        f"└ 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
+                        f"📅 *Natija:*\n"
+                        f"├ ⏱ *{months_saved} oy* ertaroq — *{pro_exit_str}*\n"
+                        f"└ 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
+                        f"🎁 *PRO imkoniyatlari:*\n"
+                        f"├ 📈 Haftalik/oylik statistika\n"
+                        f"├ 📊 Excel hisobotlar\n"
+                        f"├ 🔔 Eslatmalar va maslahatlar\n"
+                        f"└ 🏆 Shaxsiy maqsadlar\n\n"
+                        f"🔒 _To'liq foydalanish uchun PRO oling_"
+                    )
+                else:
+                    msg += f"💎 PRO bilan tezroq yengillashish mumkin!"
+            else:
+                msg = (
+                    f"✅ *Данные сохранены!*\n\n"
+                    f"📊 *Ваш путь:*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Доход: *{format_number(income_self)} сум*\n"
+                    f"💳 Нагрузка: *{format_number(total_debt)} сум*\n"
+                    f"📅 Платёж: *{format_number(loan_payment)} сум/мес*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"🗓 *Примерная дата HALOS:* {exit_str}\n"
+                    f"📆 *Осталось:* {months} мес\n\n"
+                )
+                
+                if months_saved > 0:
+                    msg += (
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"💎 *PRO РЕШЕНИЕ:*\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"📊 *Умное распределение:*\n"
+                        f"├ 🏦 Для богатства: *{format_number(int(savings_monthly))} сум*\n"
+                        f"├ ⚡ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
+                        f"└ 🏠 Жизнь: *{format_number(int(free_cash * 0.7))} сум*\n\n"
+                        f"📅 *Результат:*\n"
+                        f"├ ⏱ На *{months_saved} мес* раньше — *{pro_exit_str}*\n"
+                        f"└ 💰 *{format_number(int(savings_at_exit))} сум* богатства\n\n"
+                        f"🎁 *Возможности PRO:*\n"
+                        f"├ 📈 Еженедельная/месячная статистика\n"
+                        f"├ 📊 Excel отчёты\n"
+                        f"├ 🔔 Напоминания и советы\n"
+                        f"└ 🏆 Личные цели\n\n"
+                        f"🔒 _Получите PRO для полного доступа_"
+                    )
+                else:
+                    msg += f"💎 С PRO можно освободиться быстрее!"
+        else:
+            msg = get_message("debt_no_data", lang) if lang == "uz" else get_message("debt_no_data", lang)
+        
+        await message.reply_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+
+
+async def menu_partner_income_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle partner income input"""
+    if not context.user_data.get("awaiting_partner_income"):
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    text = update.message.text.strip()
+    income = parse_number(text)
+    
+    if income < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    context.user_data["income_partner"] = income
+    context.user_data["awaiting_partner_income"] = False
+    
+    # Ask for credit history choice instead of direct loan payment
+    await ask_credit_history_choice(update, context, lang)
+
+
+async def menu_loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle loan payment input"""
+    if not context.user_data.get("awaiting_loan_payment"):
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    text = update.message.text.strip()
+    payment = parse_number(text)
+    
+    if payment < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    context.user_data["loan_payment"] = payment
+    context.user_data["awaiting_loan_payment"] = False
+    context.user_data["awaiting_total_debt"] = True
+    
+    await update.message.reply_text(
+        get_message("input_total_debt", lang),
+        parse_mode="Markdown"
+    )
+
+
+async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle total debt input and save profile"""
+    if not context.user_data.get("awaiting_total_debt"):
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    text = update.message.text.strip()
+    debt = parse_number(text)
+    
+    if debt < 0:
+        await update.message.reply_text(
+            get_message("invalid_number", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    context.user_data["total_debt"] = debt
+    context.user_data["awaiting_total_debt"] = False
+    
+    # Save to database
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if user:
+        await db.create_financial_profile(
+            user_id=user["id"],
+            income_self=context.user_data.get("income_self", 0),
+            income_partner=context.user_data.get("income_partner", 0),
+            loan_payment=context.user_data.get("loan_payment", 0),
+            total_debt=debt,
+            mode=context.user_data.get("mode", "solo")
+        )
+    
+    # Show results
+    if debt == 0:
+        # Wealth mode
+        await update.message.reply_text(
+            get_message("debt_free_message", lang),
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+    else:
+        # Debt mode - show simple calculation
+        import math
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+        
+        loan_payment = context.user_data.get("loan_payment", 0)
+        if loan_payment > 0:
+            months = math.ceil(debt / loan_payment)
+            exit_date = datetime.now() + relativedelta(months=months)
+            exit_str = exit_date.strftime("%B %Y")
+            
+            # Calculate PRO benefits
+            income_self = context.user_data.get('income_self', 0)
+            income_partner = context.user_data.get('income_partner', 0)
+            total_income = income_self + income_partner
+            free_cash = total_income - loan_payment
+            
+            if free_cash > 0:
+                extra_payment = free_cash * 0.2  # 20% extra to debt
+                savings_monthly = free_cash * 0.1  # 10% savings
+                total_payment_pro = loan_payment + extra_payment
+                pro_months = math.ceil(debt / total_payment_pro)
+                months_saved = months - pro_months
+                pro_exit_date = datetime.now() + relativedelta(months=pro_months)
+                pro_exit_str = pro_exit_date.strftime("%B %Y")
+                savings_at_exit = savings_monthly * pro_months
+            else:
+                months_saved = 0
+                pro_exit_str = exit_str
+                savings_at_exit = 0
+            
+            if lang == "uz":
+                msg = (
+                    f"✅ *Ma'lumotlar saqlandi!*\n\n"
+                    f"📊 *Sizning yo'lingiz:*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Daromad: *{format_number(income_self)} so'm*\n"
+                    f"💳 Yuk: *{format_number(debt)} so'm*\n"
+                    f"📅 To'lov: *{format_number(loan_payment)} so'm/oy*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"🗓 *Taxminiy HALOS sanangiz:* {exit_str}\n"
+                    f"📆 *Qolgan muddat:* {months} oy\n\n"
+                )
+                
+                if months_saved > 0:
+                    msg += (
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"💎 *PRO YECHIM:*\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"📊 *Aqlli taqsimlash:*\n"
+                        f"├ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
+                        f"├ ⚡ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
+                        f"└ 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
+                        f"📅 *Natija:*\n"
+                        f"├ ⏱ *{months_saved} oy* ertaroq — *{pro_exit_str}*\n"
+                        f"└ 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
+                        f"🎁 *PRO imkoniyatlari:*\n"
+                        f"├ 📈 Haftalik/oylik statistika\n"
+                        f"├ 📊 Excel hisobotlar\n"
+                        f"├ 🔔 Eslatmalar va maslahatlar\n"
+                        f"└ 🏆 Shaxsiy maqsadlar\n\n"
+                        f"🔒 _To'liq foydalanish uchun PRO oling_"
+                    )
+                else:
+                    msg += f"💎 PRO bilan tezroq yengillashish mumkin!"
+            else:
+                msg = (
+                    f"✅ *Данные сохранены!*\n\n"
+                    f"📊 *Ваш путь:*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 Доход: *{format_number(income_self)} сум*\n"
+                    f"💳 Нагрузка: *{format_number(debt)} сум*\n"
+                    f"📅 Платёж: *{format_number(loan_payment)} сум/мес*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"🗓 *Примерная дата HALOS:* {exit_str}\n"
+                    f"📆 *Осталось:* {months} мес\n\n"
+                )
+                
+                if months_saved > 0:
+                    msg += (
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"💎 *PRO РЕШЕНИЕ:*\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"📊 *Умное распределение:*\n"
+                        f"├ 🏦 Для богатства: *{format_number(int(savings_monthly))} сум*\n"
+                        f"├ ⚡ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
+                        f"└ 🏠 Жизнь: *{format_number(int(free_cash * 0.7))} сум*\n\n"
+                        f"📅 *Результат:*\n"
+                        f"├ ⏱ На *{months_saved} мес* раньше — *{pro_exit_str}*\n"
+                        f"└ 💰 *{format_number(int(savings_at_exit))} сум* богатства\n\n"
+                        f"🎁 *Возможности PRO:*\n"
+                        f"├ 📈 Еженедельная/месячная статистика\n"
+                        f"├ 📊 Excel отчёты\n"
+                        f"├ 🔔 Напоминания и советы\n"
+                        f"└ 🏆 Личные цели\n\n"
+                        f"🔒 _Получите PRO для полного доступа_"
+                    )
+                else:
+                    msg += f"💎 С PRO можно освободиться быстрее!"
+        else:
+            msg = get_message("debt_no_data", lang) if lang == "uz" else get_message("debt_no_data", lang)
+        
+        await update.message.reply_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+
+
 async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle 👤 Profil button"""
-    # Update activity for PRO care scheduler
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    
     db = await get_database()
-    await db.update_user_activity(update.effective_user.id)
+    user = await db.get_user(telegram_id)
+    
+    # Check if user is registered
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Update activity for PRO care scheduler
+    await db.update_user_activity(telegram_id)
     
     await profile_command(update, context)
 
@@ -2672,8 +3532,18 @@ async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAUL
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
     
-    # Update activity for PRO care scheduler
     db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    # Check if user is registered
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Update activity for PRO care scheduler
     await db.update_user_activity(telegram_id)
     
     # Check if user has PRO
@@ -2690,9 +3560,22 @@ async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAUL
 
 async def menu_language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle 🌐 Til button"""
-    # Update activity for PRO care scheduler
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    
     db = await get_database()
-    await db.update_user_activity(update.effective_user.id)
+    user = await db.get_user(telegram_id)
+    
+    # Check if user is registered
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Update activity for PRO care scheduler
+    await db.update_user_activity(telegram_id)
     
     keyboard = [
         [
@@ -2713,8 +3596,18 @@ async def menu_help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     
-    # Update activity for PRO care scheduler
     db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    # Check if user is registered
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Update activity for PRO care scheduler
     await db.update_user_activity(telegram_id)
     
     await update.message.reply_text(
@@ -2924,9 +3817,9 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📊 *AQLLI TAQSIMLASH:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"├ 🏦 Boylik (10%): *{format_number(int(savings))} so'm*\n"
-            f"├ ⚡ Qo'shimcha (20%): *{format_number(int(extra_debt))} so'm*\n"
-            f"└ 🏠 Yashash (70%): *{format_number(int(living))} so'm*\n\n"
+            f"├ 🏦 Boylik uchun: *{format_number(int(savings))} so'm*\n"
+            f"├ ⚡ Kredit to'lovi: *{format_number(int(extra_debt))} so'm*\n"
+            f"└ 🏠 Yashash: *{format_number(int(living))} so'm*\n\n"
             
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📅 *NATIJA:*\n"
@@ -2958,9 +3851,9 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📊 *УМНОЕ РАСПРЕДЕЛЕНИЕ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"├ 🏦 Богатство (10%): *{format_number(int(savings))} сум*\n"
-            f"├ ⚡ Дополнительно (20%): *{format_number(int(extra_debt))} сум*\n"
-            f"└ 🏠 Жизнь (70%): *{format_number(int(living))} сум*\n\n"
+            f"├ 🏦 Для богатства: *{format_number(int(savings))} сум*\n"
+            f"├ ⚡ Платёж по кредиту: *{format_number(int(extra_debt))} сум*\n"
+            f"└ 🏠 Жизнь: *{format_number(int(living))} сум*\n\n"
             
             "━━━━━━━━━━━━━━━━━━━━\n"
             "📅 *РЕЗУЛЬТАТ:*\n"
@@ -2999,6 +3892,1333 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+
+# ==================== AI YORDAMCHI HANDLERS ====================
+
+async def ai_assistant_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show AI assistant menu"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Check PRO status
+    from app.subscription_handlers import is_user_pro
+    is_pro = await is_user_pro(telegram_id)
+    
+    if not is_pro:
+        if lang == "uz":
+            msg = (
+                "🤖 *AI YORDAMCHI*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Bu funksiya faqat PRO foydalanuvchilar uchun!\n\n"
+                "💎 PRO obuna bilan:\n"
+                "├ 🎤 Ovozli xabar orqali daromad/xarajat yozish\n"
+                "├ 📊 Avtomatik kategoriyalash\n"
+                "├ 📈 Guruhlab hisobot ko'rish\n"
+                "└ 🧠 AI tahlil va maslahatlar\n\n"
+                "PRO obuna oling va AI yordamchidan foydalaning!"
+            )
+        else:
+            msg = (
+                "🤖 *AI ПОМОЩНИК*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Эта функция только для PRO пользователей!\n\n"
+                "💎 С PRO подпиской:\n"
+                "├ 🎤 Запись доходов/расходов голосом\n"
+                "├ 📊 Автоматическая категоризация\n"
+                "├ 📈 Групповые отчёты\n"
+                "└ 🧠 AI анализ и советы\n\n"
+                "Оформите PRO и пользуйтесь AI помощником!"
+            )
+        
+        keyboard = [[InlineKeyboardButton(
+            "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
+            callback_data="show_pricing"
+        )]]
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # PRO user - show AI assistant menu
+    if lang == "uz":
+        msg = (
+            "🤖 *AI YORDAMCHI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎤 *Ovozli xabar* yuboring va men:\n"
+            "├ 📝 Matnni aniqlayman\n"
+            "├ 💰 Daromad yoki xarajatni ajrataman\n"
+            "├ 📊 Kategoriyaga qo'shaman\n"
+            "└ 📈 Hisobotda ko'rsataman\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📌 *MISOL:*\n"
+            "\"Bugun ovqatga 50 ming berdim\"\n"
+            "\"Maosh tushdi 5 million\"\n\n"
+            "👇 Ovozli xabar yuboring yoki tugmani bosing:"
+        )
+    else:
+        msg = (
+            "🤖 *AI ПОМОЩНИК*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎤 Отправьте *голосовое сообщение* и я:\n"
+            "├ 📝 Распознаю текст\n"
+            "├ 💰 Определю доход или расход\n"
+            "├ 📊 Добавлю в категорию\n"
+            "└ 📈 Покажу в отчёте\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📌 *ПРИМЕР:*\n"
+            "\"Сегодня на еду потратил 50 тысяч\"\n"
+            "\"Получил зарплату 5 миллионов\"\n\n"
+            "👇 Отправьте голосовое или нажмите кнопку:"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📊 Hisobot ko'rish" if lang == "uz" else "📊 Посмотреть отчёт",
+            callback_data="ai_report"
+        )],
+        [InlineKeyboardButton(
+            "📋 Oxirgi yozuvlar" if lang == "uz" else "📋 Последние записи",
+            callback_data="ai_recent"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    # Enable voice message mode
+    context.user_data["awaiting_voice"] = True
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle voice messages for AI assistant - works automatically for PRO users"""
+    voice = update.message.voice
+    if not voice:
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Check PRO status - PRO users can use voice anywhere
+    from app.subscription_handlers import is_user_pro
+    is_pro = await is_user_pro(telegram_id)
+    
+    if not is_pro:
+        # For non-PRO users, just ignore voice messages (don't show error)
+        return
+    
+    # Import AI functions
+    import os
+    import tempfile
+    from app.ai_assistant import (
+        transcribe_voice, parse_voice_transaction, save_transaction,
+        EXPENSE_CATEGORIES, INCOME_CATEGORIES,
+        MAX_VOICE_DURATION, MONTHLY_VOICE_LIMIT,
+        check_voice_limit, increment_voice_usage,
+        format_voice_limit_message, format_voice_duration_error
+    )
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Check voice duration limit
+    voice_duration = voice.duration or 0
+    if voice_duration > MAX_VOICE_DURATION:
+        await update.message.reply_text(
+            format_voice_duration_error(voice_duration, lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Check monthly voice limit
+    limit_info = await check_voice_limit(db, user["id"])
+    if not limit_info["allowed"]:
+        await update.message.reply_text(
+            format_voice_limit_message(limit_info, lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        # Send processing message with remaining limit
+        remaining_msg = f"\n🎤 Qolgan: {limit_info['remaining']}/{limit_info['limit']}" if lang == "uz" else f"\n🎤 Осталось: {limit_info['remaining']}/{limit_info['limit']}"
+        processing_msg = await update.message.reply_text(
+            f"🤖 *AI yordamchi*\n🎤 Ovoz qayta ishlanmoqda...{remaining_msg}" if lang == "uz" else 
+            f"🤖 *AI помощник*\n🎤 Обработка голоса...{remaining_msg}",
+            parse_mode="Markdown"
+        )
+        
+        # Download voice file
+        voice_file = await voice.get_file()
+        
+        # Create temp file
+        with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+        
+        await voice_file.download_to_drive(tmp_path)
+        
+        # Transcribe voice
+        text = await transcribe_voice(tmp_path)
+        
+        # Clean up temp file
+        try:
+            os.remove(tmp_path)
+        except:
+            pass
+        
+        if not text:
+            await processing_msg.edit_text(
+                "❌ Ovozni aniqlab bo'lmadi. Qaytadan urinib ko'ring." if lang == "uz" else 
+                "❌ Не удалось распознать голос. Попробуйте ещё раз.",
+                parse_mode="Markdown"
+            )
+            return
+        
+        # Increment voice usage AFTER successful transcription
+        await increment_voice_usage(db, user["id"], voice_duration)
+        
+        # ==================== QARZ TEKSHIRISH ====================
+        from app.ai_assistant import (
+            parse_debt_transaction, save_personal_debt, format_debt_saved_message,
+            get_debt_summary, format_debt_summary_message
+        )
+        
+        # Avval qarz ekanligini tekshirish
+        debt_info = await parse_debt_transaction(text, lang)
+        
+        if debt_info:
+            # Bu qarz tranzaksiyasi
+            debt_id = await save_personal_debt(db, user["id"], debt_info)
+            
+            # Qarz xulosasini olish
+            debt_summary = await get_debt_summary(db, user["id"])
+            
+            # Xabarni formatlash
+            msg = format_debt_saved_message(debt_info, lang)
+            msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
+            
+            # Get updated voice limit info
+            new_limit_info = await check_voice_limit(db, user["id"])
+            limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+            msg += limit_msg
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                        callback_data="ai_confirm_ok"
+                    ),
+                    InlineKeyboardButton(
+                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                        callback_data=f"ai_debt_correct_{debt_id}"
+                    )
+                ],
+                [InlineKeyboardButton(
+                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                    callback_data="ai_debt_list"
+                )]
+            ]
+            
+            await processing_msg.edit_text(
+                msg,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+        
+        # ==================== ODDIY TRANZAKSIYA ====================
+        # Parse transaction
+        transaction = await parse_voice_transaction(text, lang)
+        
+        if not transaction["amount"]:
+            await processing_msg.edit_text(
+                f"📝 *Aniqlangan matn:* {text}\n\n"
+                f"❌ Summa topilmadi. Summani aniq ayting." if lang == "uz" else
+                f"📝 *Распознанный текст:* {text}\n\n"
+                f"❌ Сумма не найдена. Назовите сумму чётко.",
+                parse_mode="Markdown"
+            )
+            return
+        
+        # Save transaction to database
+        transaction_id = await save_transaction(db, user["id"], transaction)
+        
+        # Get budget status after saving
+        from app.ai_assistant import get_budget_status, format_expense_saved_with_budget
+        budget_status = await get_budget_status(db, user["id"])
+        
+        # Format response with budget info
+        msg = format_expense_saved_with_budget(transaction, budget_status, lang)
+        
+        # Get updated voice limit info
+        new_limit_info = await check_voice_limit(db, user["id"])
+        limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+        msg += limit_msg
+        
+        # Keyboard with correction option
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                    callback_data="ai_confirm_ok"
+                ),
+                InlineKeyboardButton(
+                    "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                    callback_data=f"ai_correct_{transaction_id}"
+                )
+            ],
+            [InlineKeyboardButton(
+                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                callback_data="ai_report"
+            )]
+        ]
+        
+        await processing_msg.edit_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+    except Exception as e:
+        print(f"AI voice handler error: {e}")
+        import traceback
+        traceback.print_exc()
+        await update.message.reply_text(
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка",
+            parse_mode="Markdown"
+        )
+
+
+async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle text messages for AI assistant - auto-detect expenses/income/debts from text
+    Works for PRO users without pressing any button
+    """
+    # Skip if message is a command or from conversation handler
+    if not update.message or not update.message.text:
+        return
+    
+    text = update.message.text.strip()
+    
+    # Skip menu buttons and commands
+    menu_patterns = [
+        "📊", "👤", "💎", "🌐", "❓", "/", "Hisobotlarim", "Мои отчёты",
+        "Profil", "Профиль", "PRO", "Til", "Язык", "Yordam", "Помощь"
+    ]
+    for pattern in menu_patterns:
+        if pattern in text:
+            return
+    
+    # Skip if user is in some editing mode
+    editing_modes = ["awaiting_income", "awaiting_partner_income", "awaiting_loan", 
+                     "awaiting_total_debt", "editing_profile", "awaiting_promo",
+                     "ai_correcting"]
+    for mode in editing_modes:
+        if context.user_data.get(mode):
+            return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Check PRO status
+    from app.subscription_handlers import is_user_pro
+    is_pro = await is_user_pro(telegram_id)
+    
+    if not is_pro:
+        return  # Silently ignore for non-PRO users
+    
+    try:
+        db = await get_database()
+        user = await db.get_user(telegram_id)
+        
+        if not user:
+            return
+        
+        # ==================== QARZ TEKSHIRISH ====================
+        from app.ai_assistant import (
+            parse_debt_transaction, save_personal_debt, format_debt_saved_message,
+            get_debt_summary, format_debt_summary_message,
+            parse_voice_transaction, save_transaction, 
+            get_budget_status, format_expense_saved_with_budget
+        )
+        
+        # Avval qarz ekanligini tekshirish
+        debt_info = await parse_debt_transaction(text, lang)
+        
+        if debt_info:
+            # Bu qarz tranzaksiyasi
+            debt_id = await save_personal_debt(db, user["id"], debt_info)
+            
+            # Qarz xulosasini olish
+            debt_summary = await get_debt_summary(db, user["id"])
+            
+            # Xabarni formatlash
+            msg = format_debt_saved_message(debt_info, lang)
+            msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                        callback_data="ai_confirm_ok"
+                    ),
+                    InlineKeyboardButton(
+                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                        callback_data=f"ai_debt_correct_{debt_id}"
+                    )
+                ],
+                [InlineKeyboardButton(
+                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                    callback_data="ai_debt_list"
+                )]
+            ]
+            
+            await update.message.reply_text(
+                msg,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+        
+        # ==================== ODDIY TRANZAKSIYA ====================
+        # Try to parse transaction from text
+        transaction = await parse_voice_transaction(text, lang)
+        
+        # If no amount found, this is probably not a transaction message
+        if not transaction["amount"]:
+            return
+        
+        # Save transaction
+        transaction_id = await save_transaction(db, user["id"], transaction)
+        
+        # Get budget status
+        budget_status = await get_budget_status(db, user["id"])
+        
+        # Format response with budget info
+        msg = format_expense_saved_with_budget(transaction, budget_status, lang)
+        
+        # Keyboard with correction option
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                    callback_data="ai_confirm_ok"
+                ),
+                InlineKeyboardButton(
+                    "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                    callback_data=f"ai_correct_{transaction_id}"
+                )
+            ],
+            [InlineKeyboardButton(
+                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                callback_data="ai_report"
+            )]
+        ]
+        
+        await update.message.reply_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+    except Exception as e:
+        print(f"AI text handler error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def ai_confirm_ok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """User confirmed transaction is correct"""
+    query = update.callback_query
+    await query.answer("✅" if context.user_data.get("lang") == "uz" else "✅")
+    
+    # Just remove the buttons, keep the message
+    await query.edit_message_reply_markup(reply_markup=None)
+
+
+async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start transaction correction process"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID from callback data
+    callback_data = query.data  # ai_correct_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, transaction_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        await query.edit_message_text(
+            "❌ Tranzaksiya topilmadi" if lang == "uz" else "❌ Транзакция не найдена"
+        )
+        return
+    
+    # Store correction info
+    context.user_data["ai_correcting"] = transaction_id
+    
+    if lang == "uz":
+        msg = (
+            "✏️ *TUZATISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 Joriy yozuv:\n"
+            f"├ Turi: *{'Daromad' if transaction['type'] == 'income' else 'Xarajat'}*\n"
+            f"├ Kategoriya: *{transaction['category']}*\n"
+            f"├ Summa: *{transaction['amount']:,}* so'm\n"
+            f"└ Tavsif: _{transaction['description']}_\n\n"
+            "Quyidagilardan birini tanlang:"
+        )
+    else:
+        msg = (
+            "✏️ *ИСПРАВЛЕНИЕ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 Текущая запись:\n"
+            f"├ Тип: *{'Доход' if transaction['type'] == 'income' else 'Расход'}*\n"
+            f"├ Категория: *{transaction['category']}*\n"
+            f"├ Сумма: *{transaction['amount']:,}* сум\n"
+            f"└ Описание: _{transaction['description']}_\n\n"
+            "Выберите действие:"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "🔄 Qayta yozish" if lang == "uz" else "🔄 Перезаписать",
+            callback_data=f"ai_rewrite_{transaction_id}"
+        )],
+        [InlineKeyboardButton(
+            "✏️ Summani o'zgartirish" if lang == "uz" else "✏️ Изменить сумму",
+            callback_data=f"ai_edit_amount_{transaction_id}"
+        )],
+        [InlineKeyboardButton(
+            "🗑 O'chirish" if lang == "uz" else "🗑 Удалить",
+            callback_data=f"ai_delete_{transaction_id}"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
+            callback_data="ai_cancel_correct"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Delete a transaction"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID
+    callback_data = query.data  # ai_delete_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    from app.ai_assistant import delete_transaction
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    await delete_transaction(db, transaction_id, user["id"])
+    context.user_data.pop("ai_correcting", None)
+    
+    if lang == "uz":
+        msg = "🗑 *Yozuv o'chirildi*\n\nYangi yozuv qo'shish uchun ovozli yoki matnli xabar yuboring."
+    else:
+        msg = "🗑 *Запись удалена*\n\nОтправьте голосовое или текстовое сообщение для новой записи."
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+async def ai_rewrite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Rewrite a transaction - delete old and prompt for new"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID
+    callback_data = query.data  # ai_rewrite_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    from app.ai_assistant import delete_transaction
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    await delete_transaction(db, transaction_id, user["id"])
+    context.user_data.pop("ai_correcting", None)
+    
+    if lang == "uz":
+        msg = (
+            "🔄 *QAYTA YOZISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Eski yozuv o'chirildi.\n\n"
+            "🎤 Ovozli xabar yoki\n"
+            "✍️ Matnli xabar yuboring.\n\n"
+            "Masalan: \"Ovqatga 50 ming berdim\""
+        )
+    else:
+        msg = (
+            "🔄 *ПЕРЕЗАПИСЬ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Старая запись удалена.\n\n"
+            "🎤 Отправьте голосовое или\n"
+            "✍️ текстовое сообщение.\n\n"
+            "Например: \"На еду потратил 50 тысяч\""
+        )
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+async def ai_edit_amount_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Edit transaction amount"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID
+    callback_data = query.data  # ai_edit_amount_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    context.user_data["ai_editing_amount"] = transaction_id
+    
+    if lang == "uz":
+        msg = (
+            "✏️ *SUMMANI O'ZGARTIRISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Yangi summani yozing:\n\n"
+            "Masalan: `50000` yoki `ellik ming`"
+        )
+    else:
+        msg = (
+            "✏️ *ИЗМЕНИТЬ СУММУ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Напишите новую сумму:\n\n"
+            "Например: `50000` или `пятьдесят тысяч`"
+        )
+    
+    keyboard = [[InlineKeyboardButton(
+        "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
+        callback_data="ai_cancel_correct"
+    )]]
+    
+    await query.edit_message_text(
+        msg, 
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_amount_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle new amount input"""
+    if not context.user_data.get("ai_editing_amount"):
+        return
+    
+    transaction_id = context.user_data["ai_editing_amount"]
+    text = update.message.text.strip()
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    from app.ai_assistant import extract_amount, update_transaction, get_budget_status, format_budget_warning
+    
+    # Parse amount
+    new_amount = extract_amount(text)
+    
+    if not new_amount:
+        await update.message.reply_text(
+            "❌ Summani aniqlab bo'lmadi. Qaytadan kiriting." if lang == "uz" else
+            "❌ Не удалось определить сумму. Попробуйте ещё раз.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Update transaction
+    await update_transaction(db, transaction_id, user["id"], amount=new_amount)
+    
+    # Clear editing mode
+    context.user_data.pop("ai_editing_amount", None)
+    context.user_data.pop("ai_correcting", None)
+    
+    # Get updated budget status
+    budget_status = await get_budget_status(db, user["id"])
+    budget_msg = format_budget_warning(budget_status, lang) or ""
+    
+    if lang == "uz":
+        msg = f"✅ *Summa yangilandi: {new_amount:,} so'm*\n\n{budget_msg}"
+    else:
+        msg = f"✅ *Сумма обновлена: {new_amount:,} сум*\n\n{budget_msg}"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def ai_cancel_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel correction process"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Clear correction modes
+    context.user_data.pop("ai_correcting", None)
+    context.user_data.pop("ai_editing_amount", None)
+    
+    if lang == "uz":
+        msg = "↩️ Bekor qilindi"
+    else:
+        msg = "↩️ Отменено"
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show detailed budget status"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import get_budget_status, format_budget_warning, get_voice_usage, MONTHLY_VOICE_LIMIT
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
+        return
+    
+    budget_status = await get_budget_status(db, user["id"])
+    voice_usage = await get_voice_usage(db, user["id"])
+    
+    if budget_status["status"] == "no_data":
+        if lang == "uz":
+            msg = (
+                "💰 *BYUDJET*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "📝 Byudjetni hisoblash uchun avval daromad va xarajatlaringizni kiriting.\n\n"
+                "📊 *Hisoblash* tugmasini bosing."
+            )
+        else:
+            msg = (
+                "💰 *БЮДЖЕТ*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "📝 Для расчёта бюджета сначала введите свои доходы и расходы.\n\n"
+                "📊 Нажмите кнопку *Расчёт*."
+            )
+    else:
+        msg = format_budget_warning(budget_status, lang)
+        
+        # Add detailed breakdown
+        budget_info = budget_status.get("budget_info", {})
+        if budget_info.get("has_data"):
+            if lang == "uz":
+                msg += (
+                    f"\n\n━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📋 *TAQSIMLASH:*\n"
+                    f"├ 💰 Daromad: *{budget_info['total_income']:,.0f}* so'm\n"
+                    f"├ 📌 Majburiy: *{budget_info['mandatory_expenses']:,.0f}* so'm\n"
+                    f"├ 💵 Bo'sh pul: *{budget_info['free_cash']:,.0f}* so'm\n"
+                    f"├ 🏦 Boylik (10%): *{budget_info['savings_budget']:,.0f}* so'm\n"
+                    f"├ ⚡ Qarz (20%): *{budget_info['extra_debt_budget']:,.0f}* so'm\n"
+                    f"└ 🏠 Yashash (70%): *{budget_info['living_budget']:,.0f}* so'm"
+                )
+            else:
+                msg += (
+                    f"\n\n━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📋 *РАСПРЕДЕЛЕНИЕ:*\n"
+                    f"├ 💰 Доход: *{budget_info['total_income']:,.0f}* сум\n"
+                    f"├ 📌 Обязательные: *{budget_info['mandatory_expenses']:,.0f}* сум\n"
+                    f"├ 💵 Свободные: *{budget_info['free_cash']:,.0f}* сум\n"
+                    f"├ 🏦 Богатство (10%): *{budget_info['savings_budget']:,.0f}* сум\n"
+                    f"├ ⚡ Долг (20%): *{budget_info['extra_debt_budget']:,.0f}* сум\n"
+                    f"└ 🏠 Жизнь (70%): *{budget_info['living_budget']:,.0f}* сум"
+                )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📊 Xarajatlar" if lang == "uz" else "📊 Расходы",
+            callback_data="ai_report"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show AI transaction report"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import get_transaction_summary, format_transaction_summary, get_budget_status
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
+        return
+    
+    # Get summary for last 30 days
+    summary = await get_transaction_summary(db, user["id"], days=30)
+    
+    if summary["total_income"] == 0 and summary["total_expense"] == 0:
+        if lang == "uz":
+            msg = (
+                "📊 *MOLIYAVIY HISOBOT*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "📭 Hali hech qanday yozuv yo'q.\n\n"
+                "🎤 Ovozli xabar yuboring:\n"
+                "\"Bugun ovqatga 50 ming berdim\"\n"
+                "\"Maosh tushdi 5 million\""
+            )
+        else:
+            msg = (
+                "📊 *ФИНАНСОВЫЙ ОТЧЁТ*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "📭 Записей пока нет.\n\n"
+                "🎤 Отправьте голосовое сообщение:\n"
+                "\"Сегодня на еду потратил 50 тысяч\"\n"
+                "\"Получил зарплату 5 миллионов\""
+            )
+    else:
+        msg = format_transaction_summary(summary, lang)
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📋 Oxirgi yozuvlar" if lang == "uz" else "📋 Последние записи",
+            callback_data="ai_recent"
+        )],
+        [InlineKeyboardButton(
+            "🎤 Yangi yozuv" if lang == "uz" else "🎤 Новая запись",
+            callback_data="ai_assistant"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_recent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show recent AI transactions"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import get_user_transactions, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
+        return
+    
+    # Get last 10 transactions
+    transactions = await get_user_transactions(db, user["id"], days=30)
+    transactions = transactions[:10]  # Limit to 10
+    
+    if not transactions:
+        if lang == "uz":
+            msg = (
+                "📋 *OXIRGI YOZUVLAR*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "📭 Hali hech qanday yozuv yo'q."
+            )
+        else:
+            msg = (
+                "📋 *ПОСЛЕДНИЕ ЗАПИСИ*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "📭 Записей пока нет."
+            )
+    else:
+        if lang == "uz":
+            msg = "📋 *OXIRGI YOZUVLAR*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        else:
+            msg = "📋 *ПОСЛЕДНИЕ ЗАПИСИ*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        for t in transactions:
+            type_emoji = "💰" if t["type"] == "income" else "💸"
+            if t["type"] == "income":
+                cat_name = INCOME_CATEGORIES[lang].get(t["category"], "📦 Boshqa")
+            else:
+                cat_name = EXPENSE_CATEGORIES[lang].get(t["category"], "📦 Boshqa")
+            
+            date_str = t["created_at"][:10] if t["created_at"] else ""
+            msg += f"{type_emoji} {cat_name}: *{t['amount']:,}* so'm\n"
+            msg += f"   _{t['description']}_ ({date_str})\n\n"
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+            callback_data="ai_report"
+        )],
+        [InlineKeyboardButton(
+            "🎤 Yangi yozuv" if lang == "uz" else "🎤 Новая запись",
+            callback_data="ai_assistant"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+# ==================== QARZ HANDLERS ====================
+
+async def ai_debt_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show list of user's debts"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import get_user_debts, get_debt_summary
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    debts = await get_user_debts(db, user["id"], status="active")
+    summary = await get_debt_summary(db, user["id"])
+    
+    if lang == "uz":
+        msg = (
+            "📋 *QARZLAR RO'YXATI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        if not debts:
+            msg += "📭 Hech qanday faol qarz yo'q.\n"
+        else:
+            # Bergan qarzlar
+            lent_debts = [d for d in debts if d["debt_type"] == "lent"]
+            if lent_debts:
+                msg += "📤 *BERGAN QARZLAR:*\n"
+                for d in lent_debts:
+                    remaining = d["amount"] - d["returned_amount"]
+                    due = f" (qaytarish: {d['due_date']})" if d["due_date"] else ""
+                    msg += f"├ {d['person_name']}: *{remaining:,.0f}* so'm{due}\n"
+                msg += "\n"
+            
+            # Olgan qarzlar
+            borrowed_debts = [d for d in debts if d["debt_type"] == "borrowed"]
+            if borrowed_debts:
+                msg += "📥 *OLGAN QARZLAR:*\n"
+                for d in borrowed_debts:
+                    remaining = d["amount"] - d["returned_amount"]
+                    due = f" (qaytarish: {d['due_date']})" if d["due_date"] else ""
+                    msg += f"├ {d['person_name']}: *{remaining:,.0f}* so'm{due}\n"
+                msg += "\n"
+        
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📤 Bergan jami: *{summary['total_lent']:,}* so'm\n"
+            f"📥 Olgan jami: *{summary['total_borrowed']:,}* so'm\n"
+        )
+        
+        net = summary['net_balance']
+        if net > 0:
+            msg += f"💚 Sof balans: *+{net:,}* so'm"
+        elif net < 0:
+            msg += f"🔴 Sof balans: *{net:,}* so'm"
+        else:
+            msg += f"⚪ Sof balans: *0* so'm"
+    else:
+        msg = (
+            "📋 *СПИСОК ДОЛГОВ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        if not debts:
+            msg += "📭 Нет активных долгов.\n"
+        else:
+            lent_debts = [d for d in debts if d["debt_type"] == "lent"]
+            if lent_debts:
+                msg += "📤 *ДАЛ В ДОЛГ:*\n"
+                for d in lent_debts:
+                    remaining = d["amount"] - d["returned_amount"]
+                    due = f" (возврат: {d['due_date']})" if d["due_date"] else ""
+                    msg += f"├ {d['person_name']}: *{remaining:,.0f}* сум{due}\n"
+                msg += "\n"
+            
+            borrowed_debts = [d for d in debts if d["debt_type"] == "borrowed"]
+            if borrowed_debts:
+                msg += "📥 *ВЗЯЛ В ДОЛГ:*\n"
+                for d in borrowed_debts:
+                    remaining = d["amount"] - d["returned_amount"]
+                    due = f" (возврат: {d['due_date']})" if d["due_date"] else ""
+                    msg += f"├ {d['person_name']}: *{remaining:,.0f}* сум{due}\n"
+                msg += "\n"
+        
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📤 Всего дал: *{summary['total_lent']:,}* сум\n"
+            f"📥 Всего взял: *{summary['total_borrowed']:,}* сум\n"
+        )
+        
+        net = summary['net_balance']
+        if net > 0:
+            msg += f"💚 Чистый баланс: *+{net:,}* сум"
+        elif net < 0:
+            msg += f"🔴 Чистый баланс: *{net:,}* сум"
+        else:
+            msg += f"⚪ Чистый баланс: *0* сум"
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "✅ Qarz qaytarildi" if lang == "uz" else "✅ Долг возвращён",
+            callback_data="ai_debt_mark_returned"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_debt_mark_returned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show debts that can be marked as returned"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import get_user_debts
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    debts = await get_user_debts(db, user["id"], status="active")
+    
+    if not debts:
+        if lang == "uz":
+            msg = "📭 Faol qarzlar yo'q"
+        else:
+            msg = "📭 Нет активных долгов"
+        await query.edit_message_text(msg, parse_mode="Markdown")
+        return
+    
+    if lang == "uz":
+        msg = (
+            "✅ *QARZ QAYTARILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Qaysi qarz qaytarilganini tanlang:"
+        )
+    else:
+        msg = (
+            "✅ *ДОЛГ ВОЗВРАЩЁН*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Выберите возвращённый долг:"
+        )
+    
+    keyboard = []
+    for d in debts[:10]:  # Limit to 10
+        type_emoji = "📤" if d["debt_type"] == "lent" else "📥"
+        remaining = d["amount"] - d["returned_amount"]
+        btn_text = f"{type_emoji} {d['person_name']}: {remaining:,.0f}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"ai_debt_return_{d['id']}")])
+    
+    keyboard.append([InlineKeyboardButton(
+        "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+        callback_data="ai_debt_list"
+    )])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_debt_return_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Mark a specific debt as returned"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract debt ID
+    callback_data = query.data  # ai_debt_return_123
+    try:
+        debt_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    from app.ai_assistant import update_debt_status, get_debt_summary, format_debt_summary_message
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Get debt info first
+    cursor = await db._connection.execute(
+        "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
+        (debt_id, user["id"])
+    )
+    debt = await cursor.fetchone()
+    
+    if not debt:
+        return
+    
+    debt = dict(debt)
+    
+    # Mark as returned (full amount)
+    await update_debt_status(db, debt_id, user["id"], "returned", debt["amount"])
+    
+    # Get updated summary
+    summary = await get_debt_summary(db, user["id"])
+    
+    if lang == "uz":
+        type_text = "Bergan qarz" if debt["debt_type"] == "lent" else "Olgan qarz"
+        msg = (
+            f"✅ *{type_text} qaytarildi!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 {debt['person_name']}\n"
+            f"💵 {debt['amount']:,.0f} so'm\n\n"
+        )
+    else:
+        type_text = "Данный долг" if debt["debt_type"] == "lent" else "Взятый долг"
+        msg = (
+            f"✅ *{type_text} возвращён!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 {debt['person_name']}\n"
+            f"💵 {debt['amount']:,.0f} сум\n\n"
+        )
+    
+    msg += format_debt_summary_message(summary, lang)
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+            callback_data="ai_debt_list"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Correct a debt entry"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract debt ID
+    callback_data = query.data  # ai_debt_correct_123
+    try:
+        debt_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Get debt info
+    cursor = await db._connection.execute(
+        "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
+        (debt_id, user["id"])
+    )
+    debt = await cursor.fetchone()
+    
+    if not debt:
+        await query.edit_message_text(
+            "❌ Qarz topilmadi" if lang == "uz" else "❌ Долг не найден"
+        )
+        return
+    
+    debt = dict(debt)
+    
+    if lang == "uz":
+        type_text = "Bergan qarz" if debt["debt_type"] == "lent" else "Olgan qarz"
+        msg = (
+            f"✏️ *QARZNI TUZATISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 Joriy yozuv:\n"
+            f"├ Turi: *{type_text}*\n"
+            f"├ Kim: *{debt['person_name']}*\n"
+            f"├ Summa: *{debt['amount']:,.0f}* so'm\n"
+            f"└ Sana: *{debt['given_date']}*\n\n"
+            "Quyidagilardan birini tanlang:"
+        )
+    else:
+        type_text = "Дал в долг" if debt["debt_type"] == "lent" else "Взял в долг"
+        msg = (
+            f"✏️ *ИСПРАВИТЬ ДОЛГ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 Текущая запись:\n"
+            f"├ Тип: *{type_text}*\n"
+            f"├ Кто: *{debt['person_name']}*\n"
+            f"├ Сумма: *{debt['amount']:,.0f}* сум\n"
+            f"└ Дата: *{debt['given_date']}*\n\n"
+            "Выберите действие:"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "🗑 O'chirish" if lang == "uz" else "🗑 Удалить",
+            callback_data=f"ai_debt_delete_{debt_id}"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
+            callback_data="ai_confirm_ok"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Delete a debt entry"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract debt ID
+    callback_data = query.data  # ai_debt_delete_123
+    try:
+        debt_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Delete debt
+    await db._connection.execute(
+        "DELETE FROM personal_debts WHERE id = ? AND user_id = ?",
+        (debt_id, user["id"])
+    )
+    await db._connection.commit()
+    
+    if lang == "uz":
+        msg = "🗑 *Qarz yozuvi o'chirildi*"
+    else:
+        msg = "🗑 *Запись о долге удалена*"
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
 
 
 # Keep old function for backwards compatibility

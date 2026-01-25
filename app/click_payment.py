@@ -13,15 +13,15 @@ CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "oOV5UCfhefh")
 CLICK_API_URL = "https://my.click.uz/services/pay"
 
 # Webhook URL (Render serverda ishlaganda - avtomatik o'rnatiladi)
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://solvo-bot.onrender.com")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://halos-bot.onrender.com")
 
-def generate_click_payment_url(amount: int, order_id: str, return_url: str, description: str = "SOLVO PRO") -> str:
+def generate_click_payment_url(amount: int, order_id: str, return_url: str, description: str = "HALOS PRO") -> str:
     """
     Generate Click payment URL for inline payment
     
     Args:
         amount: Payment amount in UZS
-        order_id: Unique order identifier (format: solvo_{telegram_id}_{plan_id})
+        order_id: Unique order identifier (format: halos_{telegram_id}_{plan_id})
         return_url: URL to redirect after payment
         description: Payment description
     
