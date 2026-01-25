@@ -10,15 +10,13 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 import json
 import logging
+import ssl
 
 logger = logging.getLogger(__name__)
 
 # Check if we're using PostgreSQL (production - Supabase/Railway)
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-SUPABASE_URL = os.getenv("SUPABASE_DB_URL", "")
-# Use Supabase URL if available, otherwise DATABASE_URL
-POSTGRES_URL = SUPABASE_URL or DATABASE_URL
-USE_POSTGRES = POSTGRES_URL.startswith("postgres")
+USE_POSTGRES = DATABASE_URL.startswith("postgres")
 
 if USE_POSTGRES:
     try:
@@ -27,6 +25,29 @@ if USE_POSTGRES:
     except ImportError:
         logger.error("asyncpg not installed! Run: pip install asyncpg")
         USE_POSTGRES = False
+
+
+def parse_database_url(url: str) -> dict:
+    """Parse DATABASE_URL into connection parameters"""
+    # Replace postgres:// with postgresql://
+    url = url.replace("postgres://", "postgresql://")
+    
+    # Parse URL
+    from urllib.parse import urlparse, parse_qs
+    parsed = urlparse(url)
+    
+    params = {
+        'host': parsed.hostname,
+        'port': parsed.port or 5432,
+        'user': parsed.username,
+        'password': parsed.password,
+        'database': parsed.path.lstrip('/'),
+    }
+    
+    # Log connection info (without password)
+    logger.info(f"Database: host={params['host']}, port={params['port']}, user={params['user']}, db={params['database']}")
+    
+    return params
 
 
 class Database:
@@ -39,21 +60,33 @@ class Database:
     async def connect(self):
         """Initialize database connection and create tables"""
         if self.is_postgres:
-            # PostgreSQL (Production - Supabase)
-            db_url = POSTGRES_URL.replace("postgres://", "postgresql://")
-            logger.info(f"Connecting to PostgreSQL (Supabase)...")
+            logger.info("Connecting to PostgreSQL...")
             
-            # Supabase requires SSL - use 'require' mode
-            # This works with Supabase pooler connections
-            self._pool = await asyncpg.create_pool(
-                db_url, 
-                min_size=1, 
-                max_size=5,
-                command_timeout=60,
-                ssl='require'  # Supabase requires SSL
-            )
-            await self._create_tables_postgres()
-            logger.info("PostgreSQL (Supabase) connected and tables created")
+            # Parse DATABASE_URL
+            params = parse_database_url(DATABASE_URL)
+            
+            # Create SSL context for Supabase
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            try:
+                self._pool = await asyncpg.create_pool(
+                    host=params['host'],
+                    port=params['port'],
+                    user=params['user'],
+                    password=params['password'],
+                    database=params['database'],
+                    min_size=1, 
+                    max_size=5,
+                    command_timeout=60,
+                    ssl=ssl_context
+                )
+                await self._create_tables_postgres()
+                logger.info("PostgreSQL connected and tables created!")
+            except Exception as e:
+                logger.error(f"PostgreSQL connection failed: {e}")
+                raise
         else:
             # SQLite (Local development)
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)

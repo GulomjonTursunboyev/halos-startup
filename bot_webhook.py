@@ -97,9 +97,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-PORT = int(os.getenv("PORT", 10000))
+PORT = int(os.getenv("PORT", 8080))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
+FLY_APP_NAME = os.getenv("FLY_APP_NAME", "")
 WEBHOOK_PATH = "/webhook"
+
+# Auto-detect external URL
+def get_external_url():
+    if RENDER_EXTERNAL_URL:
+        return RENDER_EXTERNAL_URL
+    if FLY_APP_NAME:
+        return f"https://{FLY_APP_NAME}.fly.dev"
+    return ""
+
+EXTERNAL_URL = get_external_url()
 
 # Global application
 application = None
@@ -350,12 +361,12 @@ async def on_startup(web_app):
     await start_scheduler(application.bot)
     
     # Set webhook
-    if RENDER_EXTERNAL_URL:
-        webhook_url = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
+    if EXTERNAL_URL:
+        webhook_url = f"{EXTERNAL_URL}{WEBHOOK_PATH}"
         await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
         logger.info(f"Webhook set: {webhook_url}")
     else:
-        logger.warning("RENDER_EXTERNAL_URL not set - webhook not configured!")
+        logger.warning("EXTERNAL_URL not set - webhook not configured!")
     
     # Start application
     await application.start()
