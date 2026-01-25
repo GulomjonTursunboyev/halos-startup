@@ -60,28 +60,49 @@ class Database:
     async def connect(self):
         """Initialize database connection and create tables"""
         if self.is_postgres:
-            logger.info("Connecting to PostgreSQL...")
+            logger.info("Connecting to PostgreSQL (Supabase/Railway)...")
             
-            # Parse DATABASE_URL
-            params = parse_database_url(DATABASE_URL)
+            # Format URL for asyncpg
+            db_url = DATABASE_URL
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
+            # Mask password for logging
+            from urllib.parse import urlparse
+            p = urlparse(db_url)
+            masked_url = f"{p.scheme}://{p.username}:****@{p.hostname}:{p.port}{p.path}"
+            logger.info(f"Connecting to: {masked_url}")
             
             try:
-                # Supabase Pooler requires ssl='require' string, not SSL context
+                # Use DSN directly. For Supabase pooler, ssl='require' is essential.
+                # We also set a larger command timeout for slow connections.
                 self._pool = await asyncpg.create_pool(
-                    host=params['host'],
-                    port=params['port'],
-                    user=params['user'],
-                    password=params['password'],
-                    database=params['database'],
+                    dsn=db_url,
                     min_size=1, 
                     max_size=5,
-                    command_timeout=60,
-                    ssl='require'  # Simple SSL mode for Supabase pooler
+                    command_timeout=90,
+                    ssl='require'
                 )
                 await self._create_tables_postgres()
                 logger.info("PostgreSQL connected and tables created!")
             except Exception as e:
                 logger.error(f"PostgreSQL connection failed: {e}")
+                # Fallback: Try without explicit SSL if 'require' fails 
+                # (though Supabase usually requires it)
+                if "SSL" in str(e) or "terminal" in str(e):
+                    try:
+                        logger.info("Retrying without explicit SSL requirement...")
+                        self._pool = await asyncpg.create_pool(
+                            dsn=db_url,
+                            min_size=1,
+                            max_size=5,
+                            command_timeout=90
+                        )
+                        await self._create_tables_postgres()
+                        logger.info("PostgreSQL connected (No SSL)!")
+                        return
+                    except Exception as e2:
+                        logger.error(f"PostgreSQL retry failed: {e2}")
                 raise
         else:
             # SQLite (Local development)
