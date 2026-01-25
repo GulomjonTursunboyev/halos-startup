@@ -9,7 +9,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
 )
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ApplicationHandlerStop
 from telegram.constants import ParseMode
 
 from app.database import get_database
@@ -460,6 +460,8 @@ async def enter_promo_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     # Set state for promo code input
     context.user_data["awaiting_promo"] = True
     
+    logger.info(f"[PROMO] enter_promo_callback: Set awaiting_promo=True for user {query.from_user.id}")
+    
     if lang == "uz":
         msg = (
             "🎁 *Promo-kod kiritish*\n\n"
@@ -486,16 +488,23 @@ async def enter_promo_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def handle_promo_code_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Handle promo code text input, returns True if handled"""
+    # Debug logging
+    logger.info(f"[PROMO] handle_promo_code_input called. awaiting_promo={context.user_data.get('awaiting_promo')}")
+    
     if not context.user_data.get("awaiting_promo"):
         return False
     
     lang = context.user_data.get("lang", "uz")
     code = update.message.text.strip().upper()
     
+    logger.info(f"[PROMO] Processing promo code: {code}")
+    
     context.user_data["awaiting_promo"] = False
     
     # Validate promo code
     promo = validate_promo_code(code)
+    
+    logger.info(f"[PROMO] Validation result: {promo}")
     
     if not promo:
         # Promo code invalid - show error and redirect to pricing
@@ -615,8 +624,10 @@ async def handle_promo_code_input(update: Update, context: ContextTypes.DEFAULT_
             )
         
         await update.message.reply_text(msg, parse_mode="Markdown")
+        logger.info(f"[PROMO] FREE DAYS activated for user {telegram_id}: {days} days until {expires_at}")
     
-    return True
+    # Stop other handlers from processing this message
+    raise ApplicationHandlerStop()
 
 
 async def cancel_promo_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
