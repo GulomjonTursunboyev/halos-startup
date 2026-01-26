@@ -1042,7 +1042,7 @@ async def quick_partner_income_callback(update: Update, context: ContextTypes.DE
 # ==================== LIVING COSTS INPUT ====================
 
 async def rent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle rent input"""
+    """Handle rent input - Step 4, then go to utilities"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1061,19 +1061,23 @@ async def rent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         get_message("cost_saved", lang).format(amount=format_number(amount))
     )
     
-    # Add quick button for no kindergarten
+    # Go to Step 5: Utilities
     keyboard = [
-        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+        [
+            InlineKeyboardButton(get_message("btn_utilities_300", lang), callback_data="quick_utilities_300000"),
+            InlineKeyboardButton(get_message("btn_utilities_500", lang), callback_data="quick_utilities_500000"),
+            InlineKeyboardButton(get_message("btn_utilities_800", lang), callback_data="quick_utilities_800000")
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        get_message("input_kindergarten", lang),
+        get_message("input_utilities", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.KINDERGARTEN
+    return States.UTILITIES
 
 
 async def quick_rent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1089,23 +1093,27 @@ async def quick_rent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         get_message("cost_saved", lang).format(amount="0")
     )
     
-    # Add quick button for no kindergarten
+    # Go to Step 5: Utilities
     keyboard = [
-        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+        [
+            InlineKeyboardButton(get_message("btn_utilities_300", lang), callback_data="quick_utilities_300000"),
+            InlineKeyboardButton(get_message("btn_utilities_500", lang), callback_data="quick_utilities_500000"),
+            InlineKeyboardButton(get_message("btn_utilities_800", lang), callback_data="quick_utilities_800000")
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        get_message("input_kindergarten", lang),
+        get_message("input_utilities", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.KINDERGARTEN
+    return States.UTILITIES
 
 
 async def kindergarten_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle kindergarten/education input"""
+    """Handle other debts input (personal loans from friends/family) - Step 3"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1118,33 +1126,29 @@ async def kindergarten_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return States.KINDERGARTEN
     
-    context.user_data["kindergarten"] = amount
+    context.user_data["kindergarten"] = amount  # Store as kindergarten for DB compatibility
     
     await update.message.reply_text(
         get_message("cost_saved", lang).format(amount=format_number(amount))
     )
     
-    # Add quick buttons for common utility amounts
+    # Go to Step 4: Rent
     keyboard = [
-        [
-            InlineKeyboardButton(get_message("btn_utilities_300", lang), callback_data="quick_utilities_300000"),
-            InlineKeyboardButton(get_message("btn_utilities_500", lang), callback_data="quick_utilities_500000"),
-            InlineKeyboardButton(get_message("btn_utilities_800", lang), callback_data="quick_utilities_800000")
-        ]
+        [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        get_message("input_utilities", lang),
+        get_message("input_rent", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.UTILITIES
+    return States.RENT
 
 
 async def quick_kindergarten_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle quick button for no kindergarten/kids"""
+    """Handle quick button for no other debts"""
     query = update.callback_query
     await query.answer()
     
@@ -1156,27 +1160,23 @@ async def quick_kindergarten_callback(update: Update, context: ContextTypes.DEFA
         get_message("cost_saved", lang).format(amount="0")
     )
     
-    # Add quick buttons for common utility amounts
+    # Go to Step 4: Rent
     keyboard = [
-        [
-            InlineKeyboardButton(get_message("btn_utilities_300", lang), callback_data="quick_utilities_300000"),
-            InlineKeyboardButton(get_message("btn_utilities_500", lang), callback_data="quick_utilities_500000"),
-            InlineKeyboardButton(get_message("btn_utilities_800", lang), callback_data="quick_utilities_800000")
-        ]
+        [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        get_message("input_utilities", lang),
+        get_message("input_rent", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.UTILITIES
+    return States.RENT
 
 
 async def utilities_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle utilities input"""
+    """Handle utilities input - Step 5, then go to mandatory expenses"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1195,22 +1195,19 @@ async def utilities_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         get_message("cost_saved", lang).format(amount=format_number(amount))
     )
     
-    # Ask about KATM PDF upload
+    # Go to Step 6: Mandatory expenses (then calculate)
     keyboard = [
-        [
-            InlineKeyboardButton(get_message("katm_yes", lang), callback_data="katm_yes"),
-            InlineKeyboardButton(get_message("katm_no", lang), callback_data="katm_no")
-        ]
+        [InlineKeyboardButton(get_message("btn_no_mandatory", lang), callback_data="quick_mandatory_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        get_message("katm_choice", lang),
+        get_message("input_mandatory_expenses", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.KATM_CHOICE
+    return States.MANDATORY_EXPENSES
 
 
 async def quick_utilities_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1228,22 +1225,61 @@ async def quick_utilities_callback(update: Update, context: ContextTypes.DEFAULT
         get_message("cost_saved", lang).format(amount=format_number(amount))
     )
     
-    # Ask about KATM PDF upload
+    # Go to Step 6: Mandatory expenses (then calculate)
     keyboard = [
-        [
-            InlineKeyboardButton(get_message("katm_yes", lang), callback_data="katm_yes"),
-            InlineKeyboardButton(get_message("katm_no", lang), callback_data="katm_no")
-        ]
+        [InlineKeyboardButton(get_message("btn_no_mandatory", lang), callback_data="quick_mandatory_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.message.reply_text(
-        get_message("katm_choice", lang),
+        get_message("input_mandatory_expenses", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.KATM_CHOICE
+    return States.MANDATORY_EXPENSES
+
+
+# ==================== MANDATORY EXPENSES (STEP 6/7) ====================
+
+async def mandatory_expenses_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle Step 6: Mandatory expenses input"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text.strip()
+    
+    # Parse amount
+    parsed = parse_smart_input(text)
+    if parsed is None:
+        await update.message.reply_text(get_message("error_parse", lang))
+        return States.MANDATORY_EXPENSES
+    
+    amount = parsed if parsed >= 0 else 0
+    context.user_data["mandatory_expenses"] = amount
+    
+    # Confirmation
+    await update.message.reply_text(
+        get_message("cost_saved", lang).format(amount=format_number(amount))
+    )
+    
+    # Step 7: Calculate with dramatic animation!
+    return await calculate_and_show_results(update, context)
+
+
+async def quick_mandatory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle 'no mandatory expenses' quick button"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    context.user_data["mandatory_expenses"] = 0
+    
+    await query.message.reply_text(
+        get_message("cost_saved", lang).format(amount=format_number(0))
+    )
+    
+    # Step 7: Calculate with dramatic animation!
+    return await calculate_and_show_results_from_callback(update, context)
 
 
 # ==================== KATM PDF UPLOAD ====================
@@ -1526,12 +1562,23 @@ async def quick_debt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         get_message("debt_saved", lang)
     )
     
-    # Go to calculation
-    return await calculate_and_show_results_from_callback(query, context)
+    # Go to Step 3: Other debts (personal loans)
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(
+        get_message("input_kindergarten", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KINDERGARTEN
 
 
 async def total_debt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle total debt input"""
+    """Handle total debt input - Step 2, then go to other debts"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1546,7 +1593,23 @@ async def total_debt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     context.user_data["total_debt"] = amount
     
-    return await calculate_and_show_results(update, context)
+    await update.message.reply_text(
+        get_message("debt_saved", lang)
+    )
+    
+    # Go to Step 3: Other debts (personal loans from friends/family)
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        get_message("input_kindergarten", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KINDERGARTEN
 
 
 # ==================== CALCULATION & RESULTS ====================
@@ -2599,6 +2662,10 @@ def get_conversation_handler() -> ConversationHandler:
             States.TOTAL_DEBT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, total_debt_handler),
                 CallbackQueryHandler(quick_debt_callback, pattern="^quick_debt_0$"),
+            ],
+            States.MANDATORY_EXPENSES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, mandatory_expenses_handler),
+                CallbackQueryHandler(quick_mandatory_callback, pattern="^quick_mandatory_0$"),
             ],
         },
         fallbacks=[

@@ -422,20 +422,24 @@ MESSAGES = {
     # ==================== MANDATORY LIVING COSTS ====================
     "input_rent": {
         "uz": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QADAM 3/5 — UY IJARASI*\n"
+            "🏠 *QADAM 4/7 — IJARA TO'LOVI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🏠 *Oylik ijara haqi*\n\n"
-            "📝 Raqam yozing: `2000000`\n"
-            "🏡 O'z uyingiz bo'lsa: `0`"
+            "🏠 *Oylik uy ijarasi*\n\n"
+            "Uy yoki kvartira uchun\n"
+            "oyiga qancha to'laysiz?\n\n"
+            "📝 Masalan: `2000000` yoki `2 mln`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🏡 _O'z uyingiz bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *ШАГ 3/5 — АРЕНДА*\n"
+            "🏠 *ШАГ 4/7 — АРЕНДА ЖИЛЬЯ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏠 *Ежемесячная аренда*\n\n"
-            "📝 Напишите число: `2000000`\n"
-            "🏡 Если своё жильё: `0`"
+            "Сколько вы платите за\n"
+            "аренду дома или квартиры?\n\n"
+            "📝 Например: `2000000` или `2 млн`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🏡 _Если своё жильё: напишите 0_"
         )
     },
     
@@ -446,54 +450,60 @@ MESSAGES = {
     
     "input_kindergarten": {
         "uz": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QADAM 4/5 — MAJBURIY TO'LOVLAR*\n"
+            "🤝 *QADAM 3/7 — QO'SHIMCHA QARZLAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📋 *Boshqa majburiy to'lovlar:*\n\n"
-            "• 👶 Bog'cha / Maktab to'lovi\n"
-            "• 🏥 Sug'urta (avto, uy, hayot)\n"
-            "• 📚 Kurslar, repetitor\n"
-            "• 🚗 Transport (benzin, avtobus)\n"
-            "• 💊 Doimiy dori-darmonlar\n\n"
-            "📝 Jami oylik summa: `500000`\n"
-            "❌ Yo'q bo'lsa: `0`"
+            "🤝 *Insonlardan olgan qarzlar*\n\n"
+            "• Do'st-yor, qarindoshlardan\n"
+            "• Tanishlardan olgan qarz\n"
+            "• Nasiyaga olgan tovarlar\n"
+            "• Boshqa shaxsiy qarzlar\n\n"
+            "📝 Jami qarz summasi: `5000000`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "✅ _Bunday qarz yo'q bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *ШАГ 4/5 — ОБЯЗАТЕЛЬНЫЕ ПЛАТЕЖИ*\n"
+            "🤝 *ШАГ 3/7 — ДОПОЛНИТЕЛЬНЫЕ ДОЛГИ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📋 *Другие обязательные платежи:*\n\n"
-            "• 👶 Детсад / Школа\n"
-            "• 🏥 Страховка (авто, дом, жизнь)\n"
-            "• 📚 Курсы, репетитор\n"
-            "• 🚗 Транспорт (бензин, автобус)\n"
-            "• 💊 Регулярные лекарства\n\n"
-            "📝 Итого в месяц: `500000`\n"
-            "❌ Если нет: `0`"
+            "🤝 *Долги людям*\n\n"
+            "• Друзьям, родственникам\n"
+            "• Знакомым\n"
+            "• Товары в рассрочку\n"
+            "• Другие личные долги\n\n"
+            "📝 Общая сумма долга: `5000000`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "✅ _Если таких долгов нет: напишите 0_"
         )
     },
     
     "btn_no_kids": {
-        "uz": "❌ Bunday to'lovlarim yo'q",
-        "ru": "❌ Таких платежей нет"
+        "uz": "✅ Bunday qarzim yo'q",
+        "ru": "✅ Таких долгов нет"
     },
     
     "input_utilities": {
         "uz": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QADAM 5/5 — KOMMUNAL*\n"
+            "💡 *QADAM 5/7 — KOMMUNAL TO'LOVLAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💡 *Elektr, gaz, suv, internet*\n\n"
-            "📝 Jami oylik: `400000`\n"
-            "💡 O'rtacha: 300K - 800K so'm"
+            "💡 *Oylik kommunal xizmatlar*\n\n"
+            "• Elektr energiya\n"
+            "• Gaz\n"
+            "• Suv\n"
+            "• Internet\n\n"
+            "📝 Jami oylik: `400000`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _O'rtacha: 300K - 800K so'm_"
         ),
         "ru": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *ШАГ 5/5 — КОММУНАЛКА*\n"
+            "💡 *ШАГ 5/7 — КОММУНАЛЬНЫЕ УСЛУГИ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💡 *Электр, газ, вода, интернет*\n\n"
-            "📝 Всего в месяц: `400000`\n"
-            "💡 Обычно: 300K - 800K сум"
+            "💡 *Ежемесячные коммунальные*\n\n"
+            "• Электричество\n"
+            "• Газ\n"
+            "• Вода\n"
+            "• Интернет\n\n"
+            "📝 Всего в месяц: `400000`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Обычно: 300K - 800K сум_"
         )
     },
     
@@ -517,6 +527,43 @@ MESSAGES = {
         "ru": "✅ Сохранено: {amount} сум"
     },
     
+    # ==================== MANDATORY EXPENSES (Step 6) ====================
+    "input_mandatory_expenses": {
+        "uz": (
+            "📋 *QADAM 6/7 — MAJBURIY XARAJATLAR*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📋 *To'lamasa bo'lmaydigan to'lovlar*\n\n"
+            "• 👶 Bog'cha / Maktab to'lovi\n"
+            "• 🏥 Sug'urta (avto, uy, tibbiy)\n"
+            "• 📚 Kurslar, repetitor\n"
+            "• 🚗 Transport (benzin, yo'l kira)\n"
+            "• 💊 Doimiy dori-darmonlar\n"
+            "• 📱 Telefon aloqa\n\n"
+            "📝 Jami oylik: `500000`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "✅ _Yo'q bo'lsa: 0 yozing_"
+        ),
+        "ru": (
+            "📋 *ШАГ 6/7 — ОБЯЗАТЕЛЬНЫЕ РАСХОДЫ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📋 *Платежи, которые нельзя пропустить*\n\n"
+            "• 👶 Детсад / Школа\n"
+            "• 🏥 Страховка (авто, дом, мед)\n"
+            "• 📚 Курсы, репетитор\n"
+            "• 🚗 Транспорт (бензин, проезд)\n"
+            "• 💊 Регулярные лекарства\n"
+            "• 📱 Мобильная связь\n\n"
+            "📝 Всего в месяц: `500000`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "✅ _Если нет: напишите 0_"
+        )
+    },
+    
+    "btn_no_mandatory": {
+        "uz": "✅ Bunday xarajatim yo'q",
+        "ru": "✅ Таких расходов нет"
+    },
+
     # ==================== KATM PDF UPLOAD ====================
     "katm_choice": {
         "uz": (
@@ -710,30 +757,24 @@ MESSAGES = {
     # ==================== LOAN INPUT (Step by Step) ====================
     "input_loan_payment": {
         "uz": (
-            "💳 *1-QADAM: OYLIK KREDIT TO'LOVI*\n"
+            "💳 *QADAM 1/7 — KREDIT TO'LOVI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Har oyda barcha kreditlar uchun\n"
-            "qancha to'laysiz?\n\n"
-            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
-            "💡 *Misollar:*\n"
-            "• `2500000` — 2.5 million\n"
-            "• `2 mln` — 2 million\n"
-            "• `0` — kredit yo'q\n\n"
+            "🏦 *Bank kreditlari uchun oylik to'lov*\n\n"
+            "Har oyda barcha bank kreditlari\n"
+            "uchun qancha to'laysiz?\n\n"
+            "📝 Masalan: `2500000` yoki `2.5 mln`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Bu oylik TO'LOV summasi, jami qarz emas!_"
+            "💡 _Kredit yo'q bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "💳 *ШАГ 1: ЕЖЕМЕСЯЧНЫЙ ПЛАТЁЖ*\n"
+            "💳 *ШАГ 1/7 — КРЕДИТНЫЙ ПЛАТЁЖ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏦 *Ежемесячный платёж по банковским кредитам*\n\n"
             "Сколько вы платите каждый месяц\n"
-            "по всем кредитам?\n\n"
-            "📝 *Напишите:* только число (в сумах)\n\n"
-            "💡 *Примеры:*\n"
-            "• `2500000` — 2.5 миллиона\n"
-            "• `2 млн` — 2 миллиона\n"
-            "• `0` — нет кредитов\n\n"
+            "по всем банковским кредитам?\n\n"
+            "📝 Например: `2500000` или `2.5 млн`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Это ежемесячный ПЛАТЁЖ, не общий долг!_"
+            "💡 _Если нет кредитов: напишите 0_"
         )
     },
     
@@ -744,30 +785,24 @@ MESSAGES = {
     
     "input_total_debt": {
         "uz": (
-            "📊 *2-QADAM: JAMI QARZ QOLDIG'I*\n"
+            "📊 *QADAM 2/7 — JAMI KREDIT QARZI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Barcha kreditlar bo'yicha\n"
+            "🏦 *Bank kreditlari bo'yicha jami qarz*\n\n"
+            "Barcha bank kreditlari bo'yicha\n"
             "hali qancha qarz qoldi?\n\n"
-            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
-            "💡 *Misollar:*\n"
-            "• `50000000` — 50 million\n"
-            "• `30 mln` — 30 million\n"
-            "• `0` — qarz yo'q\n\n"
+            "📝 Masalan: `50000000` yoki `50 mln`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Bu jami QARZ qoldig'i, oylik to'lov emas!_"
+            "💡 _Aniq bilmasangiz, taxminiy yozing_"
         ),
         "ru": (
-            "📊 *ШАГ 2: ОСТАТОК ДОЛГА*\n"
+            "📊 *ШАГ 2/7 — ОБЩИЙ КРЕДИТНЫЙ ДОЛГ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏦 *Общий долг по банковским кредитам*\n\n"
             "Сколько всего осталось выплатить\n"
-            "по всем кредитам?\n\n"
-            "📝 *Напишите:* только число (в сумах)\n\n"
-            "💡 *Примеры:*\n"
-            "• `50000000` — 50 миллионов\n"
-            "• `30 млн` — 30 миллионов\n"
-            "• `0` — нет долга\n\n"
+            "по всем банковским кредитам?\n\n"
+            "📝 Например: `50000000` или `50 млн`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Это общий ОСТАТОК долга, не ежемесячный платёж!_"
+            "💡 _Если не знаете точно, напишите примерно_"
         )
     },
     

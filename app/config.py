@@ -51,10 +51,12 @@ class States:
     INCOME_SELF = 5
     INCOME_PARTNER = 6
     RENT = 7
-    KINDERGARTEN = 8
+    KINDERGARTEN = 8         # Now used as OTHER_DEBTS (personal loans)
     UTILITIES = 9
     KATM_CHOICE = 10         # Ask about KATM upload
     KATM_UPLOAD = 11         # Waiting for PDF
-    LOAN_PAYMENT = 12        # Manual entry
-    TOTAL_DEBT = 13          # Manual entry
+    LOAN_PAYMENT = 12        # Monthly credit payment
+    TOTAL_DEBT = 13          # Total credit debt
     CONFIRM = 14
+    OTHER_DEBTS = 15         # Personal loans from friends/family
+    MANDATORY_EXPENSES = 16  # Bills that must be paid
