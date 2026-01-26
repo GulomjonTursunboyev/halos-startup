@@ -199,129 +199,101 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
 def detect_transaction_type(text: str) -> str:
     """
     Matndan tranzaksiya turini aniqlash (daromad yoki xarajat)
-    Murakkab kontekst tahlili bilan
+    YANGILANGAN: Kontekst asosida aqlli tahlil
+    
+    QOIDA: 
+    - "X ga Y oldim" = XARAJAT (non oldim, go'sht oldim, taksi oldim)
+    - "ishlab topdim/oldim" = DAROMAD
+    - Mahsulot/xizmat nomi + oldim = XARAJAT
     """
     text_lower = text.lower()
     
-    # ==================== DAROMAD INDIKATORLARI ====================
-    # Bu so'zlar ANIQ daromadni bildiradi
-    strong_income_keywords = [
-        # O'zbek - ishlab topish
+    # ==================== XARAJAT MAHSULOTLARI ====================
+    # Bu so'zlar OLDIM bilan kelsa = XARAJAT
+    expense_products = [
+        # Oziq-ovqat
+        "non", "go'sht", "guruch", "sabzavot", "meva", "sut", "tuxum", "un", "yog'",
+        "kolbasa", "pishloq", "shokolad", "choy", "qahva", "suv", "ichimlik",
+        "ovqat", "taom", "pivo", "aroq",
+        # Transport
+        "taksi", "benzin", "gaz", "avtobus", "metro", "poyezd", "samolyot", "bilet",
+        # Kiyim
+        "kiyim", "ko'ylak", "shim", "oyoq kiyim", "krossovka", "botinka",
+        # Texnika
+        "telefon", "kompyuter", "televizor", "muzlatgich", "kir yuvish",
+        # Uy-joy
+        "ijara", "kvartira", "uy", "mebel", "stol", "stul", "krovat",
+        # Sog'liq
+        "dori", "tabletka", "shifokor", "kasalxona", "apteka",
+        # Boshqa
+        "kitob", "o'yinchoq", "sovg'a", "gul"
+    ]
+    
+    # ==================== DAROMAD KONTEKSTLARI ====================
+    income_contexts = [
         "ishlab topdim", "ishlab oldim", "ishlagan pulim", "ish pulim",
-        "topib oldim", "topgan pulim", "ishladim va", "ishlab keldim",
-        # Maosh
-        "maosh", "oylik", "ish haqi", "ish haqim", "oyligim",
-        # Qabul qilish
-        "oldim daromad", "pul oldim", "pul tushdi", "pul keldi",
-        "oladigan", "olib keldim", "qo'limga tushdi",
-        # Biznes
-        "sotib oldim emas", "sotdim", "savdodan", "foyda oldim",
-        "daromad qildim", "pul qildim", "ishdan keldi",
-        # Rus
-        "заработал", "зарплата", "получил зарплату", "заработок",
-        "доход получил", "пришла зарплата", "получил деньги",
-        "выручка", "прибыль", "продал",
-        # English
-        "earned", "received", "got paid", "salary", "income"
+        "maosh", "oylik", "ish haqi", "daromad", "foyda",
+        "sotdim", "savdodan", "biznesdan", 
+        "pul tushdi", "pul keldi", "transfer keldi",
+        "заработал", "зарплата", "получил зарплату", "доход"
     ]
     
-    # Oddiy daromad so'zlari
-    income_keywords = [
-        "oldim", "keldim", "tushdi", "olib", "olgan",
-        "получил", "пришло", "получил",
-        "received", "got", "earn"
+    # ==================== XARAJAT KONTEKSTLARI ====================
+    expense_contexts = [
+        "sotib oldim", "harid qildim", "to'ladim", "berdim", "sarfladim",
+        "xarajat qildim", "pul berdim", "ketdi", "chiqdi",
+        "потратил", "заплатил", "купил", "оплатил"
     ]
     
-    # ==================== XARAJAT INDIKATORLARI ====================
-    # Bu so'zlar ANIQ xarajatni bildiradi
-    strong_expense_keywords = [
-        # O'zbek - to'lash
-        "to'ladim", "to'lab berdim", "pul berdim", "pul to'ladim",
-        "sarfladim", "sarf qildim", "xarajat qildim",
-        # Sotib olish (xarajat)
-        "sotib oldim", "sotib olib", "harid qildim",
-        "olib keldim magazindan", "olib berdim",
-        # Berish
-        "berdim", "berib", "bergan", "bo'lib berdim",
-        "ketdi", "ketgan", "chiqim", "chiqdi",
-        # Rus
-        "потратил", "заплатил", "купил", "оплатил",
-        "расход", "истратил", "отдал", "платил",
-        # English  
-        "paid", "spent", "bought", "purchased", "expense"
-    ]
+    # ==================== TAHLIL ====================
     
-    # Oddiy xarajat so'zlari
-    expense_keywords = [
-        "berdim", "berish", "xarajat", "chiqim",
-        "платить", "тратить",
-        "pay", "spend"
-    ]
+    # 1. BIRINCHI: Aniq daromad kontekstini tekshirish
+    for ctx in income_contexts:
+        if ctx in text_lower:
+            # "ishlab topdim" - bu daromad
+            if "ishlab" in ctx or "maosh" in ctx or "oylik" in ctx or "sotdim" in ctx:
+                logger.info(f"[DETECT] Daromad konteksti topildi: '{ctx}'")
+                return "income"
     
-    # ==================== BALLARNI HISOBLASH ====================
-    income_score = 0
-    expense_score = 0
+    # 2. IKKINCHI: Aniq xarajat kontekstini tekshirish
+    for ctx in expense_contexts:
+        if ctx in text_lower:
+            logger.info(f"[DETECT] Xarajat konteksti topildi: '{ctx}'")
+            return "expense"
     
-    # Kuchli indikatorlar (3 ball)
-    for kw in strong_income_keywords:
-        if kw in text_lower:
-            income_score += 3
+    # 3. UCHINCHI: Mahsulot + "oldim/ga" = XARAJAT
+    # "non oldim", "50 mingga non oldim", "go'sht oldim"
+    for product in expense_products:
+        # Pattern: "X ga [product] oldim" yoki "[product] oldim"
+        if product in text_lower:
+            # Bu mahsulot - demak xarajat
+            if "oldim" in text_lower or "berdim" in text_lower or "to'ladim" in text_lower:
+                logger.info(f"[DETECT] Mahsulot xarajati: '{product}'")
+                return "expense"
+            # "ga" bilan kelsa ham xarajat: "10 mingga non"
+            if re.search(rf'\d+.*?ga\s+{product}', text_lower):
+                logger.info(f"[DETECT] Summa+mahsulot xarajati: '{product}'")
+                return "expense"
     
-    for kw in strong_expense_keywords:
-        if kw in text_lower:
-            expense_score += 3
+    # 4. TO'RTINCHI: "X ga ... oldim" pattern (summa + oldim)
+    # "10 000 ga non oldim" - bu xarajat
+    if re.search(r'\d+.*?ga\s+\w+\s+oldim', text_lower):
+        logger.info("[DETECT] 'X ga Y oldim' pattern - xarajat")
+        return "expense"
     
-    # Oddiy indikatorlar (1 ball)
-    for kw in income_keywords:
-        if kw in text_lower:
-            income_score += 1
-    
-    for kw in expense_keywords:
-        if kw in text_lower:
-            expense_score += 1
-    
-    # ==================== MAXSUS KONTEKST TAHLILI ====================
-    
-    # "ishlab" + (topdim/oldim/keldim) = daromad
-    if re.search(r'ishla[by].*?(topdim|oldim|keldim|topgan|olgan)', text_lower):
-        income_score += 5
-    
-    # "topib/topgan" = daromad (pul topish)
-    if re.search(r'top[ib](dim|gan|b)', text_lower):
-        income_score += 3
-    
-    # "maosh/oylik" hamma kontekstda daromad
-    if re.search(r'(maosh|oylik|ish.?haqi)', text_lower):
-        income_score += 5
-    
-    # "sotib oldim" = xarajat
-    if "sotib" in text_lower and "oldim" in text_lower:
-        expense_score += 5
-        income_score -= 3  # "oldim" ning daromad ballini kamaytirish
-    
-    # "oldim" ALONE without "ishlab/topdim" context = xarajat
+    # 5. BESHINCHI: Faqat "oldim" - default xarajat (agar daromad emas bo'lsa)
     if "oldim" in text_lower and "ishlab" not in text_lower and "topib" not in text_lower:
-        if not re.search(r'(maosh|oylik|ish.?haqi|pul.?(tushdi|keldi))', text_lower):
-            expense_score += 2
+        logger.info("[DETECT] 'oldim' without income context - xarajat")
+        return "expense"
     
-    # Kategoriya so'zlari bilan tahlil
-    food_expense_words = ["ovqat", "taom", "restoran", "kafe", "bozor", "oziq"]
-    transport_words = ["taksi", "benzin", "transport", "avtobus", "mashina"]
-    
-    for word in food_expense_words + transport_words:
-        if word in text_lower:
-            expense_score += 1
-    
-    # ==================== NATIJA ====================
-    print(f"Transaction detection: income={income_score}, expense={expense_score}, text='{text[:50]}'")
-    
-    if income_score > expense_score:
+    # 6. OLTINCHI: "topdim" alone = daromad (pul topdim)
+    if "topdim" in text_lower:
+        logger.info("[DETECT] 'topdim' - daromad")
         return "income"
-    elif expense_score > income_score:
-        return "expense"
-    else:
-        # Default - xarajat (ko'p hollarda xarajat yoziladi)
-        return "expense"
+    
+    # Default - xarajat (ko'p hollarda xarajat yoziladi)
+    logger.info("[DETECT] Default - xarajat")
+    return "expense"
 
 
 def detect_category(text: str, transaction_type: str) -> str:
@@ -1345,9 +1317,9 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
         
         # Budget status
         if budget_status and total_expense > 0:
-            daily_budget = budget_status.get("daily_budget", 0)
-            spent_today = budget_status.get("spent_today", 0) + total_expense
-            remaining = daily_budget - spent_today
+            daily_budget = int(budget_status.get("daily_budget", 0))
+            spent_today = int(budget_status.get("spent_today", 0) + total_expense)
+            remaining = int(daily_budget - spent_today)
             
             if daily_budget > 0:
                 msg += f"\n📊 *Bugungi byudjet:*\n"
