@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
-from telegram import Bot
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 
 from app.database import get_database
@@ -46,9 +46,10 @@ class ProCareScheduler:
             asyncio.create_task(self._weekly_progress_job()),
             asyncio.create_task(self._monthly_countdown_job()),
             asyncio.create_task(self._debt_reminder_job()),  # Qarz eslatmalari
+            asyncio.create_task(self._subscription_expiry_job()),  # Obuna muddati nazorati
         ]
         
-        logger.info("PRO Care Scheduler started with 5 jobs")
+        logger.info("PRO Care Scheduler started with 6 jobs")
     
     async def stop(self):
         """Stop all scheduled jobs"""
@@ -347,6 +348,137 @@ class ProCareScheduler:
                 
             except Exception as e:
                 logger.error(f"Error in monthly countdown job: {e}")
+            
+            # Check every hour
+            await asyncio.sleep(60 * 60)
+    
+    async def _subscription_expiry_job(self):
+        """
+        Job: PRO obuna muddati nazorati
+        Har 1 soatda tekshiradi:
+        - Muddati tugagan obunalarni FREE ga qaytaradi
+        - 3 kun ichida tugaydigan obunalarga ogohlantirish yuboradi
+        """
+        while self._running:
+            try:
+                now = datetime.now()
+                logger.info("Checking subscription expiry...")
+                
+                # ==================== MUDDATI TUGAGAN OBUNALAR ====================
+                expired = await get_expired_subscriptions()
+                
+                for user in expired:
+                    try:
+                        telegram_id = user["telegram_id"]
+                        lang = user.get("language", "uz")
+                        name = user.get("first_name", "")
+                        
+                        # Reset to free
+                        await reset_expired_subscription(telegram_id)
+                        
+                        # Send notification
+                        if lang == "uz":
+                            message = (
+                                "⚠️ *PRO OBUNA TUGADI*\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                f"Salom {name}! Sizning PRO obunangiz muddati tugadi.\n\n"
+                                "🔒 PRO imkoniyatlar endi cheklangan:\n"
+                                "├ ❌ HALOS sanasi\n"
+                                "├ ❌ Tezkor qutilish rejasi\n"
+                                "├ ❌ AI ovozli yordamchi\n"
+                                "└ ❌ Excel eksport\n\n"
+                                "💎 Davom ettirish uchun PRO ni yangilang!"
+                            )
+                        else:
+                            message = (
+                                "⚠️ *PRO ПОДПИСКА ИСТЕКЛА*\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                f"Здравствуйте {name}! Срок вашей PRO подписки истек.\n\n"
+                                "🔒 PRO возможности теперь ограничены:\n"
+                                "├ ❌ Дата HALOS\n"
+                                "├ ❌ Быстрый план погашения\n"
+                                "├ ❌ AI голосовой помощник\n"
+                                "└ ❌ Excel экспорт\n\n"
+                                "💎 Продлите PRO чтобы продолжить!"
+                            )
+                        
+                        keyboard = InlineKeyboardMarkup([
+                            [InlineKeyboardButton(
+                                "💎 PRO yangilash" if lang == "uz" else "💎 Продлить PRO",
+                                callback_data="show_pricing"
+                            )]
+                        ])
+                        
+                        await self.bot.send_message(
+                            chat_id=telegram_id,
+                            text=message,
+                            parse_mode="Markdown",
+                            reply_markup=keyboard
+                        )
+                        
+                        logger.info(f"Subscription expired notification sent to {telegram_id}")
+                        await asyncio.sleep(0.5)
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing expired subscription for {user.get('telegram_id')}: {e}")
+                
+                # ==================== TUZ TUGAYDIGAN OBUNALAR (3 kun ichida) ====================
+                # Faqat kuniga 1 marta (soat 10:00 da)
+                if now.hour == 10:
+                    expiring_soon = await get_expiring_soon_subscriptions(days=3)
+                    
+                    for user in expiring_soon:
+                        try:
+                            telegram_id = user["telegram_id"]
+                            lang = user.get("language", "uz")
+                            name = user.get("first_name", "")
+                            expires = user.get("subscription_expires")
+                            
+                            if isinstance(expires, str):
+                                expires = datetime.fromisoformat(expires)
+                            
+                            days_left = (expires - now).days + 1
+                            
+                            if lang == "uz":
+                                message = (
+                                    "⏰ *PRO OBUNA TUGAYAPTI*\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                    f"Salom {name}! PRO obunangiz *{days_left} kun*da tugaydi.\n\n"
+                                    f"📅 Tugash sanasi: *{expires.strftime('%d.%m.%Y')}*\n\n"
+                                    "💡 Hozir yangilasangiz, uzilishsiz davom etasiz!"
+                                )
+                            else:
+                                message = (
+                                    "⏰ *PRO ПОДПИСКА ЗАКАНЧИВАЕТСЯ*\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                    f"Здравствуйте {name}! Ваша PRO подписка истекает через *{days_left} дн.*\n\n"
+                                    f"📅 Дата окончания: *{expires.strftime('%d.%m.%Y')}*\n\n"
+                                    "💡 Продлите сейчас для непрерывного использования!"
+                                )
+                            
+                            keyboard = InlineKeyboardMarkup([
+                                [InlineKeyboardButton(
+                                    "💎 PRO yangilash" if lang == "uz" else "💎 Продлить PRO",
+                                    callback_data="show_pricing"
+                                )]
+                            ])
+                            
+                            await self.bot.send_message(
+                                chat_id=telegram_id,
+                                text=message,
+                                parse_mode="Markdown",
+                                reply_markup=keyboard
+                            )
+                            
+                            await asyncio.sleep(0.5)
+                            
+                        except Exception as e:
+                            logger.error(f"Error sending expiry warning to {user.get('telegram_id')}: {e}")
+                
+                logger.info(f"Subscription expiry check complete: {len(expired)} expired, processed")
+                
+            except Exception as e:
+                logger.error(f"Error in subscription expiry job: {e}")
             
             # Check every hour
             await asyncio.sleep(60 * 60)
@@ -717,6 +849,84 @@ async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
         """, (today_str, target_date)) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+async def get_expired_subscriptions() -> List[Dict[str, Any]]:
+    """Get users with expired PRO subscriptions that haven't been reset to free"""
+    db = await get_database()
+    
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT telegram_id, first_name, language, subscription_expires
+                FROM users
+                WHERE subscription_tier = 'pro'
+                AND subscription_expires IS NOT NULL
+                AND subscription_expires < NOW()
+            """)
+            return [dict(row) for row in rows]
+    else:
+        async with db._connection.execute("""
+            SELECT telegram_id, first_name, language, subscription_expires
+            FROM users
+            WHERE subscription_tier = 'pro'
+            AND subscription_expires IS NOT NULL
+            AND subscription_expires < datetime('now')
+        """) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def get_expiring_soon_subscriptions(days: int = 3) -> List[Dict[str, Any]]:
+    """Get users whose PRO subscription expires within N days"""
+    db = await get_database()
+    now = datetime.now()
+    future = now + timedelta(days=days)
+    
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT telegram_id, first_name, language, subscription_expires
+                FROM users
+                WHERE subscription_tier = 'pro'
+                AND subscription_expires IS NOT NULL
+                AND subscription_expires > $1
+                AND subscription_expires <= $2
+            """, now, future)
+            return [dict(row) for row in rows]
+    else:
+        async with db._connection.execute("""
+            SELECT telegram_id, first_name, language, subscription_expires
+            FROM users
+            WHERE subscription_tier = 'pro'
+            AND subscription_expires IS NOT NULL
+            AND subscription_expires > ?
+            AND subscription_expires <= ?
+        """, (now.isoformat(), future.isoformat())) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def reset_expired_subscription(telegram_id: int):
+    """Reset expired subscription to free tier"""
+    db = await get_database()
+    
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute("""
+                UPDATE users 
+                SET subscription_tier = 'free'
+                WHERE telegram_id = $1
+            """, telegram_id)
+    else:
+        await db._connection.execute("""
+            UPDATE users 
+            SET subscription_tier = 'free'
+            WHERE telegram_id = ?
+        """, (telegram_id,))
+        await db._connection.commit()
+    
+    logger.info(f"Reset subscription to FREE for user {telegram_id}")
 
 
 async def get_scheduler(bot: Bot) -> ProCareScheduler:
