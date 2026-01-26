@@ -15,13 +15,12 @@ from app.subscription import PRICING_PLANS
 logger = logging.getLogger(__name__)
 
 # Click configuration
-CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "oOV5UCfhefh")
-CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "18872")
-CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "18872")
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "wgqetRCPLPQV2oYd1I")
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "18870")
+CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "18870")
 
-# Admin notification bot
-ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN", "")  # Separate bot for notifications
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")  # Admin chat/channel ID
+# Import config for admin notifications
+from app.config import BOT_TOKEN, ADMIN_IDS
 
 # Error codes
 CLICK_ERRORS = {
@@ -81,9 +80,9 @@ async def send_admin_notification(
     user_name: str = None,
     phone: str = None
 ):
-    """Send payment notification to admin bot"""
-    if not ADMIN_BOT_TOKEN or not ADMIN_CHAT_ID:
-        logger.warning("Admin notification not configured (ADMIN_BOT_TOKEN or ADMIN_CHAT_ID missing)")
+    """Send payment notification to admins using main bot"""
+    if not ADMIN_IDS or not BOT_TOKEN:
+        logger.warning("Admin notification not configured (ADMIN_IDS or BOT_TOKEN missing)")
         return
     
     try:
@@ -98,7 +97,7 @@ async def send_admin_notification(
         }.get(status, '❓')
         
         message = (
-            f"{status_emoji} *TO'LOV XABARNOMASI*\n"
+            f"{status_emoji} *CLICK TO'LOV XABARNOMASI*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"👤 *Foydalanuvchi:* {user_name or 'N/A'}\n"
             f"📱 *Telefon:* {phone or 'N/A'}\n"
@@ -110,18 +109,23 @@ async def send_admin_notification(
             f"🕐 *Vaqt:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
-        url = f"https://api.telegram.org/bot{ADMIN_BOT_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json={
-                "chat_id": ADMIN_CHAT_ID,
-                "text": message,
-                "parse_mode": "Markdown"
-            }) as response:
-                if response.status == 200:
-                    logger.info(f"Admin notification sent for payment {payment_id}")
-                else:
-                    logger.error(f"Failed to send admin notification: {await response.text()}")
+            # Send to all admins
+            for admin_id in ADMIN_IDS:
+                try:
+                    async with session.post(url, json={
+                        "chat_id": admin_id,
+                        "text": message,
+                        "parse_mode": "Markdown"
+                    }) as response:
+                        if response.status == 200:
+                            logger.info(f"Admin notification sent to {admin_id} for payment {payment_id}")
+                        else:
+                            logger.error(f"Failed to send admin notification to {admin_id}: {await response.text()}")
+                except Exception as e:
+                    logger.error(f"Error sending to admin {admin_id}: {e}")
                     
     except Exception as e:
         logger.error(f"Error sending admin notification: {e}")

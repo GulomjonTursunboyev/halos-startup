@@ -41,6 +41,46 @@ async def click_webhook_handler(request: web.Request) -> web.Response:
         return web.json_response({"error": -8, "error_note": str(e)})
 
 
+async def click_prepare_handler(request: web.Request) -> web.Response:
+    """Handle Click PREPARE request (action=0)"""
+    try:
+        data = await request.post()
+        data_dict = dict(data)
+        data_dict['action'] = 0  # Force prepare action
+        
+        logger.info(f"Click PREPARE received: {data_dict}")
+        
+        result = await handle_click_webhook(data_dict)
+        
+        logger.info(f"Click PREPARE response: {result}")
+        
+        return web.json_response(result)
+        
+    except Exception as e:
+        logger.error(f"Click prepare error: {e}")
+        return web.json_response({"error": -8, "error_note": str(e)})
+
+
+async def click_complete_handler(request: web.Request) -> web.Response:
+    """Handle Click COMPLETE request (action=1)"""
+    try:
+        data = await request.post()
+        data_dict = dict(data)
+        data_dict['action'] = 1  # Force complete action
+        
+        logger.info(f"Click COMPLETE received: {data_dict}")
+        
+        result = await handle_click_webhook(data_dict)
+        
+        logger.info(f"Click COMPLETE response: {result}")
+        
+        return web.json_response(result)
+        
+    except Exception as e:
+        logger.error(f"Click complete error: {e}")
+        return web.json_response({"error": -8, "error_note": str(e)})
+
+
 async def health_check(request: web.Request) -> web.Response:
     """Health check endpoint for Railway"""
     return web.Response(text="OK")
@@ -99,7 +139,9 @@ async def init_app() -> web.Application:
     await get_database()
     
     # Routes
-    app.router.add_post('/click/webhook', click_webhook_handler)
+    app.router.add_post('/click/prepare', click_prepare_handler)  # Click Prepare URL
+    app.router.add_post('/click/complete', click_complete_handler)  # Click Complete URL
+    app.router.add_post('/click/webhook', click_webhook_handler)  # Generic webhook
     app.router.add_post('/click', click_webhook_handler)  # Alternative endpoint
     app.router.add_get('/health', health_check)
     app.router.add_get('/status/{order_id}', payment_status)
