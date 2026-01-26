@@ -51,6 +51,11 @@ async def send_payment_notification(
     
     emoji, status_text = status_info.get(status, ('❓', status.upper()))
     
+    # Default values for None
+    user_name_display = user_name or "Noma'lum"
+    phone_display = phone or "Noma'lum"
+    payment_id_display = payment_id or "N/A"
+    
     # Build message
     message = (
         f"{emoji} *TO'LOV XABARNOMASI*\n"
@@ -58,13 +63,13 @@ async def send_payment_notification(
         f"📋 *Status:* {status_text}\n"
         f"💳 *Usul:* {payment_method}\n\n"
         f"👤 *Foydalanuvchi:*\n"
-        f"├ Ism: {user_name or 'Noma\'lum'}\n"
-        f"├ Telefon: {phone or 'Noma\'lum'}\n"
+        f"├ Ism: {user_name_display}\n"
+        f"├ Telefon: {phone_display}\n"
         f"└ Telegram ID: `{telegram_id}`\n\n"
         f"📦 *To'lov:*\n"
         f"├ Tarif: {plan_name}\n"
         f"├ Summa: *{amount:,} so'm*\n"
-        f"└ Payment ID: `{payment_id or 'N/A'}`\n\n"
+        f"└ Payment ID: `{payment_id_display}`\n\n"
         f"🕐 *Vaqt:* {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
     )
     
