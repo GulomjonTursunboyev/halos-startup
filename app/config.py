@@ -14,6 +14,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Bot token
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# Payment notification bot (alohida bot - to'lov xabarlari uchun)
+PAYMENT_BOT_TOKEN = os.getenv("PAYMENT_BOT_TOKEN", "")
+PAYMENT_ADMIN_IDS = [int(id.strip()) for id in os.getenv("PAYMENT_ADMIN_IDS", "").split(",") if id.strip()]
+
 # Database
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/solvo.db")
 DATABASE_URL = BASE_DIR / DATABASE_PATH

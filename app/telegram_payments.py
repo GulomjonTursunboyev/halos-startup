@@ -304,13 +304,18 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         
         logger.info(f"PRO activated via Telegram Payments: user={telegram_id}, plan={plan_id}, expires={expires}")
         
-        # Send admin notification (optional)
-        await send_admin_payment_notification(
+        # Send admin notification to payment bot
+        from app.payment_notifications import send_payment_notification
+        await send_payment_notification(
             telegram_id=telegram_id,
-            user_name=user.get('first_name'),
             plan_id=plan_id,
+            plan_name=plan.description_uz,
             amount=plan.price_uzs,
-            payment_id=payment.telegram_payment_charge_id
+            status='completed',
+            payment_id=payment.telegram_payment_charge_id,
+            user_name=user.get('first_name'),
+            phone=user.get('phone_number'),
+            payment_method="Click (Telegram)"
         )
         
     except Exception as e:
@@ -319,55 +324,6 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
             "✅ To'lov qabul qilindi!\n"
             "⚠️ PRO aktivatsiyada xatolik. Admin bilan bog'laning: @halos_support"
         )
-
-
-async def send_admin_payment_notification(
-    telegram_id: int,
-    user_name: str,
-    plan_id: str,
-    amount: float,
-    payment_id: str
-):
-    """Send notification to admin about successful payment"""
-    try:
-        from app.config import ADMIN_IDS, BOT_TOKEN
-        import aiohttp
-        
-        if not ADMIN_IDS:
-            return
-        
-        plan = PRICING_PLANS.get(plan_id)
-        plan_name = plan.description_uz if plan else plan_id
-        
-        message = (
-            "💰 *YANGI TO'LOV!*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"👤 Foydalanuvchi: *{user_name or 'N/A'}*\n"
-            f"🆔 Telegram ID: `{telegram_id}`\n\n"
-            f"📦 Tarif: *{plan_name}*\n"
-            f"💵 Summa: *{amount:,} so'm*\n"
-            f"🔑 Payment ID: `{payment_id}`\n\n"
-            f"🕐 Vaqt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"{'🧪 TEST MODE' if IS_TEST_MODE else '✅ LIVE MODE'}"
-        )
-        
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        
-        async with aiohttp.ClientSession() as session:
-            for admin_id in ADMIN_IDS:
-                try:
-                    async with session.post(url, json={
-                        "chat_id": admin_id,
-                        "text": message,
-                        "parse_mode": "Markdown"
-                    }) as response:
-                        if response.status != 200:
-                            logger.error(f"Failed to notify admin {admin_id}")
-                except Exception as e:
-                    logger.error(f"Error notifying admin {admin_id}: {e}")
-                    
-    except Exception as e:
-        logger.error(f"Admin notification error: {e}")
 
 
 # ==================== TELEGRAM PAY CALLBACK ====================
