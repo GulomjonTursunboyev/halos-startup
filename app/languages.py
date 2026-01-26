@@ -11,28 +11,28 @@ MESSAGES = {
     # ==================== WELCOME & REGISTRATION ====================
     "welcome": {
         "uz": (
-            "✨ *HALOS* ga xush kelibsiz\n\n"
-            "Sizni moliyaviy yukdan xalos bo'lib, o'z boyligingizni qurish yo'liga olib chiqaman.\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 *HALOS sizga yordam beradi:*\n\n"
-            "🕊 Moliyaviy yukdan *qachon* xalos bo'lishni ko'rsatadi\n"
-            "💎 Oylik *qancha* shaxsiy kapital ortira olishingizni hisoblaydi\n"
-            "🌅 *Moliyaviy tinchlik* yo'lingizni tuzadi\n"
-            "📊 Statistika va *batafsil hisobotlar*\n"
+            "✨ *Salom!*\n\n"
+            "Men HALOS — sizning moliyaviy xaloskorigingizman.\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Boshlash uchun* ro'yxatdan o'ting 👇"
+            "📍 *Bitta savol bor:*\n\n"
+            "_Sizning qarzingiz qachon tugashini bilasizmi?_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Men sizga aniq javob beraman:\n"
+            "📅 *Qaysi oyda* qarzdan xalos bo'lasiz\n"
+            "💎 *Qancha* shaxsiy kapital qurasiz\n\n"
+            "Tayyor bo'lsangiz, *ro'yxatdan o'ting* 👇"
         ),
         "ru": (
-            "✨ Добро пожаловать в *HALOS*\n\n"
-            "Помогу вам выйти из финансового бремени и начать строить собственный капитал.\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🌟 *HALOS поможет вам:*\n\n"
-            "🕊 Показать *когда* вы освободитесь от бремени\n"
-            "💎 Рассчитать *сколько* личного капитала сможете создать\n"
-            "🌅 Построить путь к *финансовому спокойствию*\n"
-            "📊 Статистика и *детальные отчёты*\n"
+            "✨ *Привет!*\n\n"
+            "Я HALOS — ваш финансовый спаситель.\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ *Чтобы начать* зарегистрируйтесь 👇"
+            "📍 *Один вопрос:*\n\n"
+            "_Вы знаете, когда закончится ваш долг?_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Я дам вам точный ответ:\n"
+            "📅 *В каком месяце* вы освободитесь от долга\n"
+            "💎 *Сколько* личного капитала создадите\n\n"
+            "Если готовы, *зарегистрируйтесь* 👇"
         )
     },
     
@@ -367,24 +367,24 @@ MESSAGES = {
     # ==================== INCOME INPUT ====================
     "input_income_self": {
         "uz": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QADAM 1/5 — DAROMAD*\n"
+            "💵 *2-QADAM: OYLIK DAROMAD*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💵 *O'zingizning oylik maoshingiz*\n\n"
-            "Raqam yozing yoki karta tarixi faylini yuboring.\n"
-            "Bot avtomatik aniqlaydi.\n\n"
-            "📝 Masalan: `5000000` yoki `5 mln`\n"
-            "📎 Yoki: PDF, HTML, Excel fayl"
+            "Endi daromadingizni bilishim kerak.\n\n"
+            "*Oyiga qancha pul topasiz?*\n"
+            "(ish haqi, biznes, boshqa daromadlar)\n\n"
+            "📝 Masalan: `5000000` yoki `5 mln`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Barcha daromadlarni qo'shing_"
         ),
         "ru": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *ШАГ 1/5 — ДОХОД*\n"
+            "💵 *ШАГ 2: ЕЖЕМЕСЯЧНЫЙ ДОХОД*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💵 *Ваша ежемесячная зарплата*\n\n"
-            "Напишите число или отправьте файл истории карты.\n"
-            "Бот определит автоматически.\n\n"
-            "📝 Например: `5000000` или `5 млн`\n"
-            "📎 Или: PDF, HTML, Excel файл"
+            "Теперь мне нужно знать ваш доход.\n\n"
+            "*Сколько вы зарабатываете в месяц?*\n"
+            "(зарплата, бизнес, другие доходы)\n\n"
+            "📝 Например: `5000000` или `5 млн`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Сложите все доходы_"
         )
     },
     
@@ -710,30 +710,23 @@ MESSAGES = {
     # ==================== LOAN INPUT (Step by Step) ====================
     "input_loan_payment": {
         "uz": (
-            "💳 *1-QADAM: OYLIK KREDIT TO'LOVI*\n"
+            "💳 *3-QADAM: OYLIK TO'LOV*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Har oyda barcha kreditlar uchun\n"
-            "qancha to'laysiz?\n\n"
-            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
-            "💡 *Misollar:*\n"
-            "• `2500000` — 2.5 million\n"
-            "• `2 mln` — 2 million\n"
-            "• `0` — kredit yo'q\n\n"
+            "Har oyda qarzlar uchun *qancha to'laysiz?*\n\n"
+            "Barcha kredit, nasiya, qarz to'lovlarini\n"
+            "qo'shib yozing.\n\n"
+            "📝 Masalan: `2500000` yoki `2 mln`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Bu oylik TO'LOV summasi, jami qarz emas!_"
+            "_Bu oylik TO'LOV, jami qarz emas!_"
         ),
         "ru": (
-            "💳 *ШАГ 1: ЕЖЕМЕСЯЧНЫЙ ПЛАТЁЖ*\n"
+            "💳 *ШАГ 3: ЕЖЕМЕСЯЧНЫЙ ПЛАТЁЖ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Сколько вы платите каждый месяц\n"
-            "по всем кредитам?\n\n"
-            "📝 *Напишите:* только число (в сумах)\n\n"
-            "💡 *Примеры:*\n"
-            "• `2500000` — 2.5 миллиона\n"
-            "• `2 млн` — 2 миллиона\n"
-            "• `0` — нет кредитов\n\n"
+            "*Сколько вы платите* каждый месяц по долгам?\n\n"
+            "Сложите все кредиты, рассрочки, займы.\n\n"
+            "📝 Например: `2500000` или `2 млн`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Это ежемесячный ПЛАТЁЖ, не общий долг!_"
+            "_Это ежемесячный ПЛАТЁЖ, не общий долг!_"
         )
     },
     
@@ -744,30 +737,24 @@ MESSAGES = {
     
     "input_total_debt": {
         "uz": (
-            "📊 *2-QADAM: JAMI QARZ QOLDIG'I*\n"
+            "📊 *1-QADAM: JAMI QARZ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Barcha kreditlar bo'yicha\n"
-            "hali qancha qarz qoldi?\n\n"
-            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
-            "💡 *Misollar:*\n"
-            "• `50000000` — 50 million\n"
-            "• `30 mln` — 30 million\n"
-            "• `0` — qarz yo'q\n\n"
+            "Keling, aniqlab olaylik.\n\n"
+            "*Hozir jami qancha qarzingiz bor?*\n"
+            "(barcha kredit, nasiya, qarz...)\n\n"
+            "📝 Masalan: `50000000` yoki `50 mln`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Bu jami QARZ qoldig'i, oylik to'lov emas!_"
+            "💡 _Aniq bilmasangiz, taxminiy yozing_"
         ),
         "ru": (
-            "📊 *ШАГ 2: ОСТАТОК ДОЛГА*\n"
+            "📊 *ШАГ 1: ОБЩИЙ ДОЛГ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Сколько всего осталось выплатить\n"
-            "по всем кредитам?\n\n"
-            "📝 *Напишите:* только число (в сумах)\n\n"
-            "💡 *Примеры:*\n"
-            "• `50000000` — 50 миллионов\n"
-            "• `30 млн` — 30 миллионов\n"
-            "• `0` — нет долга\n\n"
+            "Давайте разберёмся.\n\n"
+            "*Сколько всего у вас долга?*\n"
+            "(все кредиты, рассрочки, займы...)\n\n"
+            "📝 Например: `50000000` или `50 млн`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ _Это общий ОСТАТОК долга, не ежемесячный платёж!_"
+            "💡 _Если не знаете точно, напишите примерно_"
         )
     },
     
@@ -843,46 +830,59 @@ MESSAGES = {
     
     # ==================== CALCULATION & RESULTS ====================
     "calculating": {
-        "uz": "⏳ Hisoblanmoqda...",
-        "ru": "⏳ Рассчитываем..."
+        "uz": "⏳ *Hisoblanmoqda...*",
+        "ru": "⏳ *Рассчитываю...*"
     },
     
+    "calculating_step1": {
+        "uz": "📊 Ma'lumotlaringiz tahlil qilinmoqda...",
+        "ru": "📊 Анализирую ваши данные..."
+    },
+    
+    "calculating_step2": {
+        "uz": "🗓 HALOS sanangiz aniqlanmoqda...",
+        "ru": "🗓 Определяю вашу дату HALOS..."
+    },
+    
+    "calculating_step3": {
+        "uz": "🌟 Natija tayyor!",
+        "ru": "🌟 Результат готов!"
+    },
+
     "result_debt_mode": {
         "uz": (
+            "✨✨✨\n\n"
             "🌟 *SIZNING HALOS SANANGIZ*\n\n"
-            "Siz *{exit_date}* da moliyaviy erkinlikka erishasiz.\n\n"
-            "Shu yo'lda davom etsangiz, {exit_months} oy ichida\n"
-            "*{savings_exit}* so'm shaxsiy kapital qurasiz.\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Oylik balans:*\n\n"
-            "💳 Yukni to'lash: *{debt_payment}* so'm\n"
-            "💎 Kapital qurish: *{savings}* so'm\n"
-            "🏠 Xotirjam yashash: *{living}* so'm\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📈 *Sizning yo'lingiz:*\n\n"
-            "• 12 oyda kapital: *{savings_12}* so'm\n"
-            "• HALOS sanangizda: *{savings_exit}* so'm\n\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "✨ Har bir qadam sizni yengillikka yaqinlashtiradi.\n"
-            "Tinch nafas oling — siz to'g'ri yo'ldasiz."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅  *{exit_date}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Siz *{exit_months} oy* ichida\n"
+            "qarzdan *to'liq xalos* bo'lasiz.\n\n"
+            "Bu sanadan keyin har oy\n"
+            "*{savings}* so'm shaxsiy kapital qurasiz.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *HALOS gacha kapital:* {savings_exit} so'm\n"
+            "💰 *12 oy kapital:* {savings_12} so'm\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "_Endi siz aniq bilasiz._\n"
+            "_Bu sana sizning yangi boshlanishingiz._"
         ),
         "ru": (
+            "✨✨✨\n\n"
             "🌟 *ВАША ДАТА HALOS*\n\n"
-            "Вы достигнете финансовой свободы *{exit_date}*.\n\n"
-            "Следуя этому пути, за {exit_months} мес\n"
-            "создадите *{savings_exit}* сум личного капитала.\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📊 *Ежемесячный баланс:*\n\n"
-            "💳 Погашение бремени: *{debt_payment}* сум\n"
-            "💎 Рост капитала: *{savings}* сум\n"
-            "🏠 Спокойная жизнь: *{living}* сум\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📈 *Ваш путь:*\n\n"
-            "• Капитал за 12 мес: *{savings_12}* сум\n"
-            "• К дате HALOS: *{savings_exit}* сум\n\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "✨ Каждый шаг приближает вас к лёгкости.\n"
-            "Вдохните спокойно — вы на верном пути."
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📅  *{exit_date}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Через *{exit_months} месяцев* вы\n"
+            "*полностью освободитесь* от долга.\n\n"
+            "После этой даты каждый месяц\n"
+            "*{savings}* сум — ваш личный капитал.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💰 *Капитал к HALOS:* {savings_exit} сум\n"
+            "💰 *Капитал за 12 мес:* {savings_12} сум\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "_Теперь вы знаете точно._\n"
+            "_Эта дата — ваше новое начало._"
         )
     },
     

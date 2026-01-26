@@ -227,7 +227,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ==================== LANGUAGE SELECTION ====================
 
 async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle language selection"""
+    """Handle language selection - then start onboarding flow"""
     query = update.callback_query
     await query.answer()
     
@@ -247,24 +247,53 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except:
         pass
     
-    # Registration complete - show main menu
-    welcome_msg = (
-        "✅ *Ro'yxatdan muvaffaqiyatli o'tdingiz!*\n\n"
-        "Endi quyidagi menyudan foydalanishingiz mumkin 👇"
-    ) if lang == "uz" else (
-        "✅ *Вы успешно зарегистрированы!*\n\n"
-        "Теперь вы можете использовать меню ниже 👇"
-    )
+    # Check if user already has financial data
+    user = await db.get_user(telegram_id)
+    if user:
+        profile = await db.get_financial_profile(user["id"])
+        if profile and profile.get("total_debt", 0) > 0:
+            # User has data - go to main menu
+            welcome_msg = (
+                "✅ *Xush kelibsiz!*\n\n"
+                "Quyidagi menyudan foydalaning 👇"
+            ) if lang == "uz" else (
+                "✅ *Добро пожаловать!*\n\n"
+                "Используйте меню ниже 👇"
+            )
+            
+            chat_id = update.effective_chat.id
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=welcome_msg,
+                parse_mode="Markdown",
+                reply_markup=get_main_menu_keyboard(lang)
+            )
+            return ConversationHandler.END
     
+    # NEW USER - Start emotional onboarding flow!
+    # Set default mode to solo for new onboarding
+    context.user_data["mode"] = "solo"
+    
+    # Step 1: Ask total debt first (most important question)
     chat_id = update.effective_chat.id
+    
+    # Add quick button for no debt
+    keyboard = [
+        [InlineKeyboardButton(
+            "✨ Qarzim yo'q" if lang == "uz" else "✨ Нет долгов",
+            callback_data="quick_debt_0"
+        )]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await context.bot.send_message(
         chat_id=chat_id,
-        text=welcome_msg,
+        text=get_message("input_total_debt", lang),
         parse_mode="Markdown",
-        reply_markup=get_main_menu_keyboard(lang)
+        reply_markup=reply_markup
     )
     
-    return ConversationHandler.END
+    return States.TOTAL_DEBT
 
 
 # ==================== MODE SELECTION ====================
@@ -969,11 +998,32 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return States.INCOME_PARTNER
     else:
         context.user_data["income_partner"] = 0
-        await update.message.reply_text(
-            get_message("input_rent", lang),
-            parse_mode="Markdown"
-        )
-        return States.RENT
+        
+        # NEW ONBOARDING FLOW: Check if user has debt
+        total_debt = context.user_data.get("total_debt", 0)
+        if total_debt > 0:
+            # Has debt - ask for monthly payment (Step 3)
+            keyboard = [
+                [InlineKeyboardButton(
+                    "0️⃣ Hozir to'lamayapman" if lang == "uz" else "0️⃣ Пока не плачу",
+                    callback_data="quick_loan_0"
+                )]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                get_message("input_loan_payment", lang),
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+            return States.LOAN_PAYMENT
+        else:
+            # No debt - go directly to calculation (wealth mode)
+            context.user_data["loan_payment"] = 0
+            context.user_data["rent"] = 0
+            context.user_data["kindergarten"] = 0
+            context.user_data["utilities"] = 0
+            return await calculate_and_show_results(update, context)
 
 
 async def income_partner_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1456,7 +1506,7 @@ async def katm_skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # ==================== LOAN INPUT ====================
 
 async def loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle monthly loan payment input"""
+    """Handle monthly loan payment input - NEW FLOW: Step 3, then calculate"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1471,42 +1521,43 @@ async def loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     
     context.user_data["loan_payment"] = amount
     
-    await update.message.reply_text(
-        get_message("debt_saved", lang)
+    # Set default values for optional fields (simplified onboarding)
+    context.user_data["rent"] = 0
+    context.user_data["kindergarten"] = 0
+    context.user_data["utilities"] = 0
+    context.user_data["income_partner"] = context.user_data.get("income_partner", 0)
+    
+    # Confirmation message
+    confirm_msg = (
+        f"✅ *{format_number(amount)} so'm* oylik to'lov qabul qilindi."
+    ) if lang == "uz" else (
+        f"✅ *{format_number(amount)} сум* ежемесячный платёж принят."
     )
     
-    # If no loan payment, skip total debt
-    if amount == 0:
-        context.user_data["total_debt"] = 0
-        return await calculate_and_show_results(update, context)
+    await update.message.reply_text(confirm_msg, parse_mode="Markdown")
     
-    # Add quick button for no debt remaining
-    keyboard = [
-        [InlineKeyboardButton(get_message("btn_no_debt", lang), callback_data="quick_debt_0")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        get_message("input_total_debt", lang),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
-    
-    return States.TOTAL_DEBT
+    # All 3 steps complete - go to dramatic calculation
+    return await calculate_and_show_results(update, context)
 
 
 async def quick_loan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle quick button for no loans"""
+    """Handle quick button for no loans - NEW FLOW: go to calculation"""
     query = update.callback_query
     await query.answer()
     
     lang = context.user_data.get("lang", "uz")
     
     context.user_data["loan_payment"] = 0
-    context.user_data["total_debt"] = 0
+    # Keep total_debt as entered (might be > 0)
+    
+    # Set default values for optional fields
+    context.user_data["rent"] = 0
+    context.user_data["kindergarten"] = 0
+    context.user_data["utilities"] = 0
+    context.user_data["income_partner"] = context.user_data.get("income_partner", 0)
     
     await query.edit_message_text(
-        get_message("debt_saved", lang)
+        "✅ " + ("Oylik to'lov: 0 so'm" if lang == "uz" else "Ежемесячный платёж: 0 сум")
     )
     
     # Go to calculation
@@ -1514,24 +1565,30 @@ async def quick_loan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def quick_debt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle quick button for no remaining debt"""
+    """Handle quick button for no remaining debt - NEW FLOW: go to income"""
     query = update.callback_query
     await query.answer()
     
     lang = context.user_data.get("lang", "uz")
     
     context.user_data["total_debt"] = 0
+    context.user_data["loan_payment"] = 0
     
     await query.edit_message_text(
-        get_message("debt_saved", lang)
+        "✅ " + ("Qarz yo'q - ajoyib!" if lang == "uz" else "Нет долга - отлично!")
     )
     
-    # Go to calculation
-    return await calculate_and_show_results_from_callback(query, context)
+    # No debt - skip to income for wealth mode
+    await query.message.reply_text(
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
+    )
+    
+    return States.INCOME_SELF
 
 
 async def total_debt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle total debt input"""
+    """Handle total debt input - NEW FLOW: Step 1, then go to income"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1546,7 +1603,29 @@ async def total_debt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     context.user_data["total_debt"] = amount
     
-    return await calculate_and_show_results(update, context)
+    # Confirmation message
+    if amount > 0:
+        confirm_msg = (
+            f"✅ *{format_number(amount)} so'm* qarz qabul qilindi.\n\n"
+            "Ajoyib, endi davom etamiz..."
+        ) if lang == "uz" else (
+            f"✅ *{format_number(amount)} сум* долга принято.\n\n"
+            "Отлично, продолжаем..."
+        )
+    else:
+        confirm_msg = "✅ " + ("Qarz yo'q - ajoyib!" if lang == "uz" else "Нет долга - отлично!")
+        context.user_data["loan_payment"] = 0
+    
+    await update.message.reply_text(confirm_msg, parse_mode="Markdown")
+    
+    # Step 2: Ask for income
+    await asyncio.sleep(0.5)
+    await update.message.reply_text(
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
+    )
+    
+    return States.INCOME_SELF
 
 
 # ==================== CALCULATION & RESULTS ====================
@@ -1618,14 +1697,53 @@ async def get_user_subscription_status(telegram_id: int) -> bool:
 
 
 async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Calculate finances and show results"""
+    """Calculate finances and show results with DRAMATIC PAUSE effect"""
     lang = context.user_data.get("lang", "uz")
     telegram_id = update.effective_user.id
     
-    # Show calculating message
+    # === DRAMATIC CALCULATION PAUSE ===
+    # Step 1: Initial calculating message
     calc_msg = await update.message.reply_text(
-        get_message("calculating", lang)
+        get_message("calculating", lang),
+        parse_mode="Markdown"
     )
+    await asyncio.sleep(1.0)
+    
+    # Step 2: Analyzing data
+    try:
+        await calc_msg.edit_text(
+            get_message("calculating_step1", lang),
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+    await asyncio.sleep(1.2)
+    
+    # Step 3: Finding HALOS date
+    try:
+        await calc_msg.edit_text(
+            get_message("calculating_step2", lang),
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+    await asyncio.sleep(1.5)
+    
+    # Step 4: Result ready!
+    try:
+        await calc_msg.edit_text(
+            get_message("calculating_step3", lang),
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+    await asyncio.sleep(0.8)
+    
+    # Delete calculating message
+    try:
+        await calc_msg.delete()
+    except:
+        pass
     
     # Get all input data
     income_self = context.user_data.get("income_self", 0)
@@ -1737,9 +1855,53 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
 
 
 async def calculate_and_show_results_from_callback(query, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Calculate finances and show results (from callback query)"""
+    """Calculate finances and show results (from callback query) with DRAMATIC PAUSE"""
     lang = context.user_data.get("lang", "uz")
     telegram_id = query.from_user.id
+    
+    # === DRAMATIC CALCULATION PAUSE ===
+    # Step 1: Initial calculating message
+    calc_msg = await query.message.reply_text(
+        get_message("calculating", lang),
+        parse_mode="Markdown"
+    )
+    await asyncio.sleep(1.0)
+    
+    # Step 2: Analyzing data
+    try:
+        await calc_msg.edit_text(
+            get_message("calculating_step1", lang),
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+    await asyncio.sleep(1.2)
+    
+    # Step 3: Finding HALOS date
+    try:
+        await calc_msg.edit_text(
+            get_message("calculating_step2", lang),
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+    await asyncio.sleep(1.5)
+    
+    # Step 4: Result ready!
+    try:
+        await calc_msg.edit_text(
+            get_message("calculating_step3", lang),
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+    await asyncio.sleep(0.8)
+    
+    # Delete calculating message
+    try:
+        await calc_msg.delete()
+    except:
+        pass
     
     # Get all input data
     income_self = context.user_data.get("income_self", 0)
