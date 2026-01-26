@@ -367,24 +367,24 @@ MESSAGES = {
     # ==================== INCOME INPUT ====================
     "input_income_self": {
         "uz": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *QADAM 1/5 — DAROMAD*\n"
+            "💵 *QADAM 7/8 — DAROMAD*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💵 *O'zingizning oylik maoshingiz*\n\n"
-            "Raqam yozing yoki karta tarixi faylini yuboring.\n"
-            "Bot avtomatik aniqlaydi.\n\n"
-            "📝 Masalan: `5000000` yoki `5 mln`\n"
-            "📎 Yoki: PDF, HTML, Excel fayl"
+            "Har oy qancha pul kiradi?\n"
+            "(ish haqi, biznes, boshqa)\n\n"
+            "📝 Masalan: `5000000` yoki `5 mln`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Sof daromad (qo'lga tegadigan)_"
         ),
         "ru": (
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "📊 *ШАГ 1/5 — ДОХОД*\n"
+            "💵 *ШАГ 7/8 — ДОХОД*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💵 *Ваша ежемесячная зарплата*\n\n"
-            "Напишите число или отправьте файл истории карты.\n"
-            "Бот определит автоматически.\n\n"
-            "📝 Например: `5000000` или `5 млн`\n"
-            "📎 Или: PDF, HTML, Excel файл"
+            "💵 *Ваш ежемесячный доход*\n\n"
+            "Сколько денег приходит каждый месяц?\n"
+            "(зарплата, бизнес, другое)\n\n"
+            "📝 Например: `5000000` или `5 млн`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Чистый доход (на руки)_"
         )
     },
     
@@ -422,7 +422,7 @@ MESSAGES = {
     # ==================== MANDATORY LIVING COSTS ====================
     "input_rent": {
         "uz": (
-            "🏠 *QADAM 4/7 — IJARA TO'LOVI*\n"
+            "🏠 *QADAM 4/8 — IJARA TO'LOVI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏠 *Oylik uy ijarasi*\n\n"
             "Uy yoki kvartira uchun\n"
@@ -432,7 +432,7 @@ MESSAGES = {
             "🏡 _O'z uyingiz bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "🏠 *ШАГ 4/7 — АРЕНДА ЖИЛЬЯ*\n"
+            "🏠 *ШАГ 4/8 — АРЕНДА ЖИЛЬЯ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏠 *Ежемесячная аренда*\n\n"
             "Сколько вы платите за\n"
@@ -450,7 +450,7 @@ MESSAGES = {
     
     "input_kindergarten": {
         "uz": (
-            "🤝 *QADAM 3/7 — QO'SHIMCHA QARZLAR*\n"
+            "🤝 *QADAM 3/8 — QO'SHIMCHA QARZLAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🤝 *Insonlardan olgan qarzlar*\n\n"
             "• Do'st-yor, qarindoshlardan\n"
@@ -462,7 +462,7 @@ MESSAGES = {
             "✅ _Bunday qarz yo'q bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "🤝 *ШАГ 3/7 — ДОПОЛНИТЕЛЬНЫЕ ДОЛГИ*\n"
+            "🤝 *ШАГ 3/8 — ДОПОЛНИТЕЛЬНЫЕ ДОЛГИ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🤝 *Долги людям*\n\n"
             "• Друзьям, родственникам\n"
@@ -482,7 +482,7 @@ MESSAGES = {
     
     "input_utilities": {
         "uz": (
-            "💡 *QADAM 5/7 — KOMMUNAL TO'LOVLAR*\n"
+            "💡 *QADAM 5/8 — KOMMUNAL TO'LOVLAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💡 *Oylik kommunal xizmatlar*\n\n"
             "• Elektr energiya\n"
@@ -494,7 +494,7 @@ MESSAGES = {
             "💡 _O'rtacha: 300K - 800K so'm_"
         ),
         "ru": (
-            "💡 *ШАГ 5/7 — КОММУНАЛЬНЫЕ УСЛУГИ*\n"
+            "💡 *ШАГ 5/8 — КОММУНАЛЬНЫЕ УСЛУГИ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "💡 *Ежемесячные коммунальные*\n\n"
             "• Электричество\n"
@@ -530,7 +530,7 @@ MESSAGES = {
     # ==================== MANDATORY EXPENSES (Step 6) ====================
     "input_mandatory_expenses": {
         "uz": (
-            "📋 *QADAM 6/7 — MAJBURIY XARAJATLAR*\n"
+            "📋 *QADAM 6/8 — MAJBURIY XARAJATLAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "📋 *To'lamasa bo'lmaydigan to'lovlar*\n\n"
             "• 👶 Bog'cha / Maktab to'lovi\n"
@@ -544,7 +544,7 @@ MESSAGES = {
             "✅ _Yo'q bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "📋 *ШАГ 6/7 — ОБЯЗАТЕЛЬНЫЕ РАСХОДЫ*\n"
+            "📋 *ШАГ 6/8 — ОБЯЗАТЕЛЬНЫЕ РАСХОДЫ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "📋 *Платежи, которые нельзя пропустить*\n\n"
             "• 👶 Детсад / Школа\n"
@@ -757,7 +757,7 @@ MESSAGES = {
     # ==================== LOAN INPUT (Step by Step) ====================
     "input_loan_payment": {
         "uz": (
-            "💳 *QADAM 1/7 — KREDIT TO'LOVI*\n"
+            "💳 *QADAM 1/8 — KREDIT TO'LOVI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏦 *Bank kreditlari uchun oylik to'lov*\n\n"
             "Har oyda barcha bank kreditlari\n"
@@ -767,7 +767,7 @@ MESSAGES = {
             "💡 _Kredit yo'q bo'lsa: 0 yozing_"
         ),
         "ru": (
-            "💳 *ШАГ 1/7 — КРЕДИТНЫЙ ПЛАТЁЖ*\n"
+            "💳 *ШАГ 1/8 — КРЕДИТНЫЙ ПЛАТЁЖ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏦 *Ежемесячный платёж по банковским кредитам*\n\n"
             "Сколько вы платите каждый месяц\n"
@@ -785,7 +785,7 @@ MESSAGES = {
     
     "input_total_debt": {
         "uz": (
-            "📊 *QADAM 2/7 — JAMI KREDIT QARZI*\n"
+            "📊 *QADAM 2/8 — JAMI KREDIT QARZI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏦 *Bank kreditlari bo'yicha jami qarz*\n\n"
             "Barcha bank kreditlari bo'yicha\n"
@@ -795,7 +795,7 @@ MESSAGES = {
             "💡 _Aniq bilmasangiz, taxminiy yozing_"
         ),
         "ru": (
-            "📊 *ШАГ 2/7 — ОБЩИЙ КРЕДИТНЫЙ ДОЛГ*\n"
+            "📊 *ШАГ 2/8 — ОБЩИЙ КРЕДИТНЫЙ ДОЛГ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🏦 *Общий долг по банковским кредитам*\n\n"
             "Сколько всего осталось выплатить\n"

@@ -270,7 +270,7 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # ==================== MODE SELECTION ====================
 
 async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle mode selection (solo/family)"""
+    """Handle mode selection (solo/family) - NEW 7-STEP UX FLOW"""
     query = update.callback_query
     await query.answer()
     
@@ -294,13 +294,19 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     except:
         pass
     
-    # Go directly to income input - user can send file or number
+    # NEW 7-STEP UX: Start with Step 1 - LOAN PAYMENT
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_loans", lang), callback_data="quick_loan_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await query.message.reply_text(
-        get_message("input_income_self", lang),
-        parse_mode="Markdown"
+        get_message("input_loan_payment", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
     )
     
-    return States.INCOME_SELF
+    return States.LOAN_PAYMENT
 
 
 # ==================== TRANSACTION HISTORY UPLOAD (MULTI-CARD) ====================
@@ -867,6 +873,9 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     lang = context.user_data.get("lang", "uz")
     telegram_id = update.effective_user.id
     
+    # Check if this is NEW 7-STEP UX FLOW (expenses already entered)
+    is_new_ux_flow = "loan_payment" in context.user_data and "rent" in context.user_data
+    
     # Check if user sent a file
     if update.message.document:
         document = update.message.document
@@ -898,7 +907,23 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                         parse_mode="Markdown"
                     )
                     
-                    # Continue to next step
+                    # NEW UX FLOW: Calculate directly
+                    if is_new_ux_flow:
+                        if context.user_data.get("mode") == "family":
+                            keyboard = [
+                                [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0_calc")]
+                            ]
+                            await update.message.reply_text(
+                                get_message("input_income_partner", lang),
+                                parse_mode="Markdown",
+                                reply_markup=InlineKeyboardMarkup(keyboard)
+                            )
+                            return States.INCOME_PARTNER
+                        else:
+                            context.user_data["income_partner"] = 0
+                            return await calculate_and_show_results(update, context)
+                    
+                    # OLD FLOW: Continue to next step
                     if context.user_data.get("mode") == "family":
                         keyboard = [
                             [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0")]
@@ -953,7 +978,23 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         get_message("income_saved", lang).format(amount=format_number(amount))
     )
     
-    # Check if family mode
+    # NEW UX FLOW: Calculate directly (expenses already entered)
+    if is_new_ux_flow:
+        if context.user_data.get("mode") == "family":
+            keyboard = [
+                [InlineKeyboardButton(get_message("btn_partner_no_income", lang), callback_data="quick_partner_0_calc")]
+            ]
+            await update.message.reply_text(
+                get_message("input_income_partner", lang),
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return States.INCOME_PARTNER
+        else:
+            context.user_data["income_partner"] = 0
+            return await calculate_and_show_results(update, context)
+    
+    # OLD FLOW: Check if family mode
     if context.user_data.get("mode") == "family":
         # Add quick button for partner with no income
         keyboard = [
@@ -996,7 +1037,12 @@ async def income_partner_handler(update: Update, context: ContextTypes.DEFAULT_T
         get_message("income_saved", lang).format(amount=format_number(amount))
     )
     
-    # Add quick button for own home
+    # NEW UX FLOW: Calculate directly (expenses already entered)
+    is_new_ux_flow = "loan_payment" in context.user_data and "rent" in context.user_data
+    if is_new_ux_flow:
+        return await calculate_and_show_results(update, context)
+    
+    # OLD FLOW: Add quick button for own home
     keyboard = [
         [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
     ]
@@ -1024,7 +1070,12 @@ async def quick_partner_income_callback(update: Update, context: ContextTypes.DE
         get_message("income_saved", lang).format(amount="0")
     )
     
-    # Add quick button for own home
+    # NEW UX FLOW: Calculate directly (expenses already entered)
+    is_new_ux_flow = "loan_payment" in context.user_data and "rent" in context.user_data
+    if is_new_ux_flow:
+        return await calculate_and_show_results_from_callback(update, context)
+    
+    # OLD FLOW: Add quick button for own home
     keyboard = [
         [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
     ]
@@ -1261,8 +1312,13 @@ async def mandatory_expenses_handler(update: Update, context: ContextTypes.DEFAU
         get_message("cost_saved", lang).format(amount=format_number(amount))
     )
     
-    # Step 7: Calculate with dramatic animation!
-    return await calculate_and_show_results(update, context)
+    # Step 7: Ask for INCOME (final step before calculate)
+    await update.message.reply_text(
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
+    )
+    
+    return States.INCOME_SELF
 
 
 async def quick_mandatory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1278,8 +1334,13 @@ async def quick_mandatory_callback(update: Update, context: ContextTypes.DEFAULT
         get_message("cost_saved", lang).format(amount=format_number(0))
     )
     
-    # Step 7: Calculate with dramatic animation!
-    return await calculate_and_show_results_from_callback(update, context)
+    # Step 7: Ask for INCOME (final step before calculate)
+    await query.message.reply_text(
+        get_message("input_income_self", lang),
+        parse_mode="Markdown"
+    )
+    
+    return States.INCOME_SELF
 
 
 # ==================== KATM PDF UPLOAD ====================
