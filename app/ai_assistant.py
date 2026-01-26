@@ -196,103 +196,143 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
         return None
 
 
+# ==================== AQLLI AI TAHLIL TIZIMI ====================
+# Har bir so'zning kontekstdagi ma'nosini tahlil qiladi
+
+# PHYSICAL ITEMS - bu narsalar "oldim" bilan kelsa = XARAJAT
+PHYSICAL_ITEMS = {
+    # Oziq-ovqat
+    "non", "go'sht", "guruch", "sabzavot", "meva", "sut", "tuxum", "un", "yog'",
+    "kolbasa", "pishloq", "shokolad", "choy", "qahva", "suv", "ichimlik", "sharbat",
+    "ovqat", "taom", "pivo", "aroq", "vino", "pishiriq", "tort", "shirinlik",
+    "kartoshka", "pomidor", "bodring", "piyoz", "sarimsoq", "sabzi", "karam",
+    "olma", "anor", "uzum", "banan", "apelsin", "limon", "qovun", "tarvuz",
+    "makaron", "tuz", "shakar", "qand", "asal", "konfet", "pechenye", "chips",
+    "baliq", "tovuq", "mol go'shti", "qo'y go'shti", "sosiska", "gamburger",
+    "lavash", "somsa", "manti", "palov", "osh", "sho'rva", "lag'mon",
+    # Transport (xizmat sifatida)
+    "taksi", "benzin", "gaz", "avtobus", "metro", "poyezd", "samolyot", "bilet",
+    "marshrutka", "tramvay", "trolleybus",
+    # Kiyim-kechak
+    "kiyim", "ko'ylak", "shim", "oyoq kiyim", "krossovka", "botinka", "tufli",
+    "kurtka", "palto", "ko'ylagi", "futbolka", "mayka", "shapka", "sharf",
+    "paypoq", "ichki kiyim", "sport kiyim", "kostyum", "galstuk", "belbog'",
+    # Texnika va jihozlar
+    "telefon", "kompyuter", "noutbuk", "televizor", "muzlatgich", "konditsioner",
+    "kir yuvish mashinasi", "changyutgich", "mikrovolnovka", "plita", "choynak",
+    "naushnik", "zaryadka", "kabeli", "flesh", "xotira",
+    # Uy-joy buyumlari
+    "mebel", "stol", "stul", "krovat", "divan", "shkaf", "ko'zgu", "parda",
+    "gilam", "ko'rpa", "yostiq", "choyshab", "sochiq", "lagan", "qozon", "pichoq",
+    # Sog'liq va gigiyena
+    "dori", "tabletka", "vitamin", "maz", "ukol", "bint", "vata",
+    "sovun", "shampun", "tish pastasi", "tish cho'tkasi", "krem", "parfyum",
+    # Ta'lim va ofis
+    "kitob", "daftar", "ruchka", "qalam", "sumka", "portfel",
+    # Boshqa
+    "o'yinchoq", "sovg'a", "gul", "sham", "batareyka", "lampochka", "sim"
+}
+
+# MONEY WORDS - bu so'zlar "oldim" bilan kelsa = DAROMAD
+MONEY_WORDS = {
+    "pul", "maosh", "oylik", "ish haqi", "avans", "bonus", "mukofot",
+    "daromad", "foyda", "tushum", "honorar", "grant", "stipendiya",
+    "dividend", "foiz", "kredit", "qarz", "transfer", "o'tkazma",
+    "деньги", "зарплата", "аванс", "бонус", "доход", "прибыль"
+}
+
+# WORK CONTEXT - bu kontekstlar daromad
+WORK_CONTEXTS = {
+    "ishlab", "ishlagan", "ishladim", "ishdan", "ish joyida",
+    "работал", "заработал", "работа"
+}
+
+
 def detect_transaction_type(text: str) -> str:
     """
-    Matndan tranzaksiya turini aniqlash (daromad yoki xarajat)
-    YANGILANGAN: Kontekst asosida aqlli tahlil
+    AQLLI AI TAHLIL - Har bir so'zning kontekstdagi ma'nosini aniqlash
     
-    QOIDA: 
-    - "X ga Y oldim" = XARAJAT (non oldim, go'sht oldim, taksi oldim)
-    - "ishlab topdim/oldim" = DAROMAD
-    - Mahsulot/xizmat nomi + oldim = XARAJAT
+    QOIDALAR:
+    1. PHYSICAL_ITEM + "oldim" = XARAJAT (non oldim, go'sht oldim)
+    2. MONEY_WORD + "oldim" = DAROMAD (pul oldim, maosh oldim, oylik oldim)
+    3. WORK_CONTEXT + "oldim/topdim" = DAROMAD (ishlab topdim)
+    4. "sotdim" = DAROMAD
+    5. "to'ladim/berdim/sarfladim" = XARAJAT
+    6. Default "oldim" without context = XARAJAT
     """
     text_lower = text.lower()
     
-    # ==================== XARAJAT MAHSULOTLARI ====================
-    # Bu so'zlar OLDIM bilan kelsa = XARAJAT
-    expense_products = [
-        # Oziq-ovqat
-        "non", "go'sht", "guruch", "sabzavot", "meva", "sut", "tuxum", "un", "yog'",
-        "kolbasa", "pishloq", "shokolad", "choy", "qahva", "suv", "ichimlik",
-        "ovqat", "taom", "pivo", "aroq",
-        # Transport
-        "taksi", "benzin", "gaz", "avtobus", "metro", "poyezd", "samolyot", "bilet",
-        # Kiyim
-        "kiyim", "ko'ylak", "shim", "oyoq kiyim", "krossovka", "botinka",
-        # Texnika
-        "telefon", "kompyuter", "televizor", "muzlatgich", "kir yuvish",
-        # Uy-joy
-        "ijara", "kvartira", "uy", "mebel", "stol", "stul", "krovat",
-        # Sog'liq
-        "dori", "tabletka", "shifokor", "kasalxona", "apteka",
-        # Boshqa
-        "kitob", "o'yinchoq", "sovg'a", "gul"
-    ]
+    logger.info(f"[AI] Matn tahlili: '{text_lower[:100]}'")
     
-    # ==================== DAROMAD KONTEKSTLARI ====================
-    income_contexts = [
-        "ishlab topdim", "ishlab oldim", "ishlagan pulim", "ish pulim",
-        "maosh", "oylik", "ish haqi", "daromad", "foyda",
-        "sotdim", "savdodan", "biznesdan", 
-        "pul tushdi", "pul keldi", "transfer keldi",
-        "заработал", "зарплата", "получил зарплату", "доход"
-    ]
-    
-    # ==================== XARAJAT KONTEKSTLARI ====================
-    expense_contexts = [
-        "sotib oldim", "harid qildim", "to'ladim", "berdim", "sarfladim",
-        "xarajat qildim", "pul berdim", "ketdi", "chiqdi",
-        "потратил", "заплатил", "купил", "оплатил"
-    ]
-    
-    # ==================== TAHLIL ====================
-    
-    # 1. BIRINCHI: Aniq daromad kontekstini tekshirish
-    for ctx in income_contexts:
-        if ctx in text_lower:
-            # "ishlab topdim" - bu daromad
-            if "ishlab" in ctx or "maosh" in ctx or "oylik" in ctx or "sotdim" in ctx:
-                logger.info(f"[DETECT] Daromad konteksti topildi: '{ctx}'")
+    # ==================== 1. ISH KONTEKSTI TEKSHIRISH ====================
+    # "ishlab topdim", "ishlab oldim" = DAROMAD
+    for work in WORK_CONTEXTS:
+        if work in text_lower:
+            if "topdim" in text_lower or "oldim" in text_lower or "keldim" in text_lower:
+                logger.info(f"[AI] ISH KONTEKSTI: '{work}' + action = DAROMAD")
                 return "income"
     
-    # 2. IKKINCHI: Aniq xarajat kontekstini tekshirish
-    for ctx in expense_contexts:
-        if ctx in text_lower:
-            logger.info(f"[DETECT] Xarajat konteksti topildi: '{ctx}'")
+    # ==================== 2. PUL SO'ZLARI TEKSHIRISH ====================
+    # "pul oldim", "maosh oldim", "oylik oldim" = DAROMAD
+    for money_word in MONEY_WORDS:
+        if money_word in text_lower:
+            # "pul oldim", "maosh tushdi", "oylik keldi"
+            if "oldim" in text_lower or "tushdi" in text_lower or "keldi" in text_lower:
+                logger.info(f"[AI] PUL SO'ZI: '{money_word}' + action = DAROMAD")
+                return "income"
+    
+    # ==================== 3. ANIQ XARAJAT FE'LLARI ====================
+    expense_verbs = ["to'ladim", "berdim", "sarfladim", "xarajat", "sotib oldim", 
+                     "harid qildim", "потратил", "заплатил", "купил"]
+    for verb in expense_verbs:
+        if verb in text_lower:
+            logger.info(f"[AI] XARAJAT FE'LI: '{verb}' = XARAJAT")
             return "expense"
     
-    # 3. UCHINCHI: Mahsulot + "oldim/ga" = XARAJAT
-    # "non oldim", "50 mingga non oldim", "go'sht oldim"
-    for product in expense_products:
-        # Pattern: "X ga [product] oldim" yoki "[product] oldim"
-        if product in text_lower:
-            # Bu mahsulot - demak xarajat
-            if "oldim" in text_lower or "berdim" in text_lower or "to'ladim" in text_lower:
-                logger.info(f"[DETECT] Mahsulot xarajati: '{product}'")
-                return "expense"
-            # "ga" bilan kelsa ham xarajat: "10 mingga non"
-            if re.search(rf'\d+.*?ga\s+{product}', text_lower):
-                logger.info(f"[DETECT] Summa+mahsulot xarajati: '{product}'")
-                return "expense"
+    # ==================== 4. ANIQ DAROMAD FE'LLARI ====================
+    income_verbs = ["sotdim", "topshirdim", "yutdim", "продал", "заработал"]
+    for verb in income_verbs:
+        if verb in text_lower:
+            logger.info(f"[AI] DAROMAD FE'LI: '{verb}' = DAROMAD")
+            return "income"
     
-    # 4. TO'RTINCHI: "X ga ... oldim" pattern (summa + oldim)
-    # "10 000 ga non oldim" - bu xarajat
-    if re.search(r'\d+.*?ga\s+\w+\s+oldim', text_lower):
-        logger.info("[DETECT] 'X ga Y oldim' pattern - xarajat")
+    # ==================== 5. JISMONIY NARSA + OLDIM = XARAJAT ====================
+    # "non oldim", "go'sht oldim", "taksi oldim" = XARAJAT
+    if "oldim" in text_lower:
+        for item in PHYSICAL_ITEMS:
+            if item in text_lower:
+                logger.info(f"[AI] JISMONIY NARSA: '{item}' + oldim = XARAJAT")
+                return "expense"
+        
+        # "X ga Y oldim" pattern - summa + nima uchun
+        # "10 mingga non oldim" - bu xarajat
+        if re.search(r'\d+.*?(ga|uchun)\s+\w+', text_lower):
+            logger.info("[AI] SUMMA + GA pattern = XARAJAT")
+            return "expense"
+    
+    # ==================== 6. KONTEKSTSIZ "OLDIM" = XARAJAT ====================
+    # Agar "oldim" bor, lekin na pul, na ish konteksti yo'q = XARAJAT
+    if "oldim" in text_lower:
+        logger.info("[AI] KONTEKSTSIZ 'oldim' = XARAJAT (default)")
         return "expense"
     
-    # 5. BESHINCHI: Faqat "oldim" - default xarajat (agar daromad emas bo'lsa)
-    if "oldim" in text_lower and "ishlab" not in text_lower and "topib" not in text_lower:
-        logger.info("[DETECT] 'oldim' without income context - xarajat")
-        return "expense"
-    
-    # 6. OLTINCHI: "topdim" alone = daromad (pul topdim)
+    # ==================== 7. "TOPDIM" = DAROMAD ====================
     if "topdim" in text_lower:
-        logger.info("[DETECT] 'topdim' - daromad")
+        logger.info("[AI] 'topdim' = DAROMAD")
         return "income"
     
-    # Default - xarajat (ko'p hollarda xarajat yoziladi)
-    logger.info("[DETECT] Default - xarajat")
+    # ==================== 8. TUSHDI/KELDI = DAROMAD ====================
+    if "tushdi" in text_lower or "keldi" in text_lower:
+        logger.info("[AI] 'tushdi/keldi' = DAROMAD")
+        return "income"
+    
+    # ==================== 9. KETDI/CHIQDI = XARAJAT ====================
+    if "ketdi" in text_lower or "chiqdi" in text_lower:
+        logger.info("[AI] 'ketdi/chiqdi' = XARAJAT")
+        return "expense"
+    
+    # Default - xarajat (statistika bo'yicha ko'p xarajat yoziladi)
+    logger.info("[AI] DEFAULT = XARAJAT")
     return "expense"
 
 

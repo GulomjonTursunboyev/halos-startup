@@ -60,6 +60,8 @@ from app.handlers import (
     # AI Correction handlers
     ai_confirm_ok_callback,
     ai_correct_callback,
+    ai_correct_multi_callback,
+    ai_delete_all_callback,
     ai_delete_callback,
     ai_rewrite_callback,
     ai_edit_amount_callback,
@@ -297,6 +299,12 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(ai_cancel_correct_callback, pattern="^ai_cancel_correct$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_correct_multi_callback, pattern="^ai_correct_multi_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_delete_all_callback, pattern="^ai_delete_all_")
     )
     
     # AI Debt handlers

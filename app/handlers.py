@@ -4601,12 +4601,16 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
             msg += limit_msg
             
-            # Keyboard - show number of transactions saved
+            # Keyboard - show correction options for each transaction
             keyboard = [
                 [
                     InlineKeyboardButton(
                         "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
                         callback_data="ai_confirm_ok"
+                    ),
+                    InlineKeyboardButton(
+                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                        callback_data=f"ai_correct_multi_{','.join(map(str, transaction_ids))}"
                     )
                 ],
                 [InlineKeyboardButton(
@@ -4805,6 +4809,122 @@ async def ai_confirm_ok_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     # Just remove the buttons, keep the message
     await query.edit_message_reply_markup(reply_markup=None)
+
+
+async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle correction for multiple transactions"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction IDs from callback data: ai_correct_multi_1,2,3
+    callback_data = query.data
+    try:
+        ids_str = callback_data.replace("ai_correct_multi_", "")
+        transaction_ids = [int(x) for x in ids_str.split(",")]
+    except:
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Get all transactions
+    transactions = []
+    for tid in transaction_ids:
+        tx = await get_transaction_by_id(db, tid)
+        if tx and tx["user_id"] == user["id"]:
+            transactions.append(tx)
+    
+    if not transactions:
+        await query.edit_message_text(
+            "❌ Tranzaksiyalar topilmadi" if lang == "uz" else "❌ Транзакции не найдены"
+        )
+        return
+    
+    # Show list of transactions to correct
+    if lang == "uz":
+        msg = (
+            "✏️ *QAYSI YOZUVNI TUZATISH KERAK?*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+    else:
+        msg = (
+            "✏️ *КАКУЮ ЗАПИСЬ ИСПРАВИТЬ?*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+    
+    keyboard = []
+    for i, tx in enumerate(transactions, 1):
+        tx_type = "📥 Daromad" if tx['type'] == 'income' else "📤 Xarajat"
+        if lang == "ru":
+            tx_type = "📥 Доход" if tx['type'] == 'income' else "📤 Расход"
+        
+        msg += f"{i}. {tx_type}: *{tx['amount']:,}* - {tx.get('description', '')[:30]}\n"
+        
+        keyboard.append([InlineKeyboardButton(
+            f"✏️ #{i} - {tx['amount']:,}",
+            callback_data=f"ai_correct_{tx['id']}"
+        )])
+    
+    keyboard.append([InlineKeyboardButton(
+        "🗑 Hammasini o'chirish" if lang == "uz" else "🗑 Удалить всё",
+        callback_data=f"ai_delete_all_{ids_str}"
+    )])
+    keyboard.append([InlineKeyboardButton(
+        "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
+        callback_data="ai_cancel_correct"
+    )])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_delete_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Delete all transactions from multi-transaction"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction IDs
+    callback_data = query.data
+    try:
+        ids_str = callback_data.replace("ai_delete_all_", "")
+        transaction_ids = [int(x) for x in ids_str.split(",")]
+    except:
+        return
+    
+    from app.ai_assistant import delete_transaction
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Delete all
+    deleted = 0
+    for tid in transaction_ids:
+        result = await delete_transaction(db, tid, user["id"])
+        if result:
+            deleted += 1
+    
+    await query.edit_message_text(
+        f"🗑 {deleted} ta yozuv o'chirildi" if lang == "uz" else f"🗑 Удалено {deleted} записей",
+        parse_mode="Markdown"
+    )
 
 
 async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
