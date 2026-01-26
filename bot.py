@@ -5,6 +5,7 @@ Main entry point - Click Payment Integration
 import os
 import asyncio
 import logging
+import threading
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -73,6 +74,8 @@ from app.handlers import (
     admin_command,
     admin_callback,
     admin_broadcast_message,
+    admin_activate_pro,
+    admin_payments,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -163,6 +166,8 @@ def main() -> None:
     
     # Admin command handler
     application.add_handler(CommandHandler("admin", admin_command))
+    application.add_handler(CommandHandler("activate", admin_activate_pro))
+    application.add_handler(CommandHandler("payments", admin_payments))
     
     # Admin callback handlers
     application.add_handler(
@@ -396,6 +401,15 @@ def main() -> None:
     
     # Add error handler
     application.add_error_handler(error_handler)
+    
+    # Start webhook server in background thread if WEBHOOK_PORT is set
+    webhook_port = os.getenv("WEBHOOK_PORT")
+    if webhook_port:
+        logger.info(f"Starting webhook server on port {webhook_port}...")
+        from webhook_server import run_webhook_server
+        webhook_thread = threading.Thread(target=run_webhook_server, daemon=True)
+        webhook_thread.start()
+        logger.info("Webhook server started in background")
     
     # Start polling with MAXIMUM SPEED settings
     logger.info("Bot is running! Press Ctrl+C to stop.")

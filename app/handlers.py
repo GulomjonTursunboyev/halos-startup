@@ -5681,6 +5681,136 @@ async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_
 
 # ==================== ADMIN COMMAND ====================
 
+async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle /activate command - manually activate PRO for a user
+    Usage: /activate <telegram_id> <plan_id>
+    Example: /activate 123456789 pro_monthly
+    """
+    telegram_id = update.effective_user.id
+    
+    # Faqat adminlar uchun
+    if telegram_id not in ADMIN_IDS:
+        return
+    
+    # Parse arguments
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text(
+            "❌ *Xato format!*\n\n"
+            "✅ To'g'ri format:\n"
+            "`/activate <telegram_id> <plan_id>`\n\n"
+            "📋 *Mavjud tariflar:*\n"
+            "├ `pro_weekly` - Haftalik (7 kun)\n"
+            "├ `pro_monthly` - Oylik (30 kun)\n"
+            "├ `pro_quarterly` - 3 oylik (90 kun)\n"
+            "└ `pro_yearly` - Yillik (365 kun)\n\n"
+            "📌 *Misol:*\n"
+            "`/activate 123456789 pro_monthly`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        plan_id = context.args[1].lower()
+        
+        # Validate plan_id
+        valid_plans = ['pro_weekly', 'pro_monthly', 'pro_quarterly', 'pro_yearly']
+        if plan_id not in valid_plans:
+            await update.message.reply_text(
+                f"❌ Noto'g'ri tarif: `{plan_id}`\n\n"
+                f"✅ Mavjud tariflar: {', '.join(valid_plans)}",
+                parse_mode="Markdown"
+            )
+            return
+        
+        await update.message.reply_text("⏳ PRO aktivatsiya qilinmoqda...")
+        
+        # Import and call manual activation
+        from app.payment_webhook import verify_payment_manually
+        
+        result = await verify_payment_manually(target_user_id, plan_id)
+        
+        if result:
+            await update.message.reply_text(
+                f"✅ *PRO muvaffaqiyatli aktivlashtirildi!*\n\n"
+                f"👤 Foydalanuvchi: `{target_user_id}`\n"
+                f"📦 Tarif: `{plan_id}`\n\n"
+                f"ℹ️ Foydalanuvchiga xabar yuborildi.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ *Aktivatsiya muvaffaqiyatsiz!*\n\n"
+                f"Foydalanuvchi topilmadi yoki xatolik yuz berdi.\n"
+                f"Telegram ID: `{target_user_id}`",
+                parse_mode="Markdown"
+            )
+            
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Telegram ID raqam bo'lishi kerak!",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Admin activate error: {e}")
+        await update.message.reply_text(f"❌ Xatolik: {e}")
+
+
+async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle /payments command - show recent payments
+    Usage: /payments [limit]
+    """
+    telegram_id = update.effective_user.id
+    
+    if telegram_id not in ADMIN_IDS:
+        return
+    
+    try:
+        limit = int(context.args[0]) if context.args else 10
+        limit = min(limit, 50)  # Max 50 payments
+        
+        db = await get_database()
+        
+        if db.is_postgres:
+            payments = await db.fetch_all(
+                """SELECT p.*, u.telegram_id, u.first_name 
+                   FROM payments p 
+                   JOIN users u ON p.user_id = u.id 
+                   ORDER BY p.created_at DESC LIMIT $1""",
+                limit
+            )
+        else:
+            payments = await db.fetch_all(
+                """SELECT p.*, u.telegram_id, u.first_name 
+                   FROM payments p 
+                   JOIN users u ON p.user_id = u.id 
+                   ORDER BY p.created_at DESC LIMIT ?""",
+                limit
+            )
+        
+        if not payments:
+            await update.message.reply_text("📋 Hech qanday to'lov topilmadi.")
+            return
+        
+        message = "📋 *SO'NGI TO'LOVLAR*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        for p in payments:
+            status_emoji = {'completed': '✅', 'pending': '⏳', 'failed': '❌'}.get(p.get('status'), '❓')
+            message += (
+                f"{status_emoji} *{p.get('first_name', 'N/A')}* (`{p.get('telegram_id')}`)\n"
+                f"   📦 {p.get('plan_id')} | 💰 {p.get('amount_uzs'):,} so'm\n"
+                f"   📅 {p.get('created_at')}\n\n"
+            )
+        
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Admin payments error: {e}")
+        await update.message.reply_text(f"❌ Xatolik: {e}")
+
+
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /admin command - show statistics for admins only"""
     telegram_id = update.effective_user.id
