@@ -67,11 +67,13 @@ async def send_payment_invoice(
     payload = f"halos_{telegram_id}_{plan_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
     
     # Invoice details
+    duration_days = plan.period.value  # Get days from SubscriptionPeriod enum
+    
     if lang == "uz":
         title = f"HALOS PRO - {plan.description_uz}"
         description = (
             f"📦 {plan.description_uz}\n"
-            f"⏱ Muddat: {plan.duration_days} kun\n\n"
+            f"⏱ Muddat: {duration_days} kun\n\n"
             "✨ PRO imkoniyatlar:\n"
             "• HALOS sanangiz\n"
             "• Tezkor qutilish rejasi\n"
@@ -84,7 +86,7 @@ async def send_payment_invoice(
         title = f"HALOS PRO - {plan.description_ru}"
         description = (
             f"📦 {plan.description_ru}\n"
-            f"⏱ Срок: {plan.duration_days} дней\n\n"
+            f"⏱ Срок: {duration_days} дней\n\n"
             "✨ PRO возможности:\n"
             "• Дата HALOS\n"
             "• План быстрого погашения\n"
@@ -227,7 +229,8 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         
         # Calculate subscription expiration
         now = datetime.now()
-        expires = now + timedelta(days=plan.duration_days)
+        duration_days = plan.period.value  # Get days from SubscriptionPeriod enum
+        expires = now + timedelta(days=duration_days)
         
         # Get database
         db = await get_database()
