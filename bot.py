@@ -434,7 +434,7 @@ def main() -> None:
     # Start polling with MAXIMUM SPEED settings
     logger.info("Bot is running! Press Ctrl+C to stop.")
     application.run_polling(
-        allowed_updates=["message", "callback_query"],
+        allowed_updates=["message", "callback_query", "pre_checkout_query"],
         drop_pending_updates=True,  # Skip old updates on restart
         poll_interval=0.0,  # NO DELAY - instant polling
     )
