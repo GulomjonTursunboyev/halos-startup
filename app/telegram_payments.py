@@ -304,19 +304,23 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         
         logger.info(f"PRO activated via Telegram Payments: user={telegram_id}, plan={plan_id}, expires={expires}")
         
-        # Send admin notification to payment bot
-        from app.payment_notifications import send_payment_notification
-        await send_payment_notification(
-            telegram_id=telegram_id,
-            plan_id=plan_id,
-            plan_name=plan.description_uz,
-            amount=plan.price_uzs,
-            status='completed',
-            payment_id=payment.telegram_payment_charge_id,
-            user_name=user.get('first_name'),
-            phone=user.get('phone_number'),
-            payment_method="Click (Telegram)"
-        )
+        # Send admin notification to payment bot (separate try-except to not affect user)
+        try:
+            from app.payment_notifications import send_payment_notification
+            await send_payment_notification(
+                telegram_id=telegram_id,
+                plan_id=plan_id,
+                plan_name=plan.description_uz,
+                amount=plan.price_uzs,
+                status='completed',
+                payment_id=payment.telegram_payment_charge_id,
+                user_name=user.get('first_name'),
+                phone=user.get('phone_number'),
+                payment_method="Click (Telegram)"
+            )
+        except Exception as notif_error:
+            logger.error(f"Failed to send payment notification: {notif_error}")
+            # Don't show error to user - PRO is already activated
         
     except Exception as e:
         logger.error(f"Error processing successful payment: {e}")
