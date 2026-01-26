@@ -5,7 +5,6 @@ Main entry point - Telegram Payments Integration (Click Terminal)
 import os
 import asyncio
 import logging
-import threading
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -432,22 +431,59 @@ def main() -> None:
     # Add error handler
     application.add_error_handler(error_handler)
     
-    # Start webhook server in background thread if WEBHOOK_PORT is set
-    webhook_port = os.getenv("WEBHOOK_PORT")
-    if webhook_port:
-        logger.info(f"Starting webhook server on port {webhook_port}...")
-        from webhook_server import run_webhook_server
-        webhook_thread = threading.Thread(target=run_webhook_server, daemon=True)
-        webhook_thread.start()
-        logger.info("Webhook server started in background")
-    
-    # Start polling with MAXIMUM SPEED settings
-    logger.info("Bot is running! Press Ctrl+C to stop.")
-    application.run_polling(
-        allowed_updates=["message", "callback_query", "pre_checkout_query"],
-        drop_pending_updates=True,  # Skip old updates on restart
-        poll_interval=0.0,  # NO DELAY - instant polling
-    )
+    # Start webhook server for Click payments
+    # Railway assigns PORT env var, we use it for webhook server
+    port = os.getenv("PORT")
+    if port:
+        logger.info(f"Starting webhook server on port {port}...")
+        from webhook_server import start_webhook_server_async
+        
+        # Create event loop and start webhook server before polling
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        async def run_bot_with_webhook():
+            """Run bot polling alongside webhook server"""
+            # Start webhook server
+            from webhook_server import start_webhook_server_async
+            webhook_runner = await start_webhook_server_async()
+            logger.info("Webhook server started successfully")
+            
+            # Initialize and start the bot
+            await application.initialize()
+            await application.start()
+            await application.updater.start_polling(
+                allowed_updates=["message", "callback_query", "pre_checkout_query"],
+                drop_pending_updates=True,
+                poll_interval=0.0,
+            )
+            
+            logger.info("Bot is running with webhook server! Press Ctrl+C to stop.")
+            
+            # Keep running
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                pass
+            finally:
+                await application.updater.stop()
+                await application.stop()
+                await application.shutdown()
+                await webhook_runner.cleanup()
+        
+        try:
+            loop.run_until_complete(run_bot_with_webhook())
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+    else:
+        # No PORT - run without webhook server (local development)
+        logger.info("Bot is running (no webhook server)! Press Ctrl+C to stop.")
+        application.run_polling(
+            allowed_updates=["message", "callback_query", "pre_checkout_query"],
+            drop_pending_updates=True,
+            poll_interval=0.0,
+        )
 
 
 if __name__ == "__main__":

@@ -152,10 +152,23 @@ async def init_app() -> web.Application:
     return app
 
 
+async def start_webhook_server_async():
+    """Start webhook server asynchronously (for running alongside bot)"""
+    app = await init_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', PORT)
+    await site.start()
+    logger.info(f"Webhook server started on port {PORT}")
+    return runner
+
+
 def run_webhook_server():
     """Run the webhook server standalone"""
     logger.info(f"Starting webhook server on port {PORT}...")
-    web.run_app(init_app(), port=PORT)
+    asyncio.run(start_webhook_server_async())
+    # Keep running
+    asyncio.get_event_loop().run_forever()
 
 
 if __name__ == "__main__":
