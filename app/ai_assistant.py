@@ -2875,70 +2875,74 @@ def extract_date_from_text(text: str) -> str:
 
 def extract_due_date(text: str) -> Optional[str]:
     """
-    Qaytarish sanasini ajratib olish
-    KUCHLI ALGORITM - barcha o'zbek tilidagi iboralarni tushunadi
+    Qaytarish sanasini AQLLI ajratib olish
     
-    Qo'llab-quvvatlanadigan formatlar:
-    - "birinchida qaytaraman" → keyingi oyning 1-sanasi
-    - "1-da beraman" → keyingi oyning 1-sanasi
-    - "10-da qaytaradi" → joriy/keyingi oyning 10-sanasi
-    - "1 oyda" / "2 oydan keyin" → N oy keyin
-    - "keyingi oy" / "kelasi oy" → keyingi oyning shu sanasi
-    - "keyingi hafta" → 7 kun keyin
-    - "10 kunda" → 10 kun keyin
-    - "fevralda" → fevralning 1-sanasi
-    - "10-fevral" → aniq sana
+    MUHIM QOIDA:
+    - "10-da qaytaraman" va bugun 2-sana bo'lsa → shu oyning 10-sanasi
+    - "10-da qaytaraman" va bugun 26-sana bo'lsa → KEYINGI oyning 10-sanasi
+    - "birinchida" → keyingi oyning 1-sanasi
+    - "1 oyda" → 1 oy keyin
     """
     from datetime import datetime, timedelta
     from dateutil.relativedelta import relativedelta
     
     text_lower = text.lower()
     today = datetime.now()
+    current_day = today.day
     
-    # ==================== KUNLIK QAYTARISH IBORALARI ====================
+    print(f"[MUDDAT] Tahlil: '{text_lower[:60]}...', Bugun: {today.strftime('%d-%m-%Y')}")
     
-    # "birinchida", "1-da", "1-sida" → keyingi oyning birinchi sanasi
-    first_day_patterns = [
-        r'\bbirinchi\s*(?:da|ga|si)?\b',  # birinchida, birinchiga
-        r'\b1\s*[-]?\s*(?:da|ga|si|chi)\b',  # 1-da, 1da, 1-chi
-        r'\b1\s*[-]?\s*san\w*\b',  # 1-sanasida, 1-sanada
+    # ==================== RAQAM + DA/CHI FORMATI ====================
+    # "10da", "10-da", "onida", "10-chi" kabi formatlar
+    
+    # Pattern: raqam + (da/ga/chi/sida/sanasida) + (qaytarish so'zi)
+    day_patterns = [
+        r'\b(\d{1,2})\s*[-]?\s*(?:da|ga|chi|sida|sanasida|sanasi)\b',  # 10da, 10-da, 10chi
+        r'\b(\d{1,2})\s*[-]?\s*(?:ida|iga)\b',  # 10ida
     ]
     
-    for pattern in first_day_patterns:
-        if re.search(pattern, text_lower):
-            # Keyingi oyning 1-sanasi
-            next_month = today + relativedelta(months=1)
-            result = next_month.replace(day=1).strftime("%Y-%m-%d")
-            print(f"[MUDDAT] 'birinchida' topildi → {result}")
-            return result
+    for pattern in day_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            day = int(match.group(1))
+            # Faqat 1-31 orasidagi kunlar uchun
+            if 1 <= day <= 31:
+                # Summa emas ekanligini tekshirish (ming, mln, so'm bilan emas)
+                context_around = text_lower[max(0, match.start()-15):min(len(text_lower), match.end()+15)]
+                if not re.search(r'ming|mln|million|so\'m|sum|dollar', context_around):
+                    try:
+                        # MUHIM: Agar bugungi sana katta bo'lsa, keyingi oyga o'tish
+                        if day > current_day:
+                            # Shu oyning o'sha sanasi
+                            target = today.replace(day=day)
+                        else:
+                            # Keyingi oyning o'sha sanasi
+                            target = (today + relativedelta(months=1)).replace(day=day)
+                        
+                        result = target.strftime("%Y-%m-%d")
+                        print(f"[MUDDAT] ✅ '{day}-da' topildi, bugun={current_day} → {result}")
+                        return result
+                    except ValueError:
+                        # Agar sana noto'g'ri bo'lsa (31-fevral kabi)
+                        pass
     
-    # "N-da beraman" / "N-da qaytaradi" → N-sana (2-31)
-    day_return_match = re.search(r'\b(\d{1,2})\s*[-]?\s*(?:da|ga|si|chi|sida|sanasida)\s*(?:bera|qayta|topshira|ola|to\'la)', text_lower)
-    if day_return_match:
-        day = int(day_return_match.group(1))
-        if 1 <= day <= 31:
-            # Agar bu sana bugundan oldin bo'lsa, keyingi oyga
-            try:
-                target = today.replace(day=day)
-                if target <= today:
-                    target = target + relativedelta(months=1)
-                result = target.strftime("%Y-%m-%d")
-                print(f"[MUDDAT] '{day}-da' topildi → {result}")
-                return result
-            except ValueError:
-                pass
+    # ==================== SO'Z BILAN SANA (birinchida, ikkinchida) ====================
+    number_words = {
+        'birinchi': 1, 'ikkinchi': 2, 'uchinchi': 3, 'to\'rtinchi': 4,
+        'beshinchi': 5, 'oltinchi': 6, 'yettinchi': 7, 'sakkizinchi': 8,
+        'to\'qqizinchi': 9, 'o\'ninchi': 10, 'oninchi': 10,
+        'yigirmanchi': 20, 'o\'ttizinchi': 30
+    }
     
-    # "N-sanasida" / "oyning N-da"
-    date_match = re.search(r'\b(\d{1,2})\s*[-]?\s*(?:sana|chi|da|ga)\b', text_lower)
-    if date_match and not re.search(r'ming|mln|million|so\'m|sum', text_lower[max(0, date_match.start()-10):date_match.end()+10]):
-        day = int(date_match.group(1))
-        if 1 <= day <= 31:
+    for word, day in number_words.items():
+        if re.search(rf'\b{word}\s*(?:da|ga|chi|sida)?\b', text_lower):
             try:
-                target = today.replace(day=day)
-                if target <= today:
-                    target = target + relativedelta(months=1)
+                if day > current_day:
+                    target = today.replace(day=day)
+                else:
+                    target = (today + relativedelta(months=1)).replace(day=day)
                 result = target.strftime("%Y-%m-%d")
-                print(f"[MUDDAT] '{day}-sana' topildi → {result}")
+                print(f"[MUDDAT] ✅ '{word}' topildi → {result}")
                 return result
             except ValueError:
                 pass
@@ -2956,7 +2960,7 @@ def extract_due_date(text: str) -> Optional[str]:
         if match:
             months = int(match.group(1))
             result = (today + relativedelta(months=months)).strftime("%Y-%m-%d")
-            print(f"[MUDDAT] '{months} oyda' topildi → {result}")
+            print(f"[MUDDAT] ✅ '{months} oyda' topildi → {result}")
             return result
     
     # "keyingi oy" / "kelasi oy" / "boshqa oy"
@@ -2968,7 +2972,7 @@ def extract_due_date(text: str) -> Optional[str]:
     for keyword in next_month_keywords:
         if keyword in text_lower:
             result = (today + relativedelta(months=1)).strftime("%Y-%m-%d")
-            print(f"[MUDDAT] '{keyword}' topildi → {result}")
+            print(f"[MUDDAT] ✅ '{keyword}' topildi → {result}")
             return result
     
     # ==================== HAFTALIK IBORALAR ====================
@@ -2978,7 +2982,7 @@ def extract_due_date(text: str) -> Optional[str]:
     if week_match:
         weeks = int(week_match.group(1))
         result = (today + timedelta(weeks=weeks)).strftime("%Y-%m-%d")
-        print(f"[MUDDAT] '{weeks} hafta' topildi → {result}")
+        print(f"[MUDDAT] ✅ '{weeks} hafta' topildi → {result}")
         return result
     
     # "keyingi hafta" / "kelasi hafta"
@@ -2990,7 +2994,7 @@ def extract_due_date(text: str) -> Optional[str]:
     for keyword in next_week_keywords:
         if keyword in text_lower:
             result = (today + timedelta(weeks=1)).strftime("%Y-%m-%d")
-            print(f"[MUDDAT] '{keyword}' topildi → {result}")
+            print(f"[MUDDAT] ✅ '{keyword}' topildi → {result}")
             return result
     
     # ==================== KUNLIK IBORALAR ====================
@@ -3001,7 +3005,7 @@ def extract_due_date(text: str) -> Optional[str]:
         days = int(day_match.group(1))
         if days <= 365:  # Mantiqiy chegaralash
             result = (today + timedelta(days=days)).strftime("%Y-%m-%d")
-            print(f"[MUDDAT] '{days} kunda' topildi → {result}")
+            print(f"[MUDDAT] ✅ '{days} kunda' topildi → {result}")
             return result
     
     # ==================== OY NOMLARI ====================
@@ -3029,7 +3033,7 @@ def extract_due_date(text: str) -> Optional[str]:
                 if target <= today:
                     target = datetime(year + 1, month_num, day)
                 result = target.strftime("%Y-%m-%d")
-                print(f"[MUDDAT] '{day}-{month_name}' topildi → {result}")
+                print(f"[MUDDAT] ✅ '{day}-{month_name}' topildi → {result}")
                 return result
             except ValueError:
                 pass
@@ -3042,27 +3046,12 @@ def extract_due_date(text: str) -> Optional[str]:
                 if target <= today:
                     target = datetime(year + 1, month_num, 1)
                 result = target.strftime("%Y-%m-%d")
-                print(f"[MUDDAT] '{month_name}da' topildi → {result}")
+                print(f"[MUDDAT] ✅ '{month_name}da' topildi → {result}")
                 return result
             except ValueError:
                 pass
     
-    # ==================== UMUMIY QAYTARISH IBORALARI ====================
-    
-    # "dedi", "beraman", "qaytaradi", "topshiradi" so'zlari bilan
-    return_verbs = [
-        r'qayta\w*', r'bera\w*', r'topshira\w*', r'to\'la\w*',
-        r'ola\w*', r'вернет', r'отдаст', r'return', r'give back'
-    ]
-    
-    # Agar "dedi" mavjud bo'lsa, lekin aniq sana yo'q
-    if re.search(r'\b(?:dedi|aytdi|va\'da|wadа|обещал|promised)\b', text_lower):
-        # Agar "birinchi" yoki raqam topilmasa ham, "dedi" bor bo'lsa
-        # bu qaytarish haqida gap ketayotganini bildiradi
-        # Lekin aniq sanasiz qaytarmaymiz (None)
-        pass
-    
-    print(f"[MUDDAT] Muddat topilmadi: '{text[:50]}...'")
+    print(f"[MUDDAT] ⚠️ Muddat topilmadi")
     return None
 
 
@@ -3267,12 +3256,19 @@ async def update_debt_status(db, debt_id: int, user_id: int, status: str, return
 def format_debt_saved_message(debt_info: Dict, lang: str = "uz") -> str:
     """
     Qarz saqlandi xabarini formatlash
+    Valyutani ham ko'rsatadi
     """
     debt_type = debt_info["type"]
     person = debt_info["person"]
     amount = debt_info["amount"]
+    currency = debt_info.get("currency", "UZS")
+    amount_in_som = debt_info.get("amount_in_som", amount)
     given_date = debt_info["given_date"]
     due_date = debt_info.get("due_date")
+    
+    # Valyuta belgisi
+    currency_symbols = {"UZS": "so'm", "USD": "$", "RUB": "₽"}
+    currency_text = currency_symbols.get(currency, "so'm")
     
     if lang == "uz":
         if debt_type == "lent":
@@ -3288,9 +3284,16 @@ def format_debt_saved_message(debt_info: Dict, lang: str = "uz") -> str:
             f"✅ {type_text}\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"{emoji} {direction}\n"
-            f"💵 Summa: *{amount:,}* so'm\n"
-            f"📅 Sana: *{given_date}*\n"
         )
+        
+        # Valyutaga qarab summa
+        if currency == "UZS":
+            msg += f"💵 Summa: *{amount:,}* so'm\n"
+        else:
+            msg += f"💵 Summa: *{amount:,}* {currency_text}\n"
+            msg += f"   ≈ _{amount_in_som:,} so'm_\n"
+        
+        msg += f"📅 Sana: *{given_date}*\n"
         
         if due_date:
             msg += f"⏰ Qaytarish: *{due_date}*\n"
@@ -3313,9 +3316,15 @@ def format_debt_saved_message(debt_info: Dict, lang: str = "uz") -> str:
             f"✅ {type_text}\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"{emoji} {direction}\n"
-            f"💵 Сумма: *{amount:,}* сум\n"
-            f"📅 Дата: *{given_date}*\n"
         )
+        
+        if currency == "UZS":
+            msg += f"💵 Сумма: *{amount:,}* сум\n"
+        else:
+            msg += f"💵 Сумма: *{amount:,}* {currency_text}\n"
+            msg += f"   ≈ _{amount_in_som:,} сум_\n"
+        
+        msg += f"📅 Дата: *{given_date}*\n"
         
         if due_date:
             msg += f"⏰ Возврат: *{due_date}*\n"
@@ -3385,9 +3394,44 @@ def format_debt_summary_message(summary: Dict, lang: str = "uz") -> str:
     return msg
 
 
+def detect_currency(text: str) -> Tuple[str, float]:
+    """
+    Matndan valyutani aniqlash
+    
+    Returns: (currency_code, exchange_rate_to_som)
+    
+    Qo'llab-quvvatlanadigan valyutalar:
+    - UZS (so'm) - default
+    - USD (dollar)
+    - RUB (rubl)
+    """
+    text_lower = text.lower()
+    
+    # Dollar tekshirish
+    dollar_keywords = ['dollar', 'doller', 'долар', 'долл', 'usd', '$', 
+                       'dollarga', 'dollardan', 'dollarni', 'dollarlik']
+    for kw in dollar_keywords:
+        if kw in text_lower:
+            # O'zbekiston kursini olish (taxminiy)
+            # Real loyihada API dan olish kerak
+            USD_RATE = 12500  # 1 USD = 12,500 so'm (taxminiy)
+            return "USD", USD_RATE
+    
+    # Rubl tekshirish
+    rubl_keywords = ['rubl', 'ruble', 'рубл', 'rub', '₽']
+    for kw in rubl_keywords:
+        if kw in text_lower:
+            RUB_RATE = 135  # 1 RUB = 135 so'm (taxminiy)
+            return "RUB", RUB_RATE
+    
+    # Default - so'm
+    return "UZS", 1.0
+
+
 async def parse_debt_transaction(text: str, lang: str = "uz") -> Optional[Dict]:
     """
     Matndan qarz tranzaksiyasini to'liq tahlil qilish
+    Valyutani ham aniqlaydi
     """
     # Avval qarz ekanligini tekshirish
     debt_info = detect_debt_transaction(text)
@@ -3401,9 +3445,17 @@ async def parse_debt_transaction(text: str, lang: str = "uz") -> Optional[Dict]:
     if not amount:
         return None
     
+    # Valyutani aniqlash
+    currency, rate = detect_currency(text)
+    
     debt_info["amount"] = amount
+    debt_info["currency"] = currency
+    debt_info["exchange_rate"] = rate
+    debt_info["amount_in_som"] = int(amount * rate)  # So'mda hisoblash uchun
     debt_info["description"] = extract_description(text, amount)
     debt_info["original_text"] = text
+    
+    print(f"[QARZ] Summa: {amount:,} {currency}, So'mda: {debt_info['amount_in_som']:,}")
     
     return debt_info
 
