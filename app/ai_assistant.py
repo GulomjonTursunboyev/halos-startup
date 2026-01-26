@@ -38,6 +38,7 @@ EXPENSE_CATEGORIES = {
         "ko'ngilochar": "🎬 Ko'ngilochar",
         "aloqa": "📱 Aloqa",
         "kredit": "💳 Kredit to'lovi",
+        "obuna": "💎 Obuna",
         "boshqa": "📦 Boshqa"
     },
     "ru": {
@@ -51,6 +52,7 @@ EXPENSE_CATEGORIES = {
         "ko'ngilochar": "🎬 Развлечения",
         "aloqa": "📱 Связь",
         "kredit": "💳 Платёж по кредиту",
+        "obuna": "💎 Подписка",
         "boshqa": "📦 Прочее"
     }
 }
@@ -3160,3 +3162,5 @@ async def parse_debt_transaction(text: str, lang: str = "uz") -> Optional[Dict]:
     debt_info["original_text"] = text
     
     return debt_info
+
+

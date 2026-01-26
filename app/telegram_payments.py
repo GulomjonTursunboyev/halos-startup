@@ -236,6 +236,20 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
             logger.error(f"Failed to record payment: {e}")
             # Continue anyway - PRO is already activated
         
+        # Record as expense transaction (for statistics)
+        try:
+            description = f"HALOS PRO - {plan.description_uz}"
+            await db.execute_update(
+                """INSERT INTO transactions (user_id, type, category, amount, description, original_text, created_at)
+                   VALUES ($1, 'expense', 'obuna', $2, $3, $4, $5)""" if db.is_postgres else
+                """INSERT INTO transactions (user_id, type, category, amount, description, original_text, created_at)
+                   VALUES (?, 'expense', 'obuna', ?, ?, ?, ?)""",
+                user['id'], plan.price_uzs, description, f"PRO obuna: {plan_id}", now
+            )
+            logger.info(f"PRO subscription expense recorded for user {telegram_id}")
+        except Exception as e:
+            logger.error(f"Failed to record expense transaction: {e}")
+        
         # Get user language
         lang = user.get("language", "uz")
         
