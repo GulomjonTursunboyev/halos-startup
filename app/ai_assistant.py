@@ -1,6 +1,6 @@
 """
 AI Yordamchi - Ovozli xabarlarni qayta ishlash va xarajat/daromad tracking
-Aisha.group STT API integratsiyasi
+Kotib.ai STT API integratsiyasi
 
 MULTI-TRANSACTION PARSING ENGINE v2.0
 =====================================
@@ -20,17 +20,9 @@ from telegram.ext import ContextTypes
 # Logger
 logger = logging.getLogger(__name__)
 
-# Aisha API konfiguratsiyasi
-AISHA_API_KEY = "A1IBAbx4.vbFpnWJRQRvDANwOEugCW1ARJkZUjlSY"
-AISHA_STT_URL = "https://back.aisha.group/api/v1/stt/post/"
-AISHA_TTS_URL = "https://back.aisha.group/api/v1/tts/post/"
-
-# Kotib.ai API konfiguratsiyasi (primary STT)
+# Kotib.ai API konfiguratsiyasi (PRIMARY STT)
 KOTIB_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55IjoiZWJkYWYyZjctZDc0My00NDUwLTg2MzItOTdhODM0YjE4MTdjIn0.NdyeqX2L61FU6PpBQBo4uYKRSZWS8bXlygJYVlgkrn0"
 KOTIB_STT_URL = "https://developer.kotib.ai/api/v1/stt"
-
-# STT Provider: "kotib" yoki "aisha" (default: kotib)
-STT_PROVIDER = os.getenv("STT_PROVIDER", "kotib")
 
 # ==================== LIMITS ====================
 MAX_VOICE_DURATION = 60  # Maksimal ovozli xabar uzunligi (sekundda)
@@ -137,11 +129,11 @@ CATEGORY_KEYWORDS = {
 async def transcribe_voice(voice_file_path: str) -> Optional[str]:
     """
     Ovozli faylni textga aylantirish
-    Primary: Kotib.ai, Fallback: Aisha
+    Faqat Kotib.ai STT API ishlatiladi
     """
     logger.info(f"[STT] Ovoz faylini o'qish: {voice_file_path}")
     
-    # Read file content once
+    # Read file content
     try:
         with open(voice_file_path, 'rb') as f:
             file_content = f.read()
@@ -150,22 +142,26 @@ async def transcribe_voice(voice_file_path: str) -> Optional[str]:
         logger.error(f"[STT] Fayl o'qishda xato: {e}")
         return None
     
-    # Try Kotib.ai first (primary)
+    # Kotib.ai ga so'rov yuborish
     logger.info("[STT] Kotib.ai ga so'rov yuborilmoqda...")
     result = await _transcribe_kotib(file_content)
+    
     if result:
+        # "Speaker 1:" prefiksini olib tashlash
+        result = _clean_kotib_text(result)
         logger.info(f"[STT][Kotib.ai] MUVAFFAQIYATLI: '{result}'")
         return result
     
-    # Fallback to Aisha
-    logger.warning("[STT][Kotib.ai] Ishlamadi, Aisha'ga o'tilmoqda...")
-    result = await _transcribe_aisha(file_content)
-    if result:
-        logger.info(f"[STT][Aisha] MUVAFFAQIYATLI: '{result}'")
-        return result
-    
-    logger.error("[STT] Barcha STT API'lar ishlamadi!")
+    logger.error("[STT] Kotib.ai STT ishlamadi!")
     return None
+
+
+def _clean_kotib_text(text: str) -> str:
+    """Kotib.ai natijasini tozalash - 'Speaker X:' prefiksini olib tashlash"""
+    import re
+    # "Speaker 1:", "Speaker 2:", va hokazo ni olib tashlash
+    cleaned = re.sub(r'^Speaker\s*\d+:\s*', '', text, flags=re.IGNORECASE)
+    return cleaned.strip()
 
 
 async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
@@ -175,12 +171,11 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
             headers = {'Authorization': f'Bearer {KOTIB_API_KEY}'}
             
             data = aiohttp.FormData()
-            # Kotib.ai 'file' field kutadi, 'audio' emas!
             data.add_field('file', file_content, filename='audio.ogg', content_type='audio/ogg')
             data.add_field('language', 'uz')
             data.add_field('blocking', 'true')
             
-            async with session.post(KOTIB_STT_URL, data=data, headers=headers, timeout=30) as response:
+            async with session.post(KOTIB_STT_URL, data=data, headers=headers, timeout=60) as response:
                 response_text = await response.text()
                 logger.info(f"[STT][Kotib.ai] Status: {response.status}, Response: {response_text[:500]}")
                 
@@ -198,45 +193,6 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
                 return None
     except Exception as e:
         logger.error(f"[STT][Kotib.ai] Exception: {e}")
-        return None
-
-
-async def _transcribe_aisha(file_content: bytes) -> Optional[str]:
-    """Aisha STT API (fallback)"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            headers = {'x-api-key': AISHA_API_KEY}
-            
-            # Try different field names
-            for field_name in ['audio', 'file', 'voice']:
-                try:
-                    data = aiohttp.FormData()
-                    data.add_field(field_name, file_content, filename='audio.ogg', content_type='audio/ogg')
-                    data.add_field('language', 'uz')
-                    
-                    async with session.post(AISHA_STT_URL, data=data, headers=headers, timeout=30) as response:
-                        response_text = await response.text()
-                        logger.info(f"[STT][Aisha] field={field_name}, Status: {response.status}, Response: {response_text[:300]}")
-                        
-                        if response.status == 200:
-                            try:
-                                result = json.loads(response_text)
-                                if isinstance(result, dict):
-                                    text = result.get('text') or result.get('transcript') or result.get('result')
-                                    if text:
-                                        logger.info(f"[STT][Aisha] Parsed text: '{text}'")
-                                        return text
-                                elif isinstance(result, str) and result:
-                                    return result
-                            except:
-                                if response_text and len(response_text) > 2:
-                                    return response_text
-                except Exception as e:
-                    logger.warning(f"[STT][Aisha] field={field_name} xato: {e}")
-                    continue
-            return None
-    except Exception as e:
-        logger.error(f"[STT][Aisha] Umumiy xato: {e}")
         return None
 
 
