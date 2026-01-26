@@ -201,22 +201,29 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
     message = update.message
     payment = message.successful_payment
     
+    # Get telegram_id from the actual user who paid
+    telegram_id = update.effective_user.id
+    
+    logger.info(f"Payment received from user {telegram_id}: {payment.total_amount} {payment.currency}")
+    
     try:
         # Parse payload: h_{user_id}_{plan_short}_{time}
         payload = payment.invoice_payload
         parts = payload.split('_')
         
-        telegram_id = int(parts[1])
-        plan_short = parts[2]
+        plan_short = parts[2] if len(parts) > 2 else 'mon'
         
         # Convert short to full plan_id
         plan_map = {'wee': 'pro_weekly', 'mon': 'pro_monthly', 'yea': 'pro_yearly'}
         plan_id = plan_map.get(plan_short, 'pro_monthly')
         
+        logger.info(f"Plan detected: {plan_id} from payload: {payload}")
+        
         # Get plan details
         plan = PRICING_PLANS.get(plan_id)
         if not plan:
             logger.error(f"Plan not found: {plan_id}")
+            await message.reply_text("❌ Tarif topilmadi. Admin bilan bog'laning: @halos_support")
             return
         
         # Calculate subscription expiration
@@ -224,12 +231,15 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         duration_days = plan.period.value
         expires = now + timedelta(days=duration_days)
         
+        logger.info(f"Activating PRO for user {telegram_id}, expires: {expires}")
+        
         # Get database
         db = await get_database()
         user = await db.get_user(telegram_id)
         
         if not user:
-            logger.error(f"User not found after payment: {telegram_id}")
+            logger.error(f"User not found: {telegram_id}")
+            await message.reply_text("❌ Foydalanuvchi topilmadi. /start bosing va qayta urinib ko'ring.")
             return
         
         # Activate PRO subscription
@@ -250,14 +260,21 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
                 expires.isoformat(), telegram_id
             )
         
+        logger.info(f"PRO subscription updated in database for user {telegram_id}")
+        
         # Record payment
-        await db.execute_update(
-            """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
-               VALUES ($1, $2, $3, 'telegram_click', $4, 'completed', $5)""" if db.is_postgres else
-            """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
-               VALUES (?, ?, ?, 'telegram_click', ?, 'completed', ?)""",
-            user['id'], plan_id, plan.price_uzs, payment.telegram_payment_charge_id, now
-        )
+        try:
+            await db.execute_update(
+                """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
+                   VALUES ($1, $2, $3, 'telegram_click', $4, 'completed', $5)""" if db.is_postgres else
+                """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
+                   VALUES (?, ?, ?, 'telegram_click', ?, 'completed', ?)""",
+                user['id'], plan_id, plan.price_uzs, payment.telegram_payment_charge_id, now
+            )
+            logger.info(f"Payment recorded: {payment.telegram_payment_charge_id}")
+        except Exception as e:
+            logger.error(f"Failed to record payment: {e}")
+            # Continue anyway - PRO is already activated
         
         # Get user language
         lang = user.get("language", "uz")
