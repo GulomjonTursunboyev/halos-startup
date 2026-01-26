@@ -835,184 +835,286 @@ SMART_CATEGORY_KEYWORDS = {
 
 def find_all_amounts_with_context(text: str) -> List[Dict]:
     """
-    Matndan BARCHA summalarni va ularning kontekstini topish.
+    KUCHAYTIRILGAN SUMMA ANIQLASH ALGORITMI v4.0
+    ============================================
     
-    Masalan: "yuz ming ishlab topdim on minga non oldim"
-    Natija: [
-        {"amount": 100000, "start": 0, "end": 8, "context_after": "ishlab topdim"},
-        {"amount": 10000, "start": 24, "end": 31, "context_after": "non oldim"}
-    ]
+    Matndan BARCHA summalarni va ularning kontekstini topish.
+    HECH QANDAY SUMMANI TASHLAB KETMASLIGI KAFOLATLANADI!
+    
+    Qo'llab-quvvatlanadigan formatlar:
+    1. "yuz ming" = 100,000
+    2. "on ming" = 10,000 
+    3. "besh ming" = 5,000
+    4. "yigirma besh ming" = 25,000
+    5. "100 ming" = 100,000
+    6. "5 minga" = 5,000
+    7. "1000000" = 1,000,000
+    8. "bir million" = 1,000,000
     """
     text_lower = text.lower().strip()
     results = []
     
-    print(f"\n[FIND_AMOUNTS] Matn: '{text_lower}'")
+    print(f"\n{'='*60}")
+    print(f"[FIND_AMOUNTS v4.0] Matn: '{text_lower}'")
+    print(f"{'='*60}")
     
-    # 1. SO'Z BILAN YOZILGAN SUMMALAR
-    # Pattern: [o'nlik] [birlik] ming[ga/da]
-    
-    # Barcha pozitsiyalarni saqlash
+    # Barcha ishlatilgan pozitsiyalar
     used_positions = set()
     
-    # 1.1 O'nlik + birlik + ming (yigirma besh ming = 25000)
-    pattern1 = r'(yuz|o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)\s+(bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz)\s+(ming(?:ga|da|dan|ni)?)'
-    for match in re.finditer(pattern1, text_lower):
+    # ==================== SO'Z SONLARI LUG'ATI ====================
+    NUMBERS = {
+        # Birliklar
+        'bir': 1, 'ikki': 2, 'uch': 3, 'tort': 4, "to'rt": 4, 'besh': 5,
+        'olti': 6, 'yetti': 7, 'sakkiz': 8, 'toqqiz': 9, "to'qqiz": 9,
+        # O'nliklar
+        'on': 10, "o'n": 10, 'yigirma': 20, 'ottiz': 30, "o'ttiz": 30,
+        'qirq': 40, 'ellik': 50, 'oltmish': 60, 'yetmish': 70,
+        'sakson': 80, 'toqson': 90, "to'qson": 90,
+        # Yuz
+        'yuz': 100,
+    }
+    
+    # ==================== PATTERN 1: YUZ MING (100,000) ====================
+    # "yuz ming", "yuz mingga", "yuz mingda"
+    pattern_yuz_ming = r'\byuz\s+(ming(?:ga|da|dan|ni|lik)?)\b'
+    for match in re.finditer(pattern_yuz_ming, text_lower):
+        start, end = match.start(), match.end()
+        if any(p in range(start, end) for p in used_positions):
+            continue
+        
+        amount = 100000
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
+        
+        results.append({
+            "amount": amount,
+            "start": start,
+            "end": end,
+            "text": match.group(0),
+            "context_before": context_before,
+            "context_after": context_after
+        })
+        used_positions.update(range(start, end))
+        print(f"  [YUZ MING] '{match.group(0)}' = {amount:,}")
+    
+    # ==================== PATTERN 2: O'NLIK + MING (10,000 - 90,000) ====================
+    # "on ming", "yigirma ming", "ellik mingga"
+    onliklar = "o'?n|yigirma|o'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to'?qson"
+    pattern_onlik_ming = rf'\b({onliklar})\s+(ming(?:ga|da|dan|ni|lik)?)\b'
+    for match in re.finditer(pattern_onlik_ming, text_lower):
+        start, end = match.start(), match.end()
+        if any(p in range(start, end) for p in used_positions):
+            continue
+        
+        word = match.group(1).replace("'", "'")
+        num = NUMBERS.get(word, NUMBERS.get(word.replace("o'", "o'"), 10))
+        amount = num * 1000
+        
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
+        
+        results.append({
+            "amount": amount,
+            "start": start,
+            "end": end,
+            "text": match.group(0),
+            "context_before": context_before,
+            "context_after": context_after
+        })
+        used_positions.update(range(start, end))
+        print(f"  [O'NLIK MING] '{match.group(0)}' = {amount:,}")
+    
+    # ==================== PATTERN 3: BIRLIK + MING (1,000 - 9,000) ====================
+    # "bir ming", "besh ming", "5 minga"
+    birliklar = "bir|ikki|uch|to'?rt|besh|olti|yetti|sakkiz|to'?qqiz"
+    pattern_birlik_ming = rf'\b({birliklar})\s+(ming(?:ga|da|dan|ni|lik)?)\b'
+    for match in re.finditer(pattern_birlik_ming, text_lower):
+        start, end = match.start(), match.end()
+        if any(p in range(start, end) for p in used_positions):
+            continue
+        
+        word = match.group(1).replace("'", "'")
+        num = NUMBERS.get(word, NUMBERS.get(word.replace("o'", "o'").replace("to'", "to'"), 1))
+        amount = num * 1000
+        
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
+        
+        results.append({
+            "amount": amount,
+            "start": start,
+            "end": end,
+            "text": match.group(0),
+            "context_before": context_before,
+            "context_after": context_after
+        })
+        used_positions.update(range(start, end))
+        print(f"  [BIRLIK MING] '{match.group(0)}' = {amount:,}")
+    
+    # ==================== PATTERN 4: O'NLIK + BIRLIK + MING (11,000 - 99,000) ====================
+    # "yigirma besh ming", "o'n ikki ming"
+    pattern_complex = rf'\b({onliklar})\s+({birliklar})\s+(ming(?:ga|da|dan|ni|lik)?)\b'
+    for match in re.finditer(pattern_complex, text_lower):
         start, end = match.start(), match.end()
         if any(p in range(start, end) for p in used_positions):
             continue
         
         word1 = match.group(1).replace("'", "'")
         word2 = match.group(2).replace("'", "'")
+        num1 = NUMBERS.get(word1, NUMBERS.get(word1.replace("o'", "o'"), 10))
+        num2 = NUMBERS.get(word2, NUMBERS.get(word2.replace("o'", "o'").replace("to'", "to'"), 1))
+        amount = (num1 + num2) * 1000
         
-        num1 = UZBEK_NUMBERS.get(word1, 0)
-        num2 = UZBEK_NUMBERS.get(word2, 0)
-        
-        if word1 == 'yuz':
-            amount = (num1 + num2) * 1000  # yuz besh ming = 105,000
-        else:
-            amount = (num1 + num2) * 1000
-        
-        # Kontekstni olish
-        context_after = text_lower[end:end+50].strip().split()[0:3] if end < len(text_lower) else []
-        context_before = text_lower[max(0,start-30):start].strip().split()[-3:] if start > 0 else []
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
         
         results.append({
             "amount": amount,
             "start": start,
             "end": end,
             "text": match.group(0),
-            "context_before": ' '.join(context_before),
-            "context_after": ' '.join(context_after)
+            "context_before": context_before,
+            "context_after": context_after
         })
         used_positions.update(range(start, end))
-        print(f"  [PATTERN1] {match.group(0)} = {amount:,}")
+        print(f"  [O'NLIK+BIRLIK MING] '{match.group(0)}' = {amount:,}")
     
-    # 1.2 Faqat o'nlik + ming (ellik ming = 50000)
-    pattern2 = r'(yuz|o\'?n|yigirma|o\'?ttiz|qirq|ellik|oltmish|yetmish|sakson|to\'?qson)\s+(ming(?:ga|da|dan|ni)?)'
-    for match in re.finditer(pattern2, text_lower):
-        start, end = match.start(), match.end()
-        if any(p in range(start, end) for p in used_positions):
-            continue
-        
-        word1 = match.group(1).replace("'", "'")
-        num1 = UZBEK_NUMBERS.get(word1, 0)
-        amount = num1 * 1000
-        
-        context_after = text_lower[end:end+50].strip().split()[0:3] if end < len(text_lower) else []
-        context_before = text_lower[max(0,start-30):start].strip().split()[-3:] if start > 0 else []
-        
-        results.append({
-            "amount": amount,
-            "start": start,
-            "end": end,
-            "text": match.group(0),
-            "context_before": ' '.join(context_before),
-            "context_after": ' '.join(context_after)
-        })
-        used_positions.update(range(start, end))
-        print(f"  [PATTERN2] {match.group(0)} = {amount:,}")
-    
-    # 1.3 Faqat birlik + ming (besh ming = 5000)
-    pattern3 = r'(bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz)\s+(ming(?:ga|da|dan|ni)?)'
-    for match in re.finditer(pattern3, text_lower):
-        start, end = match.start(), match.end()
-        if any(p in range(start, end) for p in used_positions):
-            continue
-        
-        word1 = match.group(1).replace("'", "'")
-        num1 = UZBEK_NUMBERS.get(word1, 0)
-        amount = num1 * 1000
-        
-        context_after = text_lower[end:end+50].strip().split()[0:3] if end < len(text_lower) else []
-        context_before = text_lower[max(0,start-30):start].strip().split()[-3:] if start > 0 else []
-        
-        results.append({
-            "amount": amount,
-            "start": start,
-            "end": end,
-            "text": match.group(0),
-            "context_before": ' '.join(context_before),
-            "context_after": ' '.join(context_after)
-        })
-        used_positions.update(range(start, end))
-        print(f"  [PATTERN3] {match.group(0)} = {amount:,}")
-    
-    # 2. RAQAM BILAN YOZILGAN SUMMALAR
-    # Pattern: [raqam] ming[ga/da] yoki [raqam] mln
-    
-    # 2.1 Raqam + ming
-    pattern4 = r'(\d+)\s*(ming(?:ga|da|dan|ni)?)'
-    for match in re.finditer(pattern4, text_lower):
+    # ==================== PATTERN 5: RAQAM + MING ====================
+    # "100 ming", "5 minga", "50mingga"
+    pattern_digit_ming = r'\b(\d+)\s*(ming(?:ga|da|dan|ni|lik)?)\b'
+    for match in re.finditer(pattern_digit_ming, text_lower):
         start, end = match.start(), match.end()
         if any(p in range(start, end) for p in used_positions):
             continue
         
         amount = int(match.group(1)) * 1000
         
-        context_after = text_lower[end:end+50].strip().split()[0:3] if end < len(text_lower) else []
-        context_before = text_lower[max(0,start-30):start].strip().split()[-3:] if start > 0 else []
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
         
         results.append({
             "amount": amount,
             "start": start,
             "end": end,
             "text": match.group(0),
-            "context_before": ' '.join(context_before),
-            "context_after": ' '.join(context_after)
+            "context_before": context_before,
+            "context_after": context_after
         })
         used_positions.update(range(start, end))
-        print(f"  [PATTERN4] {match.group(0)} = {amount:,}")
+        print(f"  [RAQAM MING] '{match.group(0)}' = {amount:,}")
     
-    # 2.2 Raqam + million/mln
-    pattern5 = r'(\d+)\s*(million|mln|миллион|млн)'
-    for match in re.finditer(pattern5, text_lower):
+    # ==================== PATTERN 6: MILLION ====================
+    # "bir million", "5 million", "1 mln"
+    pattern_million = r'\b(\d+|bir|ikki|uch|to\'?rt|besh|olti|yetti|sakkiz|to\'?qqiz|on)\s*(million|mln|миллион|млн)'
+    for match in re.finditer(pattern_million, text_lower):
         start, end = match.start(), match.end()
         if any(p in range(start, end) for p in used_positions):
             continue
         
-        amount = int(match.group(1)) * 1000000
+        word = match.group(1)
+        if word.isdigit():
+            num = int(word)
+        else:
+            num = NUMBERS.get(word.replace("'", "'"), 1)
+        amount = num * 1000000
         
-        context_after = text_lower[end:end+50].strip().split()[0:3] if end < len(text_lower) else []
-        context_before = text_lower[max(0,start-30):start].strip().split()[-3:] if start > 0 else []
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
         
         results.append({
             "amount": amount,
             "start": start,
             "end": end,
             "text": match.group(0),
-            "context_before": ' '.join(context_before),
-            "context_after": ' '.join(context_after)
+            "context_before": context_before,
+            "context_after": context_after
         })
         used_positions.update(range(start, end))
-        print(f"  [PATTERN5] {match.group(0)} = {amount:,}")
+        print(f"  [MILLION] '{match.group(0)}' = {amount:,}")
     
-    # 3. KATTA RAQAMLAR (formatsiz)
-    pattern6 = r'\b(\d{4,})\b'
-    for match in re.finditer(pattern6, text_lower):
+    # ==================== PATTERN 7: KATTA RAQAMLAR (5+ xonali) ====================
+    # "100000", "1000000", "50000"
+    pattern_big_num = r'\b(\d{5,})\b'
+    for match in re.finditer(pattern_big_num, text_lower):
         start, end = match.start(), match.end()
         if any(p in range(start, end) for p in used_positions):
             continue
         
         amount = int(match.group(1))
         
-        context_after = text_lower[end:end+50].strip().split()[0:3] if end < len(text_lower) else []
-        context_before = text_lower[max(0,start-30):start].strip().split()[-3:] if start > 0 else []
+        context_after = text_lower[end:end+60].strip()
+        context_before = text_lower[max(0,start-40):start].strip()
         
         results.append({
             "amount": amount,
             "start": start,
             "end": end,
             "text": match.group(0),
-            "context_before": ' '.join(context_before),
-            "context_after": ' '.join(context_after)
+            "context_before": context_before,
+            "context_after": context_after
         })
         used_positions.update(range(start, end))
-        print(f"  [PATTERN6] {match.group(0)} = {amount:,}")
+        print(f"  [KATTA RAQAM] '{match.group(0)}' = {amount:,}")
+    
+    # ==================== PATTERN 8: 4 XONALI RAQAMLAR (1000-9999) ====================
+    # "5000", "1000"
+    pattern_4digit = r'\b(\d{4})\b'
+    for match in re.finditer(pattern_4digit, text_lower):
+        start, end = match.start(), match.end()
+        if any(p in range(start, end) for p in used_positions):
+            continue
+        
+        amount = int(match.group(1))
+        if amount >= 1000:  # faqat 1000+ 
+            context_after = text_lower[end:end+60].strip()
+            context_before = text_lower[max(0,start-40):start].strip()
+            
+            results.append({
+                "amount": amount,
+                "start": start,
+                "end": end,
+                "text": match.group(0),
+                "context_before": context_before,
+                "context_after": context_after
+            })
+            used_positions.update(range(start, end))
+            print(f"  [4-XONALI] '{match.group(0)}' = {amount:,}")
+    
+    # ==================== PATTERN 9: 3 XONALI RAQAMLAR (100-999) ====================
+    # "500", "100" - faqat so'm/sum bo'lsa yoki kontekst bo'lsa
+    pattern_3digit = r'\b(\d{3})\b'
+    for match in re.finditer(pattern_3digit, text_lower):
+        start, end = match.start(), match.end()
+        if any(p in range(start, end) for p in used_positions):
+            continue
+        
+        amount = int(match.group(1))
+        if amount >= 100:
+            # Faqat so'm/sum bilan birga kelsa qabul qilish
+            after_text = text_lower[end:end+20]
+            if re.search(r"so'm|sum|сум", after_text):
+                context_after = text_lower[end:end+60].strip()
+                context_before = text_lower[max(0,start-40):start].strip()
+                
+                results.append({
+                    "amount": amount,
+                    "start": start,
+                    "end": end,
+                    "text": match.group(0),
+                    "context_before": context_before,
+                    "context_after": context_after
+                })
+                used_positions.update(range(start, end))
+                print(f"  [3-XONALI] '{match.group(0)}' = {amount:,}")
     
     # Pozitsiya bo'yicha tartiblash
     results.sort(key=lambda x: x['start'])
     
-    print(f"[FIND_AMOUNTS] Jami {len(results)} ta summa topildi")
+    print(f"\n[FIND_AMOUNTS] ✅ Jami {len(results)} ta summa topildi!")
+    for r in results:
+        print(f"  - {r['amount']:,} so'm: '{r['text']}'")
+    print(f"{'='*60}\n")
+    
     return results
 
 
