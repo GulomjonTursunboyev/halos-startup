@@ -142,56 +142,16 @@ async def send_payment_invoice(
 
 async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handle pre-checkout query - validate order before payment
-    Must respond within 10 seconds! Keep this handler FAST!
+    Handle pre-checkout query - MUST respond within 10 seconds!
+    Keep this handler EXTREMELY FAST - just approve immediately!
     """
     query = update.pre_checkout_query
     
-    try:
-        # Parse payload: h_{user_id}_{plan_short}_{time}
-        payload = query.invoice_payload
-        parts = payload.split('_')
-        
-        if len(parts) < 4 or parts[0] != 'h':
-            await query.answer(ok=False, error_message="Noto'g'ri format")
-            return
-        
-        telegram_id = int(parts[1])
-        plan_short = parts[2]  # wee, mon, yea
-        
-        # Convert short to full plan_id
-        plan_map = {'wee': 'pro_weekly', 'mon': 'pro_monthly', 'yea': 'pro_yearly'}
-        plan_id = plan_map.get(plan_short)
-        
-        # Verify user matches
-        if query.from_user.id != telegram_id:
-            await query.answer(ok=False, error_message="Foydalanuvchi mos emas")
-            return
-        
-        # Verify plan exists
-        if not plan_id or plan_id not in PRICING_PLANS:
-            await query.answer(ok=False, error_message="Tarif topilmadi")
-            return
-        
-        # Verify amount (quick check)
-        plan = PRICING_PLANS[plan_id]
-        expected_amount = int(plan.price_uzs * 100)
-        
-        if abs(query.total_amount - expected_amount) > 1000:
-            await query.answer(ok=False, error_message="Summa mos emas")
-            return
-        
-        # Approve payment immediately!
-        await query.answer(ok=True)
-        
-        logger.info(f"Pre-checkout OK: user={telegram_id}, plan={plan_id}")
-        
-    except Exception as e:
-        logger.error(f"Pre-checkout error: {e}")
-        try:
-            await query.answer(ok=False, error_message="Xatolik")
-        except:
-            pass
+    # IMMEDIATELY approve - no checks, no delays!
+    # All validation will be done in successful_payment_handler
+    await query.answer(ok=True)
+    
+    logger.info(f"Pre-checkout approved for user {query.from_user.id}")
 
 
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
