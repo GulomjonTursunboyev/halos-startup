@@ -84,8 +84,6 @@ from app.subscription_handlers import (
     enter_promo_callback,
     cancel_promo_callback,
     click_buy_callback,
-    pay_telegram_callback,
-    pay_link_callback,
     handle_promo_code_input,
 )
 from app.telegram_payments import (
@@ -309,13 +307,13 @@ def main() -> None:
         CallbackQueryHandler(click_buy_callback, pattern="^click_buy_pro_")
     )
     
-    # Payment method selection handlers
-    application.add_handler(
-        CallbackQueryHandler(pay_telegram_callback, pattern="^pay_tg_")
-    )
-    application.add_handler(
-        CallbackQueryHandler(pay_link_callback, pattern="^pay_link_")
-    )
+    # NOTE: Payment method selection handlers disabled - using direct Telegram Payment
+    # application.add_handler(
+    #     CallbackQueryHandler(pay_telegram_callback, pattern="^pay_tg_")
+    # )
+    # application.add_handler(
+    #     CallbackQueryHandler(pay_link_callback, pattern="^pay_link_")
+    # )
     
     # Promo code handlers
     application.add_handler(

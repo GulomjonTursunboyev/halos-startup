@@ -503,12 +503,11 @@ async def show_pricing_callback(update: Update, context: ContextTypes.DEFAULT_TY
 # ==================== PAYMENT METHOD SELECTION ====================
 
 async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle Click payment button - show payment method selection"""
+    """Handle Click payment button - directly go to Telegram Payment"""
     query = update.callback_query
     await query.answer()
     
     plan_id = query.data.replace("click_buy_", "")
-    lang = context.user_data.get("lang", "uz")
     
     # Store selected plan
     context.user_data["selected_plan"] = plan_id
@@ -518,38 +517,66 @@ async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer("❌ Tarif topilmadi", show_alert=True)
         return
     
-    plan = PRICING_PLANS[plan_id]
+    # Directly go to Telegram Payment (Click Terminal)
+    from app.telegram_payments import send_payment_invoice
     
-    if lang == "uz":
-        msg = (
-            f"💳 *To'lov usulini tanlang*\n\n"
-            f"📦 Tarif: *{plan.description_uz}*\n"
-            f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
-            "👇 Quyidagilardan birini tanlang:"
-        )
-        keyboard = [
-            [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
-            [InlineKeyboardButton("🔗 Click havola", callback_data=f"pay_link_{plan_id}")],
-            [InlineKeyboardButton("◀️ Orqaga", callback_data="show_pricing")]
-        ]
-    else:
-        msg = (
-            f"💳 *Выберите способ оплаты*\n\n"
-            f"📦 Тариф: *{plan.description_ru}*\n"
-            f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
-            "👇 Выберите один из вариантов:"
-        )
-        keyboard = [
-            [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
-            [InlineKeyboardButton("🔗 Click ссылка", callback_data=f"pay_link_{plan_id}")],
-            [InlineKeyboardButton("◀️ Назад", callback_data="show_pricing")]
-        ]
+    try:
+        await query.message.delete()
+    except:
+        pass
     
-    await query.edit_message_text(
-        msg,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    await send_payment_invoice(update, context, plan_id)
+
+
+# NOTE: Click havola payment temporarily disabled - code kept for future use
+# async def click_buy_callback_with_options(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     """Handle Click payment button - show payment method selection"""
+#     query = update.callback_query
+#     await query.answer()
+#     
+#     plan_id = query.data.replace("click_buy_", "")
+#     lang = context.user_data.get("lang", "uz")
+#     
+#     # Store selected plan
+#     context.user_data["selected_plan"] = plan_id
+#     
+#     # Get plan info
+#     if plan_id not in PRICING_PLANS:
+#         await query.answer("❌ Tarif topilmadi", show_alert=True)
+#         return
+#     
+#     plan = PRICING_PLANS[plan_id]
+#     
+#     if lang == "uz":
+#         msg = (
+#             f"💳 *To'lov usulini tanlang*\n\n"
+#             f"📦 Tarif: *{plan.description_uz}*\n"
+#             f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
+#             "👇 Quyidagilardan birini tanlang:"
+#         )
+#         keyboard = [
+#             [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
+#             [InlineKeyboardButton("🔗 Click havola", callback_data=f"pay_link_{plan_id}")],
+#             [InlineKeyboardButton("◀️ Orqaga", callback_data="show_pricing")]
+#         ]
+#     else:
+#         msg = (
+#             f"💳 *Выберите способ оплаты*\n\n"
+#             f"📦 Тариф: *{plan.description_ru}*\n"
+#             f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
+#             "👇 Выберите один из вариантов:"
+#         )
+#         keyboard = [
+#             [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
+#             [InlineKeyboardButton("🔗 Click ссылка", callback_data=f"pay_link_{plan_id}")],
+#             [InlineKeyboardButton("◀️ Назад", callback_data="show_pricing")]
+#         ]
+#     
+#     await query.edit_message_text(
+#         msg,
+#         parse_mode="Markdown",
+#         reply_markup=InlineKeyboardMarkup(keyboard)
+#     )
 
 
 async def pay_telegram_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
