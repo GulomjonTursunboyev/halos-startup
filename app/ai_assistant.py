@@ -175,7 +175,8 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
             headers = {'Authorization': f'Bearer {KOTIB_API_KEY}'}
             
             data = aiohttp.FormData()
-            data.add_field('audio', file_content, filename='audio.ogg', content_type='audio/ogg')
+            # Kotib.ai 'file' field kutadi, 'audio' emas!
+            data.add_field('file', file_content, filename='audio.ogg', content_type='audio/ogg')
             data.add_field('language', 'uz')
             data.add_field('blocking', 'true')
             
