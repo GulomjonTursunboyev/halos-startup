@@ -74,6 +74,9 @@ from app.handlers import (
     ai_debt_return_callback,
     ai_debt_correct_callback,
     ai_debt_delete_callback,
+    # Debt Reminder handlers
+    debt_reminder_returned_callback,
+    debt_reminder_snooze_callback,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -326,6 +329,14 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(ai_debt_delete_callback, pattern="^ai_debt_delete_")
+    )
+    
+    # Debt Reminder handlers
+    app.add_handler(
+        CallbackQueryHandler(debt_reminder_returned_callback, pattern="^debt_reminder_returned:")
+    )
+    app.add_handler(
+        CallbackQueryHandler(debt_reminder_snooze_callback, pattern="^debt_reminder_snooze:")
     )
     
     # PROMO CODE INPUT HANDLER - HIGHEST PRIORITY

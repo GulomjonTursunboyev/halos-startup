@@ -6322,6 +6322,197 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     )
 
 
+# ==================== DEBT REMINDER HANDLERS ====================
+
+async def debt_reminder_returned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handler for debt reminder "Qaytarildi" button
+    Marks debt as returned from reminder notification
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract debt ID from callback: debt_reminder_returned:123
+    try:
+        debt_id = int(query.data.split(":")[1])
+    except:
+        return
+    
+    from app.ai_assistant import update_debt_status, get_debt_summary, format_debt_summary_message
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Get debt info
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            debt = await conn.fetchrow(
+                "SELECT * FROM personal_debts WHERE id = $1 AND user_id = $2",
+                debt_id, user["id"]
+            )
+    else:
+        async with db._connection.execute(
+            "SELECT * FROM personal_debts WHERE id = ? AND user_id = ?",
+            (debt_id, user["id"])
+        ) as cursor:
+            debt = await cursor.fetchone()
+    
+    if not debt:
+        if lang == "uz":
+            msg = "❌ Qarz topilmadi"
+        else:
+            msg = "❌ Долг не найден"
+        await query.edit_message_text(msg)
+        return
+    
+    debt = dict(debt)
+    
+    # Mark as returned (full amount)
+    remaining = debt["amount"] - debt["returned_amount"]
+    
+    # Update debt status
+    success = await update_debt_status(
+        db, 
+        debt_id=debt_id, 
+        user_id=user["id"],
+        returned_amount=debt["amount"],  # Full amount
+        status="returned"
+    )
+    
+    if success:
+        person = debt["person_name"]
+        
+        # Valyuta formatlash
+        currency = debt.get("currency", "UZS")
+        if currency == "USD":
+            amount_str = f"${remaining:,.0f}"
+        elif currency == "RUB":
+            amount_str = f"₽{remaining:,.0f}"
+        else:
+            amount_str = f"{remaining:,.0f} so'm"
+        
+        if lang == "uz":
+            msg = (
+                "✅ *QARZ QAYTARILDI!*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"👤 *{person}*\n"
+                f"💰 Summa: *{amount_str}*\n\n"
+                "📊 Qarz holati yangilandi!"
+            )
+        else:
+            msg = (
+                "✅ *ДОЛГ ВОЗВРАЩЁН!*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"👤 *{person}*\n"
+                f"💰 Сумма: *{amount_str}*\n\n"
+                "📊 Статус долга обновлён!"
+            )
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                callback_data="ai_debt_list"
+            )]
+        ])
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    else:
+        if lang == "uz":
+            msg = "❌ Xatolik yuz berdi"
+        else:
+            msg = "❌ Произошла ошибка"
+        await query.edit_message_text(msg)
+
+
+async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handler for debt reminder "Ertaga eslatish" button
+    Extends due date by 1 day
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract debt ID from callback: debt_reminder_snooze:123
+    try:
+        debt_id = int(query.data.split(":")[1])
+    except:
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Update due date to tomorrow
+    from datetime import datetime, timedelta
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    if db.is_postgres:
+        async with db._pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE personal_debts SET due_date = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3",
+                tomorrow, debt_id, user["id"]
+            )
+    else:
+        await db._connection.execute(
+            "UPDATE personal_debts SET due_date = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+            (tomorrow, datetime.now().isoformat(), debt_id, user["id"])
+        )
+        await db._connection.commit()
+    
+    # Format tomorrow date nicely
+    tomorrow_dt = datetime.now() + timedelta(days=1)
+    day_num = tomorrow_dt.day
+    months_uz = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 
+                'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
+    months_ru = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
+    
+    if lang == "uz":
+        date_str = f"{day_num}-{months_uz[tomorrow_dt.month - 1]}"
+        msg = (
+            "⏰ *ESLATMA KECHIKTIRILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📅 Yangi sana: *{date_str}*\n\n"
+            "Ertaga soat 6:00 da yana eslatamiz!"
+        )
+    else:
+        date_str = f"{day_num} {months_ru[tomorrow_dt.month - 1]}"
+        msg = (
+            "⏰ *НАПОМИНАНИЕ ОТЛОЖЕНО*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📅 Новая дата: *{date_str}*\n\n"
+            "Напомним завтра в 6:00!"
+        )
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+            callback_data="ai_debt_list"
+        )]
+    ])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
+
+
 # Keep old function for backwards compatibility
 def add_trial_handler_to_app(application):
     add_global_handlers_to_app(application)

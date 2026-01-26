@@ -486,7 +486,7 @@ class ProCareScheduler:
     async def _debt_reminder_job(self):
         """
         Job: Qarz qaytarish eslatmalari
-        Har kuni ertalab 9:00 da tekshiradi
+        Har kuni ertalab 6:00 da tekshiradi
         - Bugun qaytarish sanasi bo'lganlar uchun eslatma
         - 3 kun ichida qaytarish sanasi kelayotganlar uchun oldindan ogohlantirish
         """
@@ -494,9 +494,9 @@ class ProCareScheduler:
             try:
                 now = datetime.now()
                 
-                # Faqat ertalab 9-10 oralig'ida ishlaydi
-                if 9 <= now.hour < 10:
-                    logger.info("Running debt reminder check...")
+                # Faqat ertalab 6-7 oralig'ida ishlaydi (6:00 AM)
+                if 6 <= now.hour < 7:
+                    logger.info("Running debt reminder check at 6:00 AM...")
                     db = await get_database()
                     
                     # ==================== BUGUNGI QARZLAR ====================
@@ -508,49 +508,105 @@ class ProCareScheduler:
                             person = debt.get("person_name", "Noma'lum")
                             amount = debt.get("amount", 0)
                             debt_type = debt.get("debt_type")
+                            debt_id = debt.get("id")
+                            description = debt.get("description", "")
+                            
+                            # Valyuta formatlash
+                            currency = debt.get("currency", "UZS")
+                            if currency == "USD":
+                                amount_str = f"${amount:,.0f}"
+                            elif currency == "RUB":
+                                amount_str = f"₽{amount:,.0f}"
+                            else:
+                                amount_str = f"{amount:,.0f} so'm"
                             
                             if lang == "uz":
                                 if debt_type == "lent":
                                     # Men qarz berganman, menga qaytarilishi kerak
                                     message = (
-                                        "🔔 *QARZ ESLATMASI*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📤 Bugun *{person}* sizga qarz qaytarishi kerak!\n\n"
-                                        f"💵 Summa: *{amount:,.0f}* so'm\n\n"
-                                        "💡 _Agar qaytarilgan bo'lsa, AI yordamchiga yozing:_\n"
-                                        f"_\"{person} qarzni qaytardi\"_"
+                                        "🔔 *BUGUN QARZ QAYTISH KUNI!*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 *{person}* sizga qarz qaytarishi kerak\n\n"
+                                        f"💰 Summa: *{amount_str}*\n"
+                                        f"📅 Sana: *Bugun*\n"
+                                    )
+                                    if description:
+                                        message += f"📝 Izoh: _{description}_\n"
+                                    message += (
+                                        "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        "💡 _Qarz qaytarilsa, tugmani bosing_"
                                     )
                                 else:
                                     # Men qarz olganman, men qaytarishim kerak
                                     message = (
-                                        "🔔 *QARZ ESLATMASI*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📥 Bugun *{person}*ga qarzni qaytarishingiz kerak!\n\n"
-                                        f"💵 Summa: *{amount:,.0f}* so'm\n\n"
-                                        "💡 _Qaytarganingizdan keyin AI yordamchiga yozing:_\n"
-                                        f"_\"{person}ga qarzni qaytardim\"_"
+                                        "⚠️ *BUGUN QARZ QAYTARISH KUNI!*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 *{person}*ga qarz qaytarishingiz kerak\n\n"
+                                        f"💰 Summa: *{amount_str}*\n"
+                                        f"📅 Sana: *Bugun*\n"
+                                    )
+                                    if description:
+                                        message += f"📝 Izoh: _{description}_\n"
+                                    message += (
+                                        "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        "💡 _Qarz qaytarganingizda tugmani bosing_"
                                     )
                             else:
                                 if debt_type == "lent":
                                     message = (
-                                        "🔔 *НАПОМИНАНИЕ О ДОЛГЕ*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📤 Сегодня *{person}* должен вернуть вам долг!\n\n"
-                                        f"💵 Сумма: *{amount:,.0f}* сум\n\n"
-                                        "💡 _Если вернул, напишите AI помощнику:_\n"
-                                        f"_\"{person} вернул долг\"_"
+                                        "🔔 *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 *{person}* должен вернуть вам долг\n\n"
+                                        f"💰 Сумма: *{amount_str}*\n"
+                                        f"📅 Дата: *Сегодня*\n"
+                                    )
+                                    if description:
+                                        message += f"📝 Заметка: _{description}_\n"
+                                    message += (
+                                        "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        "💡 _Нажмите кнопку когда долг вернут_"
                                     )
                                 else:
                                     message = (
-                                        "🔔 *НАПОМИНАНИЕ О ДОЛГЕ*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📥 Сегодня вы должны вернуть долг *{person}*!\n\n"
-                                        f"💵 Сумма: *{amount:,.0f}* сум\n\n"
-                                        "💡 _После возврата напишите AI помощнику:_\n"
-                                        f"_\"Вернул долг {person}\"_"
+                                        "⚠️ *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 Вы должны вернуть долг *{person}*\n\n"
+                                        f"💰 Сумма: *{amount_str}*\n"
+                                        f"📅 Дата: *Сегодня*\n"
+                                    )
+                                    if description:
+                                        message += f"📝 Заметка: _{description}_\n"
+                                    message += (
+                                        "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                                        "💡 _Нажмите кнопку когда вернёте долг_"
                                     )
                             
-                            await self._send_message_safe(debt["telegram_id"], message)
+                            # Tugmalar
+                            keyboard = InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton(
+                                        "✅ Qaytarildi" if lang == "uz" else "✅ Возвращён",
+                                        callback_data=f"debt_reminder_returned:{debt_id}"
+                                    )
+                                ],
+                                [
+                                    InlineKeyboardButton(
+                                        "⏰ Ertaga eslatish" if lang == "uz" else "⏰ Напомнить завтра",
+                                        callback_data=f"debt_reminder_snooze:{debt_id}"
+                                    ),
+                                    InlineKeyboardButton(
+                                        "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                                        callback_data="ai_debt_list"
+                                    )
+                                ]
+                            ])
+                            
+                            await self.bot.send_message(
+                                chat_id=debt["telegram_id"],
+                                text=message,
+                                parse_mode="Markdown",
+                                reply_markup=keyboard
+                            )
                             await asyncio.sleep(0.5)
                             
                         except Exception as e:
@@ -568,47 +624,92 @@ class ProCareScheduler:
                             amount = debt.get("amount", 0)
                             debt_type = debt.get("debt_type")
                             due_date = debt.get("due_date", "")
+                            debt_id = debt.get("id")
+                            description = debt.get("description", "")
+                            
+                            # Valyuta formatlash
+                            currency = debt.get("currency", "UZS")
+                            if currency == "USD":
+                                amount_str = f"${amount:,.0f}"
+                            elif currency == "RUB":
+                                amount_str = f"₽{amount:,.0f}"
+                            else:
+                                amount_str = f"{amount:,.0f} so'm"
                             
                             # Kun hisoblash
                             due_dt = datetime.strptime(due_date, "%Y-%m-%d")
                             days_left = (due_dt - now).days
                             
-                            if lang == "uz":
-                                if debt_type == "lent":
-                                    message = (
-                                        "⏰ *QARZ OGOHLANTIRISHI*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📤 *{person}* {days_left} kunda sizga qarz qaytarishi kerak.\n\n"
-                                        f"💵 Summa: *{amount:,.0f}* so'm\n"
-                                        f"📅 Sana: *{due_date}*"
-                                    )
-                                else:
-                                    message = (
-                                        "⏰ *QARZ OGOHLANTIRISHI*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📥 {days_left} kunda *{person}*ga qarzni qaytarishingiz kerak.\n\n"
-                                        f"💵 Summa: *{amount:,.0f}* so'm\n"
-                                        f"📅 Sana: *{due_date}*"
-                                    )
-                            else:
-                                if debt_type == "lent":
-                                    message = (
-                                        "⏰ *ПРЕДУПРЕЖДЕНИЕ О ДОЛГЕ*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📤 *{person}* должен вернуть вам долг через {days_left} дней.\n\n"
-                                        f"💵 Сумма: *{amount:,.0f}* сум\n"
-                                        f"📅 Дата: *{due_date}*"
-                                    )
-                                else:
-                                    message = (
-                                        "⏰ *ПРЕДУПРЕЖДЕНИЕ О ДОЛГЕ*\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"📥 Через {days_left} дней вы должны вернуть долг *{person}*.\n\n"
-                                        f"💵 Сумма: *{amount:,.0f}* сум\n"
-                                        f"📅 Дата: *{due_date}*"
-                                    )
+                            # Sana formatlash
+                            day_num = due_dt.day
+                            months_uz = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 
+                                        'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
+                            months_ru = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                                        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
                             
-                            await self._send_message_safe(debt["telegram_id"], message)
+                            if lang == "uz":
+                                date_str = f"{day_num}-{months_uz[due_dt.month - 1]}"
+                                days_word = "kun" if days_left == 1 else "kun"
+                                
+                                if debt_type == "lent":
+                                    message = (
+                                        "⏰ *YAQINLASHAYOTGAN QARZ*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 *{person}* sizga qarz qaytarishi kerak\n\n"
+                                        f"💰 Summa: *{amount_str}*\n"
+                                        f"📅 Sana: *{date_str}* ({days_left} {days_word} qoldi)\n"
+                                    )
+                                else:
+                                    message = (
+                                        "⏰ *YAQINLASHAYOTGAN QARZ*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 *{person}*ga qarz qaytarishingiz kerak\n\n"
+                                        f"💰 Summa: *{amount_str}*\n"
+                                        f"📅 Sana: *{date_str}* ({days_left} {days_word} qoldi)\n"
+                                    )
+                                
+                                if description:
+                                    message += f"📝 Izoh: _{description}_\n"
+                            else:
+                                date_str = f"{day_num} {months_ru[due_dt.month - 1]}"
+                                days_word = "день" if days_left == 1 else ("дня" if 2 <= days_left <= 4 else "дней")
+                                
+                                if debt_type == "lent":
+                                    message = (
+                                        "⏰ *ПРИБЛИЖАЕТСЯ СРОК ДОЛГА*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 *{person}* должен вернуть вам долг\n\n"
+                                        f"💰 Сумма: *{amount_str}*\n"
+                                        f"📅 Дата: *{date_str}* (осталось {days_left} {days_word})\n"
+                                    )
+                                else:
+                                    message = (
+                                        "⏰ *ПРИБЛИЖАЕТСЯ СРОК ДОЛГА*\n"
+                                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"👤 Вы должны вернуть долг *{person}*\n\n"
+                                        f"💰 Сумма: *{amount_str}*\n"
+                                        f"📅 Дата: *{date_str}* (осталось {days_left} {days_word})\n"
+                                    )
+                                
+                                if description:
+                                    message += f"📝 Заметка: _{description}_\n"
+                            
+                            # Tugma
+                            keyboard = InlineKeyboardMarkup([
+                                [
+                                    InlineKeyboardButton(
+                                        "📋 Qarzlarimni ko'rish" if lang == "uz" else "📋 Мои долги",
+                                        callback_data="ai_debt_list"
+                                    )
+                                ]
+                            ])
+                            
+                            await self.bot.send_message(
+                                chat_id=debt["telegram_id"],
+                                text=message,
+                                parse_mode="Markdown",
+                                reply_markup=keyboard
+                            )
                             await asyncio.sleep(0.5)
                             
                         except Exception as e:
