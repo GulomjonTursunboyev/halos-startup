@@ -4,6 +4,7 @@ All conversation handlers and command handlers
 """
 import logging
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import (
     Update, 
@@ -6095,88 +6096,65 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /admin command - show statistics for admins only"""
+    """Handle /admin command - show admin panel with statistics"""
     telegram_id = update.effective_user.id
     
     logger.info(f"Admin command received from user {telegram_id}")
-    logger.info(f"ADMIN_IDS: {ADMIN_IDS}")
     
     # Faqat adminlar uchun
     if telegram_id not in ADMIN_IDS:
         logger.info(f"User {telegram_id} is not admin, ignoring")
         return
     
-    logger.info(f"User {telegram_id} is admin, showing stats...")
+    logger.info(f"User {telegram_id} is admin, showing panel...")
     
-    await update.message.reply_text("⏳ Statistika yuklanmoqda...")
+    await update.message.reply_text("⏳ Admin panel yuklanmoqda...")
     
-    db = await get_database()
-    stats = await db.get_admin_statistics()
+    # Admin panel asosiy menyusini ko'rsatish
+    await show_admin_main_menu(update, context)
+
+
+async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False):
+    """Admin panel asosiy menyusi"""
     
-    logger.info(f"Stats retrieved: {stats}")
-    
-    # Format statistics
-    message = """
-📊 *HALOS BOT ADMIN PANEL*
-━━━━━━━━━━━━━━━━━━━━━
-
-👥 *FOYDALANUVCHILAR*
-├ Jami: *{total_users:,}* ta
-├ Bugun: *+{today_users:,}* ta
-├ Haftalik: *+{week_users:,}* ta
-└ Oylik: *+{month_users:,}* ta
-
-💎 *PRO OBUNALAR*
-├ Aktiv PRO: *{active_pro:,}* ta
-├ ↳ Haftalik: *{pro_weekly:,}* ta
-├ ↳ Oylik: *{pro_monthly:,}* ta
-├ ↳ Yillik: *{pro_yearly:,}* ta
-├ ↳ Promo: *{pro_promo:,}* ta
-├ ↳ Trial: *{pro_trial:,}* ta
-└ Muddati tugagan: *{pro_expired:,}* ta
-
-📈 *FAOLLIK*
-├ Jami tranzaksiyalar: *{total_transactions:,}* ta
-├ Bugungi tranzaksiyalar: *{today_transactions:,}* ta
-├ Aktiv qarzlar: *{active_debts:,}* ta
-└ Qarzlar summasi: *{total_debt:,}* so'm
-
-🌐 *TILLAR*
-{lang_stats}
-
-━━━━━━━━━━━━━━━━━━━━━
-⏰ Yangilangan: {timestamp}
-""".format(
-        total_users=stats.get("total_users", 0),
-        today_users=stats.get("today_users", 0),
-        week_users=stats.get("week_users", 0),
-        month_users=stats.get("month_users", 0),
-        active_pro=stats.get("active_pro", 0),
-        pro_weekly=stats.get("pro_weekly", 0),
-        pro_monthly=stats.get("pro_monthly", 0),
-        pro_yearly=stats.get("pro_yearly", 0),
-        pro_promo=stats.get("pro_promo", 0),
-        pro_trial=stats.get("pro_trial", 0),
-        pro_expired=stats.get("pro_expired", 0),
-        total_transactions=stats.get("total_transactions", 0),
-        today_transactions=stats.get("today_transactions", 0),
-        active_debts=stats.get("active_debts", 0),
-        total_debt=int(stats.get("total_debt_amount", 0)),
-        lang_stats="\n".join([f"├ {lang.upper()}: *{count:,}* ta" for lang, count in stats.get("languages", {}).items()]),
-        timestamp=__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    message = (
+        "🎛 *HALOS ADMIN PANEL*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🔐 Xush kelibsiz, Admin!\n\n"
+        "Quyidagi bo'limlardan birini tanlang:"
     )
     
-    # Admin tugmalari
     keyboard = [
-        [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_refresh")],
-        [InlineKeyboardButton("📤 Xabar yuborish", callback_data="admin_broadcast")],
+        [
+            InlineKeyboardButton("📊 Statistika", callback_data="admin_stats"),
+            InlineKeyboardButton("💎 PRO hisoboti", callback_data="admin_pro_report")
+        ],
+        [
+            InlineKeyboardButton("💰 Kotib.ai balans", callback_data="admin_kotib_balance"),
+            InlineKeyboardButton("💳 To'lovlar", callback_data="admin_payments_list")
+        ],
+        [
+            InlineKeyboardButton("👥 Foydalanuvchilar", callback_data="admin_users"),
+            InlineKeyboardButton("📈 Faollik", callback_data="admin_activity")
+        ],
+        [
+            InlineKeyboardButton("📤 Xabar yuborish", callback_data="admin_broadcast"),
+            InlineKeyboardButton("⚙️ Sozlamalar", callback_data="admin_settings")
+        ]
     ]
     
-    await update.message.reply_text(
-        message,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    if edit:
+        await update.callback_query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6190,63 +6168,52 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if telegram_id not in ADMIN_IDS:
         return
     
-    if query.data == "admin_refresh":
+    # ==================== ASOSIY MENYU ====================
+    if query.data == "admin_main":
+        await show_admin_main_menu(update, context, edit=True)
+        return
+    
+    # ==================== STATISTIKA ====================
+    if query.data == "admin_stats":
         db = await get_database()
         stats = await db.get_admin_statistics()
         
-        message = """
-📊 *HALOS BOT ADMIN PANEL*
-━━━━━━━━━━━━━━━━━━━━━
-
-👥 *FOYDALANUVCHILAR*
-├ Jami: *{total_users:,}* ta
-├ Bugun: *+{today_users:,}* ta
-├ Haftalik: *+{week_users:,}* ta
-└ Oylik: *+{month_users:,}* ta
-
-💎 *PRO OBUNALAR*
-├ Aktiv PRO: *{active_pro:,}* ta
-├ ↳ Haftalik: *{pro_weekly:,}* ta
-├ ↳ Oylik: *{pro_monthly:,}* ta
-├ ↳ Yillik: *{pro_yearly:,}* ta
-├ ↳ Promo: *{pro_promo:,}* ta
-├ ↳ Trial: *{pro_trial:,}* ta
-└ Muddati tugagan: *{pro_expired:,}* ta
-
-📈 *FAOLLIK*
-├ Jami tranzaksiyalar: *{total_transactions:,}* ta
-├ Bugungi tranzaksiyalar: *{today_transactions:,}* ta
-├ Aktiv qarzlar: *{active_debts:,}* ta
-└ Qarzlar summasi: *{total_debt:,}* so'm
-
-🌐 *TILLAR*
-{lang_stats}
-
-━━━━━━━━━━━━━━━━━━━━━
-⏰ Yangilangan: {timestamp}
-""".format(
-            total_users=stats.get("total_users", 0),
-            today_users=stats.get("today_users", 0),
-            week_users=stats.get("week_users", 0),
-            month_users=stats.get("month_users", 0),
-            active_pro=stats.get("active_pro", 0),
-            pro_weekly=stats.get("pro_weekly", 0),
-            pro_monthly=stats.get("pro_monthly", 0),
-            pro_yearly=stats.get("pro_yearly", 0),
-            pro_promo=stats.get("pro_promo", 0),
-            pro_trial=stats.get("pro_trial", 0),
-            pro_expired=stats.get("pro_expired", 0),
-            total_transactions=stats.get("total_transactions", 0),
-            today_transactions=stats.get("today_transactions", 0),
-            active_debts=stats.get("active_debts", 0),
-            total_debt=int(stats.get("total_debt_amount", 0)),
-            lang_stats="\n".join([f"├ {lang.upper()}: *{count:,}* ta" for lang, count in stats.get("languages", {}).items()]),
-            timestamp=__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # O'sish foizini hisoblash
+        total = stats.get("total_users", 0)
+        week = stats.get("week_users", 0)
+        growth = round((week / max(total - week, 1)) * 100, 1) if total > 0 else 0
+        
+        message = (
+            "📊 *UMUMIY STATISTIKA*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "👥 *FOYDALANUVCHILAR*\n"
+            f"┌ 📈 Jami: *{stats.get('total_users', 0):,}* ta\n"
+            f"├ 🆕 Bugun: *+{stats.get('today_users', 0):,}* ta\n"
+            f"├ 📅 Haftalik: *+{stats.get('week_users', 0):,}* ta\n"
+            f"├ 📆 Oylik: *+{stats.get('month_users', 0):,}* ta\n"
+            f"└ 📊 O'sish: *{growth}%* (haftalik)\n\n"
+            
+            "📈 *FAOLLIK*\n"
+            f"┌ 💬 Jami tranzaksiyalar: *{stats.get('total_transactions', 0):,}*\n"
+            f"├ ⚡ Bugungi: *{stats.get('today_transactions', 0):,}*\n"
+            f"├ 🤝 Aktiv qarzlar: *{stats.get('active_debts', 0):,}*\n"
+            f"└ 💵 Qarzlar summasi: *{int(stats.get('total_debt_amount', 0)):,}* so'm\n\n"
+            
+            "🌐 *TILLAR*\n"
         )
         
+        langs = stats.get("languages", {})
+        for i, (lang, count) in enumerate(langs.items()):
+            prefix = "└" if i == len(langs) - 1 else "├"
+            flag = "🇺🇿" if lang == "uz" else "🇷🇺"
+            message += f"{prefix} {flag} {lang.upper()}: *{count:,}* ta\n"
+        
+        message += f"\n⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+        
         keyboard = [
-            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_refresh")],
-            [InlineKeyboardButton("📤 Xabar yuborish", callback_data="admin_broadcast")],
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_stats")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -6254,15 +6221,391 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return
     
-    elif query.data == "admin_broadcast":
-        context.user_data["admin_broadcast"] = True
-        await query.edit_message_text(
-            "📤 *Broadcast xabar*\n\n"
-            "Barcha foydalanuvchilarga yuboriladigan xabarni yozing:\n\n"
-            "❌ Bekor qilish uchun /cancel yozing",
-            parse_mode="Markdown"
+    # ==================== PRO HISOBOTI ====================
+    if query.data == "admin_pro_report":
+        db = await get_database()
+        stats = await db.get_admin_statistics()
+        
+        active_pro = stats.get("active_pro", 0)
+        total = stats.get("total_users", 0)
+        pro_percent = round((active_pro / max(total, 1)) * 100, 1)
+        
+        # PRO daromad hisoblash (taxminiy)
+        weekly_count = stats.get("pro_weekly", 0)
+        monthly_count = stats.get("pro_monthly", 0)
+        yearly_count = stats.get("pro_yearly", 0)
+        
+        # Narxlar (so'mda)
+        weekly_price = 14900
+        monthly_price = 29900
+        yearly_price = 199000
+        
+        total_revenue = (weekly_count * weekly_price) + (monthly_count * monthly_price) + (yearly_count * yearly_price)
+        
+        message = (
+            "💎 *PRO OBUNALAR HISOBOTI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            f"📊 *UMUMIY*\n"
+            f"┌ ✅ Aktiv PRO: *{active_pro:,}* ta\n"
+            f"├ 📈 Konversiya: *{pro_percent}%*\n"
+            f"└ ❌ Muddati tugagan: *{stats.get('pro_expired', 0):,}* ta\n\n"
+            
+            "📦 *REJALAR BO'YICHA*\n"
+            f"┌ 📅 Haftalik: *{weekly_count:,}* ta\n"
+            f"├ 📆 Oylik: *{monthly_count:,}* ta\n"
+            f"├ 📅 Yillik: *{yearly_count:,}* ta\n"
+            f"├ 🎁 Promo: *{stats.get('pro_promo', 0):,}* ta\n"
+            f"└ 🆓 Trial: *{stats.get('pro_trial', 0):,}* ta\n\n"
+            
+            f"💰 *DAROMAD (taxminiy)*\n"
+            f"└ 💵 Jami: *{total_revenue:,}* so'm\n\n"
+            
+            f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
         )
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_pro_report")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== KOTIB.AI BALANS ====================
+    if query.data == "admin_kotib_balance":
+        from app.ai_assistant import get_kotib_balance
+        
+        balance_info = await get_kotib_balance()
+        
+        if balance_info:
+            balance = balance_info.get("balance", 0)
+            currency = balance_info.get("currency", "UZS")
+            
+            # Status aniqlash
+            if balance > 100000:
+                status_emoji = "🟢"
+                status_text = "Yaxshi"
+            elif balance > 50000:
+                status_emoji = "🟡"
+                status_text = "O'rtacha"
+            elif balance > 10000:
+                status_emoji = "🟠"
+                status_text = "Kam"
+            else:
+                status_emoji = "🔴"
+                status_text = "KRITIK!"
+            
+            message = (
+                "💰 *KOTIB.AI BALANS*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                
+                f"{status_emoji} *Status:* {status_text}\n\n"
+                
+                f"💵 *Balans:* *{balance:,.0f}* {currency}\n\n"
+                
+                "📊 *TAXMINIY ISHLATISH*\n"
+                f"┌ 🎙 1 ovozli xabar: ~100-200 so'm\n"
+                f"├ 📈 Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n"
+                f"└ 📅 Taxminan: ~*{int(balance / 150 / 50)}* kun\n\n"
+                
+                "⚠️ _Balans kamaysa @HalosPaybot ga ogohlantirish yuboriladi_\n\n"
+                
+                f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            )
+        else:
+            message = (
+                "💰 *KOTIB.AI BALANS*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                
+                "❌ *Balansni olishda xatolik!*\n\n"
+                "_API bilan bog'lanishda muammo yoki_\n"
+                "_balans API mavjud emas._\n\n"
+                
+                f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            )
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_kotib_balance")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== TO'LOVLAR RO'YXATI ====================
+    if query.data == "admin_payments_list":
+        db = await get_database()
+        
+        try:
+            if db.is_postgres:
+                async with db._pool.acquire() as conn:
+                    payments = await conn.fetch("""
+                        SELECT p.*, u.telegram_id as user_tid, u.first_name 
+                        FROM payments p 
+                        JOIN users u ON p.user_id = u.id 
+                        ORDER BY p.created_at DESC 
+                        LIMIT 15
+                    """)
+            else:
+                async with db._connection.execute("""
+                    SELECT p.*, u.telegram_id as user_tid, u.first_name 
+                    FROM payments p 
+                    JOIN users u ON p.user_id = u.id 
+                    ORDER BY p.created_at DESC 
+                    LIMIT 15
+                """) as cursor:
+                    payments = await cursor.fetchall()
+            
+            message = (
+                "💳 *SO'NGI TO'LOVLAR*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            )
+            
+            if payments:
+                for p in payments:
+                    p = dict(p)
+                    status_emoji = {
+                        'completed': '✅', 
+                        'pending': '⏳', 
+                        'failed': '❌'
+                    }.get(p.get('status'), '❓')
+                    
+                    amount = p.get('amount_uzs', 0) or 0
+                    created = p.get('created_at', '')
+                    if hasattr(created, 'strftime'):
+                        created = created.strftime('%d.%m %H:%M')
+                    else:
+                        created = str(created)[:10]
+                    
+                    message += (
+                        f"{status_emoji} *{p.get('first_name', 'N/A')}*\n"
+                        f"   📦 {p.get('plan_id', '-')} | 💰 {amount:,} so'm\n"
+                        f"   📅 {created}\n\n"
+                    )
+            else:
+                message += "📭 _Hech qanday to'lov topilmadi_\n"
+            
+            message += f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            
+        except Exception as e:
+            logger.error(f"Admin payments list error: {e}")
+            message = f"❌ Xatolik: {e}"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_payments_list")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== FOYDALANUVCHILAR ====================
+    if query.data == "admin_users":
+        db = await get_database()
+        
+        try:
+            if db.is_postgres:
+                async with db._pool.acquire() as conn:
+                    # So'nggi 10 ta yangi foydalanuvchi
+                    users = await conn.fetch("""
+                        SELECT telegram_id, first_name, username, subscription_tier, created_at
+                        FROM users 
+                        ORDER BY created_at DESC 
+                        LIMIT 10
+                    """)
+            else:
+                async with db._connection.execute("""
+                    SELECT telegram_id, first_name, username, subscription_tier, created_at
+                    FROM users 
+                    ORDER BY created_at DESC 
+                    LIMIT 10
+                """) as cursor:
+                    users = await cursor.fetchall()
+            
+            message = (
+                "👥 *SO'NGI FOYDALANUVCHILAR*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            )
+            
+            for u in users:
+                u = dict(u)
+                tier = u.get('subscription_tier', 'free')
+                tier_emoji = "💎" if tier == 'pro' else "🆓"
+                username = u.get('username', '')
+                username_str = f"@{username}" if username else "-"
+                
+                created = u.get('created_at', '')
+                if hasattr(created, 'strftime'):
+                    created = created.strftime('%d.%m.%Y')
+                else:
+                    created = str(created)[:10]
+                
+                message += (
+                    f"{tier_emoji} *{u.get('first_name', 'N/A')}*\n"
+                    f"   👤 {username_str} | 📅 {created}\n\n"
+                )
+            
+            message += f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            
+        except Exception as e:
+            logger.error(f"Admin users error: {e}")
+            message = f"❌ Xatolik: {e}"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_users")],
+            [InlineKeyboardButton("🔍 ID bo'yicha qidirish", callback_data="admin_search_user")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== FAOLLIK ====================
+    if query.data == "admin_activity":
+        db = await get_database()
+        
+        try:
+            if db.is_postgres:
+                async with db._pool.acquire() as conn:
+                    # Bugungi faollik
+                    today_stats = await conn.fetchrow("""
+                        SELECT 
+                            (SELECT COUNT(*) FROM transactions WHERE DATE(created_at) = CURRENT_DATE) as today_tx,
+                            (SELECT COUNT(*) FROM personal_debts WHERE DATE(created_at) = CURRENT_DATE) as today_debts,
+                            (SELECT COUNT(*) FROM voice_usage WHERE month = TO_CHAR(CURRENT_DATE, 'YYYY-MM')) as voice_users
+                    """)
+                    
+                    # Ovozli xabarlar
+                    voice_total = await conn.fetchrow("""
+                        SELECT COALESCE(SUM(voice_count), 0) as total FROM voice_usage
+                    """)
+            else:
+                today_stats = {"today_tx": 0, "today_debts": 0, "voice_users": 0}
+                voice_total = {"total": 0}
+            
+            ts = dict(today_stats) if today_stats else {}
+            vt = dict(voice_total) if voice_total else {}
+            
+            message = (
+                "📈 *FAOLLIK HISOBOTI*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                
+                "⚡ *BUGUNGI FAOLLIK*\n"
+                f"┌ 💬 Tranzaksiyalar: *{ts.get('today_tx', 0):,}*\n"
+                f"├ 🤝 Yangi qarzlar: *{ts.get('today_debts', 0):,}*\n"
+                f"└ 🎙 Ovoz ishlatganlar: *{ts.get('voice_users', 0):,}* ta\n\n"
+                
+                "🎙 *OVOZLI YORDAMCHI*\n"
+                f"└ 📊 Jami ovozli xabarlar: *{vt.get('total', 0):,}*\n\n"
+                
+                f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            )
+            
+        except Exception as e:
+            logger.error(f"Admin activity error: {e}")
+            message = f"❌ Xatolik: {e}"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_activity")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== SOZLAMALAR ====================
+    if query.data == "admin_settings":
+        message = (
+            "⚙️ *ADMIN SOZLAMALARI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "🔔 *Ogohlantirish chegaralari:*\n"
+            "├ 🟡 50,000 so'm - O'rtacha\n"
+            "├ 🟠 20,000 so'm - Kam\n"
+            "└ 🔴 10,000 so'm - Kritik\n\n"
+            
+            "📤 *Ogohlantirish yuboriladi:*\n"
+            "└ @HalosPaybot\n\n"
+            
+            "_Sozlamalarni o'zgartirish hozircha mavjud emas_"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== BROADCAST ====================
+    if query.data == "admin_broadcast":
+        context.user_data["admin_broadcast"] = True
+        
+        keyboard = [
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            "📤 *XABAR YUBORISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Barcha foydalanuvchilarga yuboriladigan\n"
+            "xabarni yozing:\n\n"
+            "💡 _Markdown formatlash qo'llab-quvvatlanadi_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== FOYDALANUVCHI QIDIRISH ====================
+    if query.data == "admin_search_user":
+        context.user_data["admin_search_user"] = True
+        
+        keyboard = [
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_users")]
+        ]
+        
+        await query.edit_message_text(
+            "🔍 *FOYDALANUVCHI QIDIRISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Telegram ID ni kiriting:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # Legacy support
+    if query.data == "admin_refresh":
+        # admin_stats ga yo'naltirish
+        query.data = "admin_stats"
+        await admin_callback(update, context)
+        return
 
 
 async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

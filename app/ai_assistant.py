@@ -196,6 +196,156 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
         return None
 
 
+# ==================== KOTIB.AI BALANS TEKSHIRISH ====================
+
+# Balans ogohlantirish chegaralari (so'mda)
+KOTIB_BALANCE_THRESHOLDS = {
+    "critical": 10000,   # 🔴 Kritik - darhol xabar
+    "low": 20000,        # 🟠 Kam
+    "medium": 50000,     # 🟡 O'rtacha
+}
+
+# Ogohlantirish yuborilgan balans (takroriy xabar oldini olish)
+_last_alert_balance = None
+
+
+async def get_kotib_balance() -> Optional[Dict]:
+    """
+    Kotib.ai API balansini olish
+    
+    Returns:
+        Dict with balance info or None if error
+    """
+    try:
+        # Kotib.ai balance endpoint (agar mavjud bo'lsa)
+        # Hozircha taxminiy balans - keyinchalik real API bilan almashtiriladi
+        balance_url = "https://developer.kotib.ai/api/v1/balance"
+        
+        async with aiohttp.ClientSession() as session:
+            headers = {'Authorization': f'Bearer {KOTIB_API_KEY}'}
+            
+            try:
+                async with session.get(balance_url, headers=headers, timeout=10) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        logger.info(f"[Kotib.ai Balance] Response: {result}")
+                        
+                        # API formatiga qarab
+                        if "balance" in result:
+                            return {
+                                "balance": result.get("balance", 0),
+                                "currency": result.get("currency", "UZS"),
+                                "status": "success"
+                            }
+                        elif "data" in result and "balance" in result["data"]:
+                            return {
+                                "balance": result["data"]["balance"],
+                                "currency": result["data"].get("currency", "UZS"),
+                                "status": "success"
+                            }
+                    
+                    logger.warning(f"[Kotib.ai Balance] Non-200 status: {response.status}")
+            except Exception as e:
+                logger.warning(f"[Kotib.ai Balance] API error: {e}")
+        
+        # Agar API ishlamasa, None qaytarish
+        return None
+        
+    except Exception as e:
+        logger.error(f"[Kotib.ai Balance] Exception: {e}")
+        return None
+
+
+async def check_kotib_balance_and_alert(bot) -> None:
+    """
+    Kotib.ai balansini tekshirish va kam bo'lsa @HalosPaybot ga ogohlantirish yuborish
+    
+    Bu funksiya scheduler orqali chaqiriladi
+    """
+    global _last_alert_balance
+    
+    try:
+        balance_info = await get_kotib_balance()
+        
+        if not balance_info:
+            logger.warning("[Kotib Balance Alert] Could not get balance")
+            return
+        
+        balance = balance_info.get("balance", 0)
+        
+        # Ogohlantirish kerakligini tekshirish
+        alert_level = None
+        if balance <= KOTIB_BALANCE_THRESHOLDS["critical"]:
+            alert_level = "critical"
+        elif balance <= KOTIB_BALANCE_THRESHOLDS["low"]:
+            alert_level = "low"
+        elif balance <= KOTIB_BALANCE_THRESHOLDS["medium"]:
+            alert_level = "medium"
+        
+        if not alert_level:
+            _last_alert_balance = None  # Reset
+            return
+        
+        # Takroriy xabar yubormaslik
+        if _last_alert_balance is not None:
+            # Agar balans o'zgargan bo'lsa yoki yangi chegara o'tgan bo'lsa
+            if abs(balance - _last_alert_balance) < 5000:
+                return  # Takroriy xabar yubormaslik
+        
+        _last_alert_balance = balance
+        
+        # Xabar tayyorlash
+        if alert_level == "critical":
+            emoji = "🔴"
+            status = "KRITIK!"
+            message = (
+                f"{emoji} *KOTIB.AI BALANS KRITIK!*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"💰 Balans: *{balance:,.0f}* so'm\n\n"
+                "⚠️ *DIQQAT!* Ovozli yordamchi tez orada\n"
+                "ishlamay qolishi mumkin!\n\n"
+                "🔋 Darhol to'ldirish kerak!"
+            )
+        elif alert_level == "low":
+            emoji = "🟠"
+            status = "KAM"
+            message = (
+                f"{emoji} *KOTIB.AI BALANS KAM*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"💰 Balans: *{balance:,.0f}* so'm\n\n"
+                f"📊 Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n\n"
+                "💡 Yaqin orada to'ldirish tavsiya etiladi"
+            )
+        else:  # medium
+            emoji = "🟡"
+            status = "O'RTACHA"
+            message = (
+                f"{emoji} *KOTIB.AI BALANS O'RTACHA*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"💰 Balans: *{balance:,.0f}* so'm\n\n"
+                f"📊 Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n\n"
+                "ℹ️ Kuzatishda davom eting"
+            )
+        
+        # @HalosPaybot ga yuborish
+        # Admin ID larga yuborish
+        from app.config import ADMIN_IDS
+        
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    chat_id=admin_id,
+                    text=message,
+                    parse_mode="Markdown"
+                )
+                logger.info(f"[Kotib Balance Alert] Sent to admin {admin_id}")
+            except Exception as e:
+                logger.error(f"[Kotib Balance Alert] Failed to send to {admin_id}: {e}")
+        
+    except Exception as e:
+        logger.error(f"[Kotib Balance Alert] Exception: {e}")
+
+
 # ==================== AQLLI AI TAHLIL TIZIMI ====================
 # Har bir so'zning kontekstdagi ma'nosini tahlil qiladi
 

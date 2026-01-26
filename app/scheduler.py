@@ -47,9 +47,10 @@ class ProCareScheduler:
             asyncio.create_task(self._monthly_countdown_job()),
             asyncio.create_task(self._debt_reminder_job()),  # Qarz eslatmalari
             asyncio.create_task(self._subscription_expiry_job()),  # Obuna muddati nazorati
+            asyncio.create_task(self._kotib_balance_job()),  # Kotib.ai balans nazorati
         ]
         
-        logger.info("PRO Care Scheduler started with 6 jobs")
+        logger.info("PRO Care Scheduler started with 7 jobs")
     
     async def stop(self):
         """Stop all scheduled jobs"""
@@ -722,6 +723,26 @@ class ProCareScheduler:
             
             # Har 1 soatda tekshirish
             await asyncio.sleep(60 * 60)
+    
+    async def _kotib_balance_job(self):
+        """
+        Job: Kotib.ai balansini nazorat qilish
+        Har 6 soatda tekshiradi va kam bo'lsa adminlarga xabar yuboradi
+        """
+        while self._running:
+            try:
+                logger.info("Checking Kotib.ai balance...")
+                
+                from app.ai_assistant import check_kotib_balance_and_alert
+                await check_kotib_balance_and_alert(self.bot)
+                
+                logger.info("Kotib.ai balance check complete")
+                
+            except Exception as e:
+                logger.error(f"Error in Kotib balance job: {e}")
+            
+            # Har 6 soatda tekshirish
+            await asyncio.sleep(6 * 60 * 60)
 
 
 # ==================== MANUAL TRIGGER FUNCTIONS ====================
