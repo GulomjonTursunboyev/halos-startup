@@ -1298,13 +1298,13 @@ async def mandatory_expenses_handler(update: Update, context: ContextTypes.DEFAU
     lang = context.user_data.get("lang", "uz")
     text = update.message.text.strip()
     
-    # Parse amount
-    parsed = parse_smart_input(text)
-    if parsed is None:
+    # Parse amount (supports: 12mln, 12 mln, 12000000, etc)
+    amount = parse_number(text)
+    if amount < 0:
         await update.message.reply_text(get_message("error_parse", lang))
         return States.MANDATORY_EXPENSES
     
-    amount = parsed if parsed >= 0 else 0
+    amount = amount if amount >= 0 else 0
     context.user_data["mandatory_expenses"] = amount
     
     # Confirmation
@@ -1855,7 +1855,7 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         # Show PRO upgrade button for free users
         keyboard = [
             [InlineKeyboardButton(
-                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
@@ -2015,7 +2015,7 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
@@ -2146,7 +2146,7 @@ async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "💎 To'liq natijani ko'rish" if lang == "uz" else "💎 Увидеть полный результат",
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],

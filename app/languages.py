@@ -1125,28 +1125,70 @@ MESSAGES = {
     
     "help": {
         "uz": (
-            "ℹ️ *HALOS yordam*\n\n"
-            "*Buyruqlar:*\n"
-            "/start — Qayta boshlash\n"
-            "/help — Yordam\n"
-            "/status — Joriy yo'lingiz\n"
-            "/language — Tilni o'zgartirish\n\n"
-            "*HALOS nima?*\n"
-            "HALOS — moliyaviy yukdan xalos bo'lib, shaxsiy kapital qurish yo'li.\n\n"
-            "*Savollar bo'lsa:*\n"
-            "Telegram: @halos_support"
+            "❓ *HALOS YORDAM MARKAZI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "🤖 *HALOS NIMA?*\n"
+            "Qarzlardan xalos bo'lib, shaxsiy\n"
+            "kapital qurish yo'li.\n\n"
+            
+            "📱 *ASOSIY BUYRUQLAR:*\n"
+            "├ /start — Qayta boshlash\n"
+            "├ /help — Yordam\n"
+            "└ /language — Til o'zgartirish\n\n"
+            
+            "💎 *PRO IMKONIYATLAR:*\n"
+            "├ 🗓 HALOS sanangiz\n"
+            "├ ⚡ Tezkor qutilish rejasi\n"
+            "├ 🎤 Ovozli AI yordamchi\n"
+            "├ 📊 Batafsil statistika\n"
+            "└ 📥 Excel hisobot\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📞 *QOÂLLAB-QUVVATLASH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "Savollaringiz bormi?\n"
+            "Muammoga duch keldingizmi?\n\n"
+            
+            "👇 *Bizga yozing:*\n"
+            "🔗 @halos\\_support\n\n"
+            
+            "_Ishchi kunlari 09:00-18:00_\n"
+            "_Javob vaqti: 1-2 soat ichida_"
         ),
         "ru": (
-            "ℹ️ *Помощь HALOS*\n\n"
-            "*Команды:*\n"
-            "/start — Перезапуск\n"
-            "/help — Помощь\n"
-            "/status — Ваш текущий путь\n"
-            "/language — Сменить язык\n\n"
-            "*Что такое HALOS?*\n"
-            "HALOS — путь от финансового бремени к свободе и личному капиталу.\n\n"
-            "*Есть вопросы?*\n"
-            "Telegram: @halos_support"
+            "❓ *ЦЕНТР ПОМОЩИ HALOS*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "🤖 *ЧТО ТАКОЕ HALOS?*\n"
+            "Путь к свободе от долгов\n"
+            "и личному капиталу.\n\n"
+            
+            "📱 *ОСНОВНЫЕ КОМАНДЫ:*\n"
+            "├ /start — Перезапуск\n"
+            "├ /help — Помощь\n"
+            "└ /language — Сменить язык\n\n"
+            
+            "💎 *ВОЗМОЖНОСТИ PRO:*\n"
+            "├ 🗓 Дата HALOS\n"
+            "├ ⚡ План быстрого выхода\n"
+            "├ 🎤 Голосовой AI помощник\n"
+            "├ 📊 Детальная статистика\n"
+            "└ 📥 Excel отчёт\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📞 *ПОДДЕРЖКА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "Есть вопросы?\n"
+            "Столкнулись с проблемой?\n\n"
+            
+            "👇 *Напишите нам:*\n"
+            "🔗 @halos\\_support\n\n"
+            
+            "_Рабочие дни 09:00-18:00_\n"
+            "_Время ответа: 1-2 часа_"
         )
     },
     
