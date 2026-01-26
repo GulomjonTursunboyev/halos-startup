@@ -530,7 +530,6 @@ async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         keyboard = [
             [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
             [InlineKeyboardButton("🔗 Click havola", callback_data=f"pay_link_{plan_id}")],
-            [InlineKeyboardButton("💳 Karta orqali (P2P)", callback_data=f"pay_card_{plan_id}")],
             [InlineKeyboardButton("◀️ Orqaga", callback_data="show_pricing")]
         ]
     else:
@@ -543,7 +542,6 @@ async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         keyboard = [
             [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
             [InlineKeyboardButton("🔗 Click ссылка", callback_data=f"pay_link_{plan_id}")],
-            [InlineKeyboardButton("💳 Картой (P2P)", callback_data=f"pay_card_{plan_id}")],
             [InlineKeyboardButton("◀️ Назад", callback_data="show_pricing")]
         ]
     

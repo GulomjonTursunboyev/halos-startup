@@ -5,11 +5,11 @@ from urllib.parse import urlencode
 logger = logging.getLogger(__name__)
 
 # Click to'lov ma'lumotlari (LIVE environment)
-# Service ID: 18872, Secret Key: oOV5UCfhefh
+# Service ID: 18870, Secret Key: wgqetRCPLPQV2oYd1I
 CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID", "333605228")
-CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "18872")
-CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "18872")
-CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "oOV5UCfhefh")
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "18870")
+CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "18870")
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "wgqetRCPLPQV2oYd1I")
 CLICK_API_URL = "https://my.click.uz/services/pay"
 
 # Webhook URL (Render serverda ishlaganda - avtomatik o'rnatiladi)
