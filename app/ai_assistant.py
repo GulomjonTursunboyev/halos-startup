@@ -2926,23 +2926,49 @@ def extract_due_date(text: str) -> Optional[str]:
                         # Agar sana noto'g'ri bo'lsa (31-fevral kabi)
                         pass
     
-    # ==================== SO'Z BILAN SANA (birinchida, ikkinchida) ====================
-    number_words = {
-        'birinchi': 1, 'ikkinchi': 2, 'uchinchi': 3, 'to\'rtinchi': 4,
-        'beshinchi': 5, 'oltinchi': 6, 'yettinchi': 7, 'sakkizinchi': 8,
-        'to\'qqizinchi': 9, 'o\'ninchi': 10, 'oninchi': 10,
-        'yigirmanchi': 20, 'o\'ttizinchi': 30
-    }
+    # ==================== SO'Z BILAN SANA (birinchida, ikkinchida, o'ninchida) ====================
+    # MUHIM: Har xil yozuv usullari - o', o', ʻ, ʼ, ', '
     
-    for word, day in number_words.items():
-        if re.search(rf'\b{word}\s*(?:da|ga|chi|sida)?\b', text_lower):
+    # Barcha tartib sonlar - turli apostrof variantlari bilan
+    ordinal_numbers = [
+        # 1-10
+        (r'\bbirinchi', 1),
+        (r'\bikkinchi', 2),
+        (r'\buchinchi', 3),
+        (r'\b(?:to[\'\'ʻʼ]?rt|tort)inchi', 4),  # to'rtinchi, tortinchi
+        (r'\bbeshinchi', 5),
+        (r'\boltinchi', 6),
+        (r'\byettinchi', 7),
+        (r'\bsakkizinchi', 8),
+        (r'\b(?:to[\'\'ʻʼ]?qqiz|toqqiz)inchi', 9),  # to'qqizinchi
+        (r'\b(?:o[\'\'ʻʼ]?n|on)inchi', 10),  # o'ninchi, oninchi
+        # 11-19
+        (r'\b(?:o[\'\'ʻʼ]?n\s*bir|on\s*bir)inchi', 11),
+        (r'\b(?:o[\'\'ʻʼ]?n\s*ikki|on\s*ikki)nchi', 12),
+        (r'\b(?:o[\'\'ʻʼ]?n\s*uch|on\s*uch)inchi', 13),
+        (r'\b(?:o[\'\'ʻʼ]?n\s*to[\'\'ʻʼ]?rt|on\s*tort)inchi', 14),
+        (r'\b(?:o[\'\'ʻʼ]?n\s*besh|on\s*besh)inchi', 15),
+        # 20, 30
+        (r'\byigirma(?:nchi)?', 20),
+        (r'\b(?:o[\'\'ʻʼ]?ttiz|ottiz)(?:inchi)?', 30),
+        # 21-29
+        (r'\byigirma\s*bir(?:inchi)?', 21),
+        (r'\byigirma\s*ikki(?:nchi)?', 22),
+        (r'\byigirma\s*uch(?:inchi)?', 23),
+        (r'\byigirma\s*besh(?:inchi)?', 25),
+    ]
+    
+    for pattern, day in ordinal_numbers:
+        # Qo'shimchalar: da, ga, chi, sida, ida, iga, dan, gacha
+        full_pattern = pattern + r'(?:da|ga|chi|sida|ida|iga|dan|gacha|ni|ning)?\b'
+        if re.search(full_pattern, text_lower):
             try:
                 if day > current_day:
                     target = today.replace(day=day)
                 else:
                     target = (today + relativedelta(months=1)).replace(day=day)
                 result = target.strftime("%Y-%m-%d")
-                print(f"[MUDDAT] ✅ '{word}' topildi → {result}")
+                print(f"[MUDDAT] ✅ Tartib son topildi: {day} → {result}")
                 return result
             except ValueError:
                 pass
