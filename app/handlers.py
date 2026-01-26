@@ -4443,11 +4443,30 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     try:
-        # Send processing message with remaining limit
-        remaining_msg = f"\n🎤 Qolgan: {limit_info['remaining']}/{limit_info['limit']}" if lang == "uz" else f"\n🎤 Осталось: {limit_info['remaining']}/{limit_info['limit']}"
+        # Send beautiful processing message
+        if lang == "uz":
+            processing_text = (
+                "🤖 *AI Yordamchi*\n\n"
+                "🎙 *Ovozingiz qabul qilindi!*\n\n"
+                "⏳ Ishlov berish jarayoni:\n"
+                "├ 🔊 Ovoz yuklanmoqda...\n"
+                "├ 🧠 Sun'iy intellekt tahlil qilmoqda...\n"
+                "└ 💾 Tranzaksiya saqlanmoqda...\n\n"
+                f"📊 _Qolgan limit: {limit_info['remaining']}/{limit_info['limit']} ta_"
+            )
+        else:
+            processing_text = (
+                "🤖 *AI Помощник*\n\n"
+                "🎙 *Голос получен!*\n\n"
+                "⏳ Процесс обработки:\n"
+                "├ 🔊 Загрузка голоса...\n"
+                "├ 🧠 Анализ ИИ...\n"
+                "└ 💾 Сохранение транзакции...\n\n"
+                f"📊 _Осталось: {limit_info['remaining']}/{limit_info['limit']}_"
+            )
+        
         processing_msg = await update.message.reply_text(
-            f"🤖 *AI yordamchi*\n🎤 Ovoz qayta ishlanmoqda...{remaining_msg}" if lang == "uz" else 
-            f"🤖 *AI помощник*\n🎤 Обработка голоса...{remaining_msg}",
+            processing_text,
             parse_mode="Markdown"
         )
         

@@ -865,7 +865,7 @@ SMART_CATEGORY_KEYWORDS = {
 
 def find_all_amounts_with_context(text: str) -> List[Dict]:
     """
-    KUCHAYTIRILGAN SUMMA ANIQLASH ALGORITMI v4.0
+    KUCHAYTIRILGAN SUMMA ANIQLASH ALGORITMI v5.0
     ============================================
     
     Matndan BARCHA summalarni va ularning kontekstini topish.
@@ -880,12 +880,18 @@ def find_all_amounts_with_context(text: str) -> List[Dict]:
     6. "5 minga" = 5,000
     7. "1000000" = 1,000,000
     8. "bir million" = 1,000,000
+    9. "100 000" = 100,000 (bo'sh joy bilan)
+    10. "10 000" = 10,000 (bo'sh joy bilan)
     """
-    text_lower = text.lower().strip()
+    # MUHIM: Avval bo'sh joylarni tozalash (100 000 -> 100000)
+    text_cleaned = re.sub(r'(\d)\s+(\d)', r'\1\2', text)
+    text_lower = text_cleaned.lower().strip()
+    
     results = []
     
     print(f"\n{'='*60}")
-    print(f"[FIND_AMOUNTS v4.0] Matn: '{text_lower}'")
+    print(f"[FIND_AMOUNTS v5.0] Original: '{text}'")
+    print(f"[FIND_AMOUNTS v5.0] Cleaned: '{text_lower}'")
     print(f"{'='*60}")
     
     # Barcha ishlatilgan pozitsiyalar
