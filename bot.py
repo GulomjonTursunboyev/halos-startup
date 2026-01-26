@@ -1,6 +1,6 @@
 """
 HALOS Telegram Bot
-Main entry point - Click Payment Integration
+Main entry point - Telegram Payments Integration (Click Terminal)
 """
 import os
 import asyncio
@@ -11,6 +11,7 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
+    PreCheckoutQueryHandler,
     filters,
 )
 
@@ -85,6 +86,11 @@ from app.subscription_handlers import (
     cancel_promo_callback,
     click_buy_callback,
     handle_promo_code_input,
+)
+from app.telegram_payments import (
+    pre_checkout_handler,
+    successful_payment_handler,
+    telegram_pay_callback,
 )
 from app.pro_features import (
     show_pro_menu,
@@ -172,6 +178,20 @@ def main() -> None:
     # Admin callback handlers
     application.add_handler(
         CallbackQueryHandler(admin_callback, pattern="^admin_")
+    )
+    
+    # ==================== TELEGRAM PAYMENTS HANDLERS ====================
+    # Pre-checkout query handler (MUST respond within 10 seconds)
+    application.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
+    
+    # Successful payment handler
+    application.add_handler(
+        MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler)
+    )
+    
+    # Telegram Pay callback handler (tg_pay_{plan_id})
+    application.add_handler(
+        CallbackQueryHandler(telegram_pay_callback, pattern="^tg_pay_")
     )
     
     # Promo code input handler - HIGHEST PRIORITY (must be before admin broadcast)

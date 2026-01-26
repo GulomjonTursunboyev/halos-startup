@@ -503,61 +503,23 @@ async def show_pricing_callback(update: Update, context: ContextTypes.DEFAULT_TY
 # ==================== CLICK PAYMENT HANDLER ====================
 
 async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle Click payment button click - show payment link"""
+    """Handle Click payment button click - send Telegram Payment invoice"""
     query = update.callback_query
     await query.answer()
     
     plan_id = query.data.replace("click_buy_", "")  # pro_monthly, pro_quarterly, pro_yearly
-    lang = context.user_data.get("lang", "uz")
-
-    if plan_id not in PRICING_PLANS:
-        await query.answer("❌ Plan not found", show_alert=True)
-        return
-
-    plan = PRICING_PLANS[plan_id]
-    amount = plan.price_uzs
-    order_id = f"halos_{update.effective_user.id}_{plan_id}"
-    return_url = "https://t.me/HalosRobot"  # Redirect back to bot after payment
     
-    click_url = generate_click_payment_url(
-        amount=amount, 
-        order_id=order_id, 
-        return_url=return_url, 
-        description=plan.description_uz
-    )
-
-    if lang == "uz":
-        msg = (
-            f"💳 *Click orqali to'lov*\n\n"
-            f"📦 Tarif: *{plan.description_uz}*\n"
-            f"💰 Narx: *{amount:,} so'm*\n\n"
-            f"👇 Quyidagi tugmani bosing va Click orqali to'lovni amalga oshiring.\n\n"
-            f"✅ To'lovdan so'ng PRO imkoniyatlar *darhol* ochiladi!"
-        )
-        pay_btn = "💳 Click orqali to'lash"
-        back_btn = "◀️ Orqaga"
-    else:
-        msg = (
-            f"💳 *Оплата через Click*\n\n"
-            f"📦 Тариф: *{plan.description_ru}*\n"
-            f"💰 Цена: *{amount:,} сум*\n\n"
-            f"👇 Нажмите кнопку ниже и оплатите через Click.\n\n"
-            f"✅ После оплаты PRO откроется *мгновенно*!"
-        )
-        pay_btn = "💳 Оплатить через Click"
-        back_btn = "◀️ Назад"
-
-    keyboard = [
-        [InlineKeyboardButton(pay_btn, url=click_url)],
-        [InlineKeyboardButton(back_btn, callback_data="show_pricing")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text(
-        msg, 
-        parse_mode=ParseMode.MARKDOWN, 
-        reply_markup=reply_markup
-    )
+    # Use Telegram Payments API instead of URL redirect
+    from app.telegram_payments import send_payment_invoice
+    
+    # Delete current message
+    try:
+        await query.message.delete()
+    except:
+        pass
+    
+    # Send payment invoice
+    await send_payment_invoice(update, context, plan_id)
 
 
 # ==================== PROMO CODE ====================
