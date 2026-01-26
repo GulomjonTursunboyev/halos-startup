@@ -2663,6 +2663,8 @@ def get_conversation_handler() -> ConversationHandler:
             CallbackQueryHandler(recalculate_callback, pattern="^recalculate$"),
             CallbackQueryHandler(recalc_saved_callback, pattern="^recalc_saved$"),
             CallbackQueryHandler(recalc_new_callback, pattern="^recalc_new$"),
+            # Entry point for menu mode selection (from 📊 Hisobotlarim)
+            CallbackQueryHandler(mode_callback, pattern="^mode_(solo|family)$"),
         ],
         states={
             States.LANGUAGE: [
@@ -3096,8 +3098,8 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
 
-async def menu_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle mode selection from main menu (solo/family) - global callback handler"""
+async def menu_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle mode selection from main menu (solo/family) - NEW 8-STEP UX FLOW"""
     query = update.callback_query
     await query.answer()
     
@@ -3112,7 +3114,7 @@ async def menu_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     db = await get_database()
     await db.update_user(telegram_id, mode=mode)
     
-    # Confirm mode and ask for income
+    # Confirm mode
     if mode == "solo":
         confirm_msg = get_message("mode_set_solo", lang)
     else:
@@ -3120,17 +3122,24 @@ async def menu_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await query.edit_message_text(confirm_msg)
     
-    # Wait a moment then ask for income
+    # Wait a moment
     await asyncio.sleep(1)
     
-    # Ask for income input
+    # NEW 8-STEP UX: Start with Step 1 - LOAN PAYMENT
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_loans", lang), callback_data="quick_loan_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await query.message.reply_text(
-        get_message("input_income_self", lang),
-        parse_mode="Markdown"
+        get_message("input_loan_payment", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
     )
     
-    # Set state for income input
-    context.user_data["awaiting_income"] = True
+    # Set conversation state
+    context.user_data["in_onboarding_flow"] = True
+    return States.LOAN_PAYMENT
 
 
 async def menu_income_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

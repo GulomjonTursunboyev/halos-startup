@@ -37,7 +37,7 @@ from app.handlers import (
     menu_help_handler,
     debt_plan_free_callback,
     debt_plan_pro_callback,
-    menu_mode_callback,
+    # menu_mode_callback - now handled by ConversationHandler
     menu_income_handler,
     menu_partner_income_handler,
     menu_loan_payment_handler,
@@ -225,10 +225,8 @@ def main() -> None:
         group=2
     )
     
-    # Menu mode selection callback (from main menu flow)
-    application.add_handler(
-        CallbackQueryHandler(menu_mode_callback, pattern="^mode_(solo|family)$")
-    )
+    # NOTE: mode_solo/mode_family callbacks are now handled by ConversationHandler entry_points
+    # Menu mode selection moved to handlers.py get_conversation_handler()
     
     # Menu credit history choice callbacks
     application.add_handler(
