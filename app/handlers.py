@@ -4390,13 +4390,18 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
+    logger.info(f"[VOICE] Voice message received from {telegram_id}, duration={voice.duration}s")
+    
     # Check PRO status - PRO users can use voice anywhere
     from app.subscription_handlers import is_user_pro
     is_pro = await is_user_pro(telegram_id)
     
     if not is_pro:
         # For non-PRO users, just ignore voice messages (don't show error)
+        logger.info(f"[VOICE] User {telegram_id} is not PRO, ignoring voice")
         return
+    
+    logger.info(f"[VOICE] User {telegram_id} is PRO, processing voice...")
     
     # Import AI functions
     import os
@@ -4416,6 +4421,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user = await db.get_user(telegram_id)
     
     if not user:
+        logger.warning(f"[VOICE] User {telegram_id} not found in DB")
         return
     
     # Check voice duration limit
@@ -4447,15 +4453,19 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         # Download voice file
         voice_file = await voice.get_file()
+        logger.info(f"[VOICE] Got file: {voice_file.file_path}")
         
         # Create temp file
         with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as tmp_file:
             tmp_path = tmp_file.name
         
         await voice_file.download_to_drive(tmp_path)
+        logger.info(f"[VOICE] Downloaded to: {tmp_path}")
         
         # Transcribe voice
+        logger.info(f"[VOICE] Calling transcribe_voice...")
         text = await transcribe_voice(tmp_path)
+        logger.info(f"[VOICE] Transcribed text: '{text}'")
         
         # Clean up temp file
         try:
@@ -4464,12 +4474,15 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             pass
         
         if not text:
+            logger.warning(f"[VOICE] Transcription returned None/empty")
             await processing_msg.edit_text(
                 "❌ Ovozni aniqlab bo'lmadi. Qaytadan urinib ko'ring." if lang == "uz" else 
                 "❌ Не удалось распознать голос. Попробуйте ещё раз.",
                 parse_mode="Markdown"
             )
             return
+        
+        logger.info(f"[VOICE] Successfully transcribed: '{text}'")
         
         # Increment voice usage AFTER successful transcription
         await increment_voice_usage(db, user["id"], voice_duration)

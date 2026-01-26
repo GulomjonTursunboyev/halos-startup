@@ -11,10 +11,14 @@ import aiohttp
 import os
 import re
 import json
+import logging
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+
+# Logger
+logger = logging.getLogger(__name__)
 
 # Aisha API konfiguratsiyasi
 AISHA_API_KEY = "A1IBAbx4.vbFpnWJRQRvDANwOEugCW1ARJkZUjlSY"
@@ -135,28 +139,32 @@ async def transcribe_voice(voice_file_path: str) -> Optional[str]:
     Ovozli faylni textga aylantirish
     Primary: Kotib.ai, Fallback: Aisha
     """
+    logger.info(f"[STT] Ovoz faylini o'qish: {voice_file_path}")
+    
     # Read file content once
     try:
         with open(voice_file_path, 'rb') as f:
             file_content = f.read()
+        logger.info(f"[STT] Fayl hajmi: {len(file_content)} bytes")
     except Exception as e:
-        print(f"Fayl o'qishda xato: {e}")
+        logger.error(f"[STT] Fayl o'qishda xato: {e}")
         return None
     
     # Try Kotib.ai first (primary)
+    logger.info("[STT] Kotib.ai ga so'rov yuborilmoqda...")
     result = await _transcribe_kotib(file_content)
     if result:
-        print(f"[Kotib.ai] Muvaffaqiyatli: {result[:100]}...")
+        logger.info(f"[STT][Kotib.ai] MUVAFFAQIYATLI: '{result}'")
         return result
     
     # Fallback to Aisha
-    print("[Kotib.ai] Ishlamadi, Aisha'ga o'tilmoqda...")
+    logger.warning("[STT][Kotib.ai] Ishlamadi, Aisha'ga o'tilmoqda...")
     result = await _transcribe_aisha(file_content)
     if result:
-        print(f"[Aisha] Muvaffaqiyatli: {result[:100]}...")
+        logger.info(f"[STT][Aisha] MUVAFFAQIYATLI: '{result}'")
         return result
     
-    print("Barcha STT API'lar ishlamadi!")
+    logger.error("[STT] Barcha STT API'lar ishlamadi!")
     return None
 
 
@@ -173,18 +181,22 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
             
             async with session.post(KOTIB_STT_URL, data=data, headers=headers, timeout=30) as response:
                 response_text = await response.text()
-                print(f"[Kotib.ai] Status: {response.status}, Response: {response_text[:200]}")
+                logger.info(f"[STT][Kotib.ai] Status: {response.status}, Response: {response_text[:500]}")
                 
                 if response.status == 200:
                     try:
                         result = json.loads(response_text)
                         if result.get("status") == "success":
-                            return result.get('text')
-                    except:
-                        pass
+                            text = result.get('text')
+                            logger.info(f"[STT][Kotib.ai] Parsed text: '{text}'")
+                            return text
+                        else:
+                            logger.warning(f"[STT][Kotib.ai] Status not success: {result}")
+                    except Exception as e:
+                        logger.error(f"[STT][Kotib.ai] JSON parse error: {e}")
                 return None
     except Exception as e:
-        print(f"[Kotib.ai] Xato: {e}")
+        logger.error(f"[STT][Kotib.ai] Exception: {e}")
         return None
 
 
@@ -203,7 +215,7 @@ async def _transcribe_aisha(file_content: bytes) -> Optional[str]:
                     
                     async with session.post(AISHA_STT_URL, data=data, headers=headers, timeout=30) as response:
                         response_text = await response.text()
-                        print(f"[Aisha] field={field_name}, Status: {response.status}")
+                        logger.info(f"[STT][Aisha] field={field_name}, Status: {response.status}, Response: {response_text[:300]}")
                         
                         if response.status == 200:
                             try:
@@ -211,6 +223,7 @@ async def _transcribe_aisha(file_content: bytes) -> Optional[str]:
                                 if isinstance(result, dict):
                                     text = result.get('text') or result.get('transcript') or result.get('result')
                                     if text:
+                                        logger.info(f"[STT][Aisha] Parsed text: '{text}'")
                                         return text
                                 elif isinstance(result, str) and result:
                                     return result
@@ -218,11 +231,11 @@ async def _transcribe_aisha(file_content: bytes) -> Optional[str]:
                                 if response_text and len(response_text) > 2:
                                     return response_text
                 except Exception as e:
-                    print(f"[Aisha] field={field_name} xato: {e}")
+                    logger.warning(f"[STT][Aisha] field={field_name} xato: {e}")
                     continue
             return None
     except Exception as e:
-        print(f"[Aisha] Umumiy xato: {e}")
+        logger.error(f"[STT][Aisha] Umumiy xato: {e}")
         return None
 
 
