@@ -367,24 +367,24 @@ MESSAGES = {
     # ==================== INCOME INPUT ====================
     "input_income_self": {
         "uz": (
-            "💵 *2-QADAM: OYLIK DAROMAD*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Endi daromadingizni bilishim kerak.\n\n"
-            "*Oyiga qancha pul topasiz?*\n"
-            "(ish haqi, biznes, boshqa daromadlar)\n\n"
-            "📝 Masalan: `5000000` yoki `5 mln`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 _Barcha daromadlarni qo'shing_"
+            "📊 *QADAM 1/5 — DAROMAD*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💵 *O'zingizning oylik maoshingiz*\n\n"
+            "Raqam yozing yoki karta tarixi faylini yuboring.\n"
+            "Bot avtomatik aniqlaydi.\n\n"
+            "📝 Masalan: `5000000` yoki `5 mln`\n"
+            "📎 Yoki: PDF, HTML, Excel fayl"
         ),
         "ru": (
-            "💵 *ШАГ 2: ЕЖЕМЕСЯЧНЫЙ ДОХОД*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Теперь мне нужно знать ваш доход.\n\n"
-            "*Сколько вы зарабатываете в месяц?*\n"
-            "(зарплата, бизнес, другие доходы)\n\n"
-            "📝 Например: `5000000` или `5 млн`\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 _Сложите все доходы_"
+            "📊 *ШАГ 1/5 — ДОХОД*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💵 *Ваша ежемесячная зарплата*\n\n"
+            "Напишите число или отправьте файл истории карты.\n"
+            "Бот определит автоматически.\n\n"
+            "📝 Например: `5000000` или `5 млн`\n"
+            "📎 Или: PDF, HTML, Excel файл"
         )
     },
     
@@ -710,23 +710,30 @@ MESSAGES = {
     # ==================== LOAN INPUT (Step by Step) ====================
     "input_loan_payment": {
         "uz": (
-            "💳 *3-QADAM: OYLIK TO'LOV*\n"
+            "💳 *1-QADAM: OYLIK KREDIT TO'LOVI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Har oyda qarzlar uchun *qancha to'laysiz?*\n\n"
-            "Barcha kredit, nasiya, qarz to'lovlarini\n"
-            "qo'shib yozing.\n\n"
-            "📝 Masalan: `2500000` yoki `2 mln`\n\n"
+            "Har oyda barcha kreditlar uchun\n"
+            "qancha to'laysiz?\n\n"
+            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
+            "💡 *Misollar:*\n"
+            "• `2500000` — 2.5 million\n"
+            "• `2 mln` — 2 million\n"
+            "• `0` — kredit yo'q\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "_Bu oylik TO'LOV, jami qarz emas!_"
+            "⚠️ _Bu oylik TO'LOV summasi, jami qarz emas!_"
         ),
         "ru": (
-            "💳 *ШАГ 3: ЕЖЕМЕСЯЧНЫЙ ПЛАТЁЖ*\n"
+            "💳 *ШАГ 1: ЕЖЕМЕСЯЧНЫЙ ПЛАТЁЖ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "*Сколько вы платите* каждый месяц по долгам?\n\n"
-            "Сложите все кредиты, рассрочки, займы.\n\n"
-            "📝 Например: `2500000` или `2 млн`\n\n"
+            "Сколько вы платите каждый месяц\n"
+            "по всем кредитам?\n\n"
+            "📝 *Напишите:* только число (в сумах)\n\n"
+            "💡 *Примеры:*\n"
+            "• `2500000` — 2.5 миллиона\n"
+            "• `2 млн` — 2 миллиона\n"
+            "• `0` — нет кредитов\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "_Это ежемесячный ПЛАТЁЖ, не общий долг!_"
+            "⚠️ _Это ежемесячный ПЛАТЁЖ, не общий долг!_"
         )
     },
     
@@ -737,24 +744,30 @@ MESSAGES = {
     
     "input_total_debt": {
         "uz": (
-            "📊 *1-QADAM: JAMI QARZ*\n"
+            "📊 *2-QADAM: JAMI QARZ QOLDIG'I*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Keling, aniqlab olaylik.\n\n"
-            "*Hozir jami qancha qarzingiz bor?*\n"
-            "(barcha kredit, nasiya, qarz...)\n\n"
-            "📝 Masalan: `50000000` yoki `50 mln`\n\n"
+            "Barcha kreditlar bo'yicha\n"
+            "hali qancha qarz qoldi?\n\n"
+            "📝 *Yozing:* faqat raqam (so'mda)\n\n"
+            "💡 *Misollar:*\n"
+            "• `50000000` — 50 million\n"
+            "• `30 mln` — 30 million\n"
+            "• `0` — qarz yo'q\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 _Aniq bilmasangiz, taxminiy yozing_"
+            "⚠️ _Bu jami QARZ qoldig'i, oylik to'lov emas!_"
         ),
         "ru": (
-            "📊 *ШАГ 1: ОБЩИЙ ДОЛГ*\n"
+            "📊 *ШАГ 2: ОСТАТОК ДОЛГА*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Давайте разберёмся.\n\n"
-            "*Сколько всего у вас долга?*\n"
-            "(все кредиты, рассрочки, займы...)\n\n"
-            "📝 Например: `50000000` или `50 млн`\n\n"
+            "Сколько всего осталось выплатить\n"
+            "по всем кредитам?\n\n"
+            "📝 *Напишите:* только число (в сумах)\n\n"
+            "💡 *Примеры:*\n"
+            "• `50000000` — 50 миллионов\n"
+            "• `30 млн` — 30 миллионов\n"
+            "• `0` — нет долга\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 _Если не знаете точно, напишите примерно_"
+            "⚠️ _Это общий ОСТАТОК долга, не ежемесячный платёж!_"
         )
     },
     
