@@ -1046,19 +1046,31 @@ async def income_partner_handler(update: Update, context: ContextTypes.DEFAULT_T
         get_message("income_saved", lang).format(amount=format_number(amount))
     )
     
-    # Add quick button for own home
-    keyboard = [
-        [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        get_message("input_rent", lang),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
-    
-    return States.RENT
+    # NEW ONBOARDING FLOW: Check if user has debt, go to loan_payment
+    total_debt = context.user_data.get("total_debt", 0)
+    if total_debt > 0:
+        # Has debt - ask for monthly payment (Step 3)
+        keyboard = [
+            [InlineKeyboardButton(
+                "0️⃣ Hozir to'lamayapman" if lang == "uz" else "0️⃣ Пока не плачу",
+                callback_data="quick_loan_0"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.LOAN_PAYMENT
+    else:
+        # No debt - go directly to calculation (wealth mode)
+        context.user_data["loan_payment"] = 0
+        context.user_data["rent"] = 0
+        context.user_data["kindergarten"] = 0
+        context.user_data["utilities"] = 0
+        return await calculate_and_show_results(update, context)
 
 
 async def quick_partner_income_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1074,19 +1086,31 @@ async def quick_partner_income_callback(update: Update, context: ContextTypes.DE
         get_message("income_saved", lang).format(amount="0")
     )
     
-    # Add quick button for own home
-    keyboard = [
-        [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.message.reply_text(
-        get_message("input_rent", lang),
-        parse_mode="Markdown",
-        reply_markup=reply_markup
-    )
-    
-    return States.RENT
+    # NEW ONBOARDING FLOW: Check if user has debt, go to loan_payment
+    total_debt = context.user_data.get("total_debt", 0)
+    if total_debt > 0:
+        # Has debt - ask for monthly payment (Step 3)
+        keyboard = [
+            [InlineKeyboardButton(
+                "0️⃣ Hozir to'lamayapman" if lang == "uz" else "0️⃣ Пока не плачу",
+                callback_data="quick_loan_0"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(
+            get_message("input_loan_payment", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return States.LOAN_PAYMENT
+    else:
+        # No debt - go directly to calculation (wealth mode)
+        context.user_data["loan_payment"] = 0
+        context.user_data["rent"] = 0
+        context.user_data["kindergarten"] = 0
+        context.user_data["utilities"] = 0
+        return await calculate_and_show_results_from_callback(query, context)
 
 
 # ==================== LIVING COSTS INPUT ====================
