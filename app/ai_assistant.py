@@ -1154,30 +1154,112 @@ def find_all_amounts_with_context(text: str) -> List[Dict]:
     return results
 
 
-def determine_transaction_type_and_category(context_before: str, context_after: str, text_lower: str) -> Tuple[str, str, str]:
+async def determine_transaction_type_and_category_smart(context_before: str, context_after: str, 
+                                                         text_lower: str, db=None) -> Tuple[str, str, str]:
     """
-    Kontekst asosida tranzaksiya turini va kategoriyasini aniqlash.
+    SELF-LEARNING AI - Kontekst asosida tranzaksiya turini va kategoriyasini aniqlash.
+    
+    MUHIM: "X oldim" ni tahlil qilishda X nimaga qarab qaror qiladi:
+    - "non oldim", "go'sht oldim", "suv oldim" → XARAJAT (jismoniy narsa)
+    - "pul oldim", "oylik oldim", "maosh oldim" → DAROMAD (pul so'zi)
+    - "ishlab topdim", "ishlagan pulim" → DAROMAD (ish konteksti)
+    
     Returns: (transaction_type, category_key, category_name)
     """
     full_context = f"{context_before} {context_after}".lower()
     
-    print(f"    [DETECT] Context: '{full_context}'")
+    print(f"    [SMART-DETECT] Context: '{full_context}'")
     
-    # 1. Avval daromad yoki xarajat ekanligini aniqlash
+    # ==================== 1. AI O'RGANGAN PATTERNLARNI TEKSHIRISH ====================
+    # Avval database dan o'rgangan patternlarni tekshirish
+    if db:
+        try:
+            learned = await db.check_ai_pattern(full_context)
+            if learned:
+                print(f"    [SMART-DETECT] 🧠 AI o'rgangan pattern topildi: {learned['pattern']}")
+                print(f"    [SMART-DETECT] 🎯 Confidence: {learned['confidence']}, Count: {learned['correction_count']}")
+                return learned["correct_type"], learned["correct_category"], ""
+        except Exception as e:
+            print(f"    [SMART-DETECT] AI learning check error: {e}")
+    
+    # ==================== 2. JISMONIY NARSA + OLDIM = XARAJAT ====================
+    # Bu eng muhim qoida: agar "non", "go'sht", "suv" kabi narsa + "oldim" bo'lsa = XARAJAT
+    PHYSICAL_ITEMS = {
+        # Oziq-ovqat
+        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot', 'guruch', 'un',
+        'qand', 'shakar', 'tuz', 'yog', "yog'", 'sut', 'tuxum', 'tovuq', 'baliq', 'kolbasa',
+        'pishloq', 'smetana', 'qatiq', 'kefir', 'yogurt', 'shokolad', 'pechenye', 'tort',
+        'shirinlik', 'muzqaymoq', 'chips', 'gazak', 'pivo', 'vino', 'aroq', 'sigaret',
+        'osh', 'palov', 'somsa', 'manti', 'chuchvara', 'lagmon', "lag'mon", 'shashlik',
+        'kabob', 'burger', 'pizza', 'lavash', 'hotdog', 'sendvich',
+        # Kiyim
+        'kiyim', 'oyoq', "ko'ylak", 'koylak', 'shim', 'kurtka', 'palto', 'krossovka',
+        'tufli', 'botinka', 'shapka', 'kepka', 'galstuk', 'kemer', 'sumka', 'ryukzak',
+        # Uy jihozlari
+        'mebel', 'stol', 'stul', 'divan', 'krovat', 'shkaf', 'kreslo', 'lamp', 'gilam',
+        'parda', 'idish', 'kastrulka', 'skovoroda', 'choynak', 'piyola', 'qoshiq',
+        # Texnika
+        'telefon', 'noutbuk', 'kompyuter', 'televizor', 'muzlatgich', 'konditsioner',
+        'kir yuvish', 'changyutgich', 'dazmol', 'fen', 'mikser',
+        # Dori
+        'dori', 'tabletka', 'vitamin', 'maz', 'ukol', 'shpris',
+        # Transport xizmati (lekin transport = expense)
+        'benzin', 'yoqilgi', "yoqilg'i", 'gaz',
+    }
+    
+    # "oldim" so'zi kontekstda borligini tekshirish
+    if 'oldim' in full_context or 'olgan' in full_context or 'olib' in full_context:
+        # Jismoniy narsa borligini tekshirish
+        for item in PHYSICAL_ITEMS:
+            if item in full_context:
+                print(f"    [SMART-DETECT] 🛒 Jismoniy narsa topildi: '{item}' + oldim = XARAJAT")
+                # Kategoriyani aniqlash
+                category = detect_expense_category(full_context)
+                return "expense", category, ""
+    
+    # ==================== 3. PUL SO'ZI + OLDIM = DAROMAD ====================
+    MONEY_WORDS = {'pul', 'maosh', 'oylik', 'ish haqi', 'daromad', 'foyda', 'bonus', 'mukofot',
+                   'stipendiya', 'nafaqa', 'pensiya', 'grant'}
+    
+    if 'oldim' in full_context or 'olgan' in full_context:
+        for word in MONEY_WORDS:
+            if word in full_context:
+                print(f"    [SMART-DETECT] 💰 Pul so'zi topildi: '{word}' + oldim = DAROMAD")
+                return "income", "ish_haqi", ""
+    
+    # ==================== 4. ISH KONTEKSTI = DAROMAD ====================
+    WORK_INDICATORS = ['ishlab topdim', 'ishlab oldim', 'ishlagan', 'ishladim', 
+                       'topib oldim', 'topgan', 'topdim pul', 'sotdim', 'savdo qildim']
+    
+    for indicator in WORK_INDICATORS:
+        if indicator in full_context:
+            print(f"    [SMART-DETECT] 💼 Ish konteksti topildi: '{indicator}' = DAROMAD")
+            return "income", "ish_haqi", ""
+    
+    # ==================== 5. TRANSPORT KONTEKSTI = XARAJAT ====================
+    TRANSPORT_KEYWORDS = ['taksi', 'taksiga', 'taksida', 'yolkira', "yo'lkira", 'avtobus',
+                          'metro', 'marshrutka', 'poyezd', 'samolyot', 'uber', 'yandex', 'bolt']
+    
+    for kw in TRANSPORT_KEYWORDS:
+        if kw in full_context:
+            print(f"    [SMART-DETECT] 🚗 Transport topildi: '{kw}' = XARAJAT")
+            return "expense", "transport", ""
+    
+    # ==================== 6. UMUMIY DAROMAD/XARAJAT INDIKATORLARI ====================
     income_score = 0
     expense_score = 0
     
     for indicator in INCOME_INDICATORS:
         if indicator in full_context:
             income_score += 3
-            print(f"    [DETECT] Income indicator found: '{indicator}' (+3)")
+            print(f"    [SMART-DETECT] Income indicator: '{indicator}' (+3)")
     
     for indicator in EXPENSE_INDICATORS:
         if indicator in full_context:
             expense_score += 2
-            print(f"    [DETECT] Expense indicator found: '{indicator}' (+2)")
+            print(f"    [SMART-DETECT] Expense indicator: '{indicator}' (+2)")
     
-    # 2. Kategoriyani aniqlash
+    # ==================== 7. KATEGORIYANI ANIQLASH ====================
     best_category = "boshqa"
     best_score = 0
     best_type = "expense"  # default
@@ -1193,15 +1275,121 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
             best_category = cat_key
             best_type = cat_info["type"]
     
-    # 3. Daromad indikatori kuchli bo'lsa, turni daromadga o'zgartirish
-    if income_score > expense_score and income_score >= 3:
+    # Daromad indikatori kuchli bo'lsa
+    if income_score > expense_score + 2 and income_score >= 3:
         best_type = "income"
-        # Agar kategoriya xarajat uchun bo'lsa, ish_haqi ga o'zgartirish
         if SMART_CATEGORY_KEYWORDS.get(best_category, {}).get("type") == "expense":
             best_category = "ish_haqi"
     
     # Kategoriya nomini olish
-    lang = "uz"  # default
+    lang = "uz"
+    if best_type == "income":
+        category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(best_category, "📦 Boshqa")
+    else:
+        category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(best_category, "📦 Boshqa")
+    
+    print(f"    [SMART-DETECT] Final: type={best_type}, category={best_category}")
+    
+    return best_type, best_category, category_name
+
+
+def detect_expense_category(context: str) -> str:
+    """Xarajat kategoriyasini aniqlash"""
+    # Oziq-ovqat
+    food_words = ['non', 'gosht', "go'sht", 'suv', 'choy', 'meva', 'sabzavot', 'osh', 'ovqat', 
+                  'yedim', 'ichdim', 'tushlik', 'kechki', 'nonushta', 'restoran', 'kafe']
+    if any(w in context for w in food_words):
+        return "oziq_ovqat"
+    
+    # Transport
+    transport_words = ['taksi', 'avtobus', 'metro', 'benzin', 'yolkira', "yo'lkira", 'mashina']
+    if any(w in context for w in transport_words):
+        return "transport"
+    
+    # Kiyim
+    clothes_words = ['kiyim', "ko'ylak", 'shim', 'kurtka', 'krossovka', 'tufli']
+    if any(w in context for w in clothes_words):
+        return "kiyim"
+    
+    # Dori
+    medicine_words = ['dori', 'apteka', 'shifoxona', 'tabletka', 'vrach']
+    if any(w in context for w in medicine_words):
+        return "sog'liq"
+    
+    return "boshqa"
+
+
+def determine_transaction_type_and_category(context_before: str, context_after: str, text_lower: str) -> Tuple[str, str, str]:
+    """
+    Sync wrapper for backward compatibility
+    Kontekst asosida tranzaksiya turini va kategoriyasini aniqlash.
+    Returns: (transaction_type, category_key, category_name)
+    """
+    full_context = f"{context_before} {context_after}".lower()
+    
+    print(f"    [DETECT] Context: '{full_context}'")
+    
+    # ==================== JISMONIY NARSA + OLDIM = XARAJAT ====================
+    PHYSICAL_ITEMS = {
+        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot', 'guruch', 'un',
+        'qand', 'shakar', 'tuz', 'yog', "yog'", 'sut', 'tuxum', 'tovuq', 'baliq', 'kolbasa',
+        'osh', 'palov', 'somsa', 'manti', 'chuchvara', 'lagmon', 'shashlik', 'kabob', 
+        'burger', 'pizza', 'lavash', 'kiyim', 'telefon', 'dori', 'benzin', 'gaz',
+    }
+    
+    if 'oldim' in full_context or 'olgan' in full_context or 'olib' in full_context:
+        for item in PHYSICAL_ITEMS:
+            if item in full_context:
+                print(f"    [DETECT] 🛒 Jismoniy narsa: '{item}' + oldim = XARAJAT")
+                category = detect_expense_category(full_context)
+                category_name = EXPENSE_CATEGORIES.get("uz", {}).get(category, "📦 Boshqa")
+                return "expense", category, category_name
+    
+    # ==================== TRANSPORT = XARAJAT ====================
+    TRANSPORT_KEYWORDS = ['taksi', 'taksiga', 'taksida', 'yolkira', "yo'lkira", 'avtobus', 'metro']
+    for kw in TRANSPORT_KEYWORDS:
+        if kw in full_context:
+            return "expense", "transport", EXPENSE_CATEGORIES.get("uz", {}).get("transport", "🚗 Transport")
+    
+    # ==================== ISH = DAROMAD ====================
+    WORK_INDICATORS = ['ishlab topdim', 'ishlab oldim', 'ishlagan', 'ishladim', 'topdim', 'sotdim']
+    for indicator in WORK_INDICATORS:
+        if indicator in full_context:
+            return "income", "ish_haqi", INCOME_CATEGORIES.get("uz", {}).get("ish_haqi", "💼 Ish haqi")
+    
+    # ==================== UMUMIY TAHLIL ====================
+    income_score = 0
+    expense_score = 0
+    
+    for indicator in INCOME_INDICATORS:
+        if indicator in full_context:
+            income_score += 3
+    
+    for indicator in EXPENSE_INDICATORS:
+        if indicator in full_context:
+            expense_score += 2
+    
+    best_category = "boshqa"
+    best_score = 0
+    best_type = "expense"
+    
+    for cat_key, cat_info in SMART_CATEGORY_KEYWORDS.items():
+        score = 0
+        for keyword in cat_info["keywords"]:
+            if keyword in full_context:
+                score += cat_info["weight"]
+        
+        if score > best_score:
+            best_score = score
+            best_category = cat_key
+            best_type = cat_info["type"]
+    
+    if income_score > expense_score + 2 and income_score >= 3:
+        best_type = "income"
+        if SMART_CATEGORY_KEYWORDS.get(best_category, {}).get("type") == "expense":
+            best_category = "ish_haqi"
+    
+    lang = "uz"
     if best_type == "income":
         category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(best_category, "📦 Boshqa")
     else:

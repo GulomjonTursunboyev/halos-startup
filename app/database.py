@@ -358,6 +358,24 @@ class Database:
                 )
             """)
             
+            # AI Learning table - foydalanuvchi tuzatishlaridan o'rganish
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_learning (
+                    id SERIAL PRIMARY KEY,
+                    pattern TEXT NOT NULL,
+                    wrong_type TEXT NOT NULL,
+                    correct_type TEXT NOT NULL,
+                    wrong_category TEXT,
+                    correct_category TEXT,
+                    context_keywords TEXT,
+                    correction_count INTEGER DEFAULT 1,
+                    confidence REAL DEFAULT 1.0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(pattern, correct_type, correct_category)
+                )
+            """)
+            
             # Create indexes
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON financial_profiles(user_id)")
@@ -366,6 +384,7 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_voice_usage_user_month ON voice_usage(user_id, month)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_personal_debts_user_id ON personal_debts(user_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_personal_debts_status ON personal_debts(status)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_learning_pattern ON ai_learning(pattern)")
     
     async def _create_tables_sqlite(self):
         """Create all required tables for SQLite"""
@@ -544,6 +563,22 @@ class Database:
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
             
+            -- AI Learning table - foydalanuvchi tuzatishlaridan o'rganish
+            CREATE TABLE IF NOT EXISTS ai_learning (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern TEXT NOT NULL,
+                wrong_type TEXT NOT NULL,
+                correct_type TEXT NOT NULL,
+                wrong_category TEXT,
+                correct_category TEXT,
+                context_keywords TEXT,
+                correction_count INTEGER DEFAULT 1,
+                confidence REAL DEFAULT 1.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(pattern, correct_type, correct_category)
+            );
+            
             -- Indexes for performance
             CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
             CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON financial_profiles(user_id);
@@ -559,6 +594,7 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_personal_debts_user_id ON personal_debts(user_id);
             CREATE INDEX IF NOT EXISTS idx_personal_debts_status ON personal_debts(status);
             CREATE INDEX IF NOT EXISTS idx_personal_debts_type ON personal_debts(debt_type);
+            CREATE INDEX IF NOT EXISTS idx_ai_learning_pattern ON ai_learning(pattern);
         """)
         await self._connection.commit()
     
@@ -1569,6 +1605,127 @@ class Database:
             stats["languages"] = {}
         
         return stats
+
+    # ==================== AI LEARNING METHODS ====================
+    
+    async def save_ai_correction(self, pattern: str, wrong_type: str, correct_type: str,
+                                  wrong_category: str = None, correct_category: str = None,
+                                  context_keywords: str = None) -> int:
+        """
+        Foydalanuvchi tuzatishini saqlash - AI o'rganishi uchun
+        Agar pattern mavjud bo'lsa, correction_count ni oshirish
+        """
+        if USE_POSTGRES:
+            async with self._pool.acquire() as conn:
+                # Avval mavjudligini tekshirish
+                existing = await conn.fetchrow("""
+                    SELECT id, correction_count FROM ai_learning 
+                    WHERE pattern = $1 AND correct_type = $2 AND correct_category = $3
+                """, pattern, correct_type, correct_category or '')
+                
+                if existing:
+                    # Mavjud bo'lsa - counter va confidence ni oshirish
+                    new_count = existing["correction_count"] + 1
+                    new_confidence = min(1.0, 0.5 + (new_count * 0.1))  # Max 1.0
+                    await conn.execute("""
+                        UPDATE ai_learning 
+                        SET correction_count = $1, confidence = $2, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $3
+                    """, new_count, new_confidence, existing["id"])
+                    return existing["id"]
+                else:
+                    # Yangi yozuv
+                    row = await conn.fetchrow("""
+                        INSERT INTO ai_learning 
+                        (pattern, wrong_type, correct_type, wrong_category, correct_category, context_keywords)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        RETURNING id
+                    """, pattern, wrong_type, correct_type, wrong_category, correct_category, context_keywords)
+                    return row["id"]
+        else:
+            cursor = await self._connection.execute("""
+                SELECT id, correction_count FROM ai_learning 
+                WHERE pattern = ? AND correct_type = ? AND correct_category = ?
+            """, (pattern, correct_type, correct_category or ''))
+            existing = await cursor.fetchone()
+            
+            if existing:
+                new_count = existing[1] + 1
+                new_confidence = min(1.0, 0.5 + (new_count * 0.1))
+                await self._connection.execute("""
+                    UPDATE ai_learning 
+                    SET correction_count = ?, confidence = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (new_count, new_confidence, existing[0]))
+                await self._connection.commit()
+                return existing[0]
+            else:
+                cursor = await self._connection.execute("""
+                    INSERT INTO ai_learning 
+                    (pattern, wrong_type, correct_type, wrong_category, correct_category, context_keywords)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (pattern, wrong_type, correct_type, wrong_category, correct_category, context_keywords))
+                await self._connection.commit()
+                return cursor.lastrowid
+    
+    async def get_ai_learned_patterns(self, min_confidence: float = 0.5) -> list:
+        """
+        AI o'rgangan patternlarni olish
+        Faqat yuqori confidence bo'lganlarni qaytaradi
+        """
+        if USE_POSTGRES:
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT pattern, correct_type, correct_category, context_keywords, 
+                           correction_count, confidence
+                    FROM ai_learning 
+                    WHERE confidence >= $1
+                    ORDER BY correction_count DESC, confidence DESC
+                """, min_confidence)
+                return [dict(row) for row in rows]
+        else:
+            cursor = await self._connection.execute("""
+                SELECT pattern, correct_type, correct_category, context_keywords,
+                       correction_count, confidence
+                FROM ai_learning 
+                WHERE confidence >= ?
+                ORDER BY correction_count DESC, confidence DESC
+            """, (min_confidence,))
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "pattern": row[0],
+                    "correct_type": row[1],
+                    "correct_category": row[2],
+                    "context_keywords": row[3],
+                    "correction_count": row[4],
+                    "confidence": row[5]
+                }
+                for row in rows
+            ]
+    
+    async def check_ai_pattern(self, text: str) -> dict:
+        """
+        Matnni AI o'rgangan patternlar bilan solishtirish
+        Agar mos pattern topilsa, to'g'ri type/category ni qaytarish
+        """
+        text_lower = text.lower()
+        patterns = await self.get_ai_learned_patterns(min_confidence=0.6)
+        
+        best_match = None
+        best_score = 0
+        
+        for p in patterns:
+            pattern = p["pattern"].lower()
+            # Pattern matnda borligini tekshirish
+            if pattern in text_lower:
+                # Score = confidence * correction_count
+                score = p["confidence"] * p["correction_count"]
+                if score > best_score:
+                    best_score = score
+                    best_match = p
+        
+        return best_match
 
 
 # Singleton database instance

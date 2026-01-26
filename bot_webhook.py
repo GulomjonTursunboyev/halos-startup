@@ -61,6 +61,7 @@ from app.handlers import (
     ai_confirm_ok_callback,
     ai_correct_callback,
     ai_correct_multi_callback,
+    ai_swap_type_callback,
     ai_delete_all_callback,
     ai_delete_callback,
     ai_rewrite_callback,
@@ -302,6 +303,9 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(ai_correct_multi_callback, pattern="^ai_correct_multi_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_swap_type_callback, pattern="^ai_swap_type_")
     )
     app.add_handler(
         CallbackQueryHandler(ai_delete_all_callback, pattern="^ai_delete_all_")
