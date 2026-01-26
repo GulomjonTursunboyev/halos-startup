@@ -63,43 +63,40 @@ async def send_payment_invoice(
     # 1 UZS = 100 tiyin
     amount_tiyin = int(plan.price_uzs * 100)
     
-    # Create invoice payload (will be returned in successful_payment)
-    payload = f"halos_{telegram_id}_{plan_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    # Create short invoice payload: h_{user_id}_{plan_short}_{time}
+    plan_short = plan_id.replace("pro_", "")[:3]  # weekly->wee, monthly->mon, yearly->yea
+    payload = f"h_{telegram_id}_{plan_short}_{datetime.now().strftime('%m%d%H%M')}"
     
-    # Invoice details
-    duration_days = plan.period.value  # Get days from SubscriptionPeriod enum
+    # Invoice details - short and clear
+    duration_days = plan.period.value
+    
+    # Short plan names
+    if "weekly" in plan_id:
+        period_name_uz, period_name_ru = "1 hafta", "1 неделя"
+    elif "monthly" in plan_id:
+        period_name_uz, period_name_ru = "1 oy", "1 месяц"
+    else:
+        period_name_uz, period_name_ru = "1 yil", "1 год"
     
     if lang == "uz":
-        title = f"HALOS PRO - {plan.description_uz}"
+        title = "HALOS PRO"
         description = (
-            f"📦 {plan.description_uz}\n"
-            f"⏱ Muddat: {duration_days} kun\n\n"
-            "✨ PRO imkoniyatlar:\n"
-            "• HALOS sanangiz\n"
-            "• Tezkor qutilish rejasi\n"
-            "• Shaxsiy kapital\n"
-            "• AI ovozli yordamchi\n"
-            "• Excel eksport\n"
-            "• Aqlli eslatmalar"
+            f"⏱ {period_name_uz} ({duration_days} kun)\n\n"
+            "✨ Barcha PRO imkoniyatlar"
         )
+        price_label = f"PRO {period_name_uz}"
     else:
-        title = f"HALOS PRO - {plan.description_ru}"
+        title = "HALOS PRO"
         description = (
-            f"📦 {plan.description_ru}\n"
-            f"⏱ Срок: {duration_days} дней\n\n"
-            "✨ PRO возможности:\n"
-            "• Дата HALOS\n"
-            "• План быстрого погашения\n"
-            "• Личный капитал\n"
-            "• AI голосовой помощник\n"
-            "• Экспорт в Excel\n"
-            "• Умные напоминания"
+            f"⏱ {period_name_ru} ({duration_days} дней)\n\n"
+            "✨ Все PRO возможности"
         )
+        price_label = f"PRO {period_name_ru}"
     
     # Price labels
     prices = [
         LabeledPrice(
-            label=plan.description_uz if lang == "uz" else plan.description_ru,
+            label=price_label,
             amount=amount_tiyin
         )
     ]
@@ -116,17 +113,12 @@ async def send_payment_invoice(
             provider_token=CLICK_PROVIDER_TOKEN,
             currency="UZS",
             prices=prices,
-            start_parameter=f"pay_{plan_id}",
-            # Optional parameters
-            photo_url="https://i.ibb.co/4gQJ4Pv/halos-pro.png",  # PRO logo
-            photo_width=512,
-            photo_height=512,
+            start_parameter=f"pro{plan_short}",
             need_name=False,
             need_phone_number=False,
             need_email=False,
             need_shipping_address=False,
             is_flexible=False,
-            protect_content=True,
         )
         
         logger.info(f"Invoice sent to user {telegram_id} for plan {plan_id}, amount: {plan.price_uzs} UZS")
@@ -156,48 +148,48 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.pre_checkout_query
     
     try:
-        # Parse payload: halos_{telegram_id}_{plan_id}_{timestamp}
+        # Parse payload: h_{user_id}_{plan_short}_{time}
         payload = query.invoice_payload
         parts = payload.split('_')
         
-        if len(parts) < 4 or parts[0] != 'halos':
-            await query.answer(ok=False, error_message="Invalid order format")
+        if len(parts) < 4 or parts[0] != 'h':
+            await query.answer(ok=False, error_message="Noto'g'ri format")
             return
         
         telegram_id = int(parts[1])
-        plan_id = '_'.join(parts[2:-1])  # Handle plan_id with underscore
+        plan_short = parts[2]  # wee, mon, yea
+        
+        # Convert short to full plan_id
+        plan_map = {'wee': 'pro_weekly', 'mon': 'pro_monthly', 'yea': 'pro_yearly'}
+        plan_id = plan_map.get(plan_short)
         
         # Verify user matches
         if query.from_user.id != telegram_id:
-            await query.answer(ok=False, error_message="User mismatch")
+            await query.answer(ok=False, error_message="Foydalanuvchi mos emas")
             return
         
         # Verify plan exists
-        if plan_id not in PRICING_PLANS:
-            await query.answer(ok=False, error_message="Plan not found")
+        if not plan_id or plan_id not in PRICING_PLANS:
+            await query.answer(ok=False, error_message="Tarif topilmadi")
             return
         
-        # Verify amount (quick check, no database)
+        # Verify amount (quick check)
         plan = PRICING_PLANS[plan_id]
-        expected_amount = int(plan.price_uzs * 100)  # tiyin
+        expected_amount = int(plan.price_uzs * 100)
         
-        # Allow some tolerance for rounding
-        if abs(query.total_amount - expected_amount) > 1000:  # 10 UZS tolerance
-            logger.warning(f"Amount mismatch: expected {expected_amount}, got {query.total_amount}")
-            await query.answer(ok=False, error_message="Amount mismatch")
+        if abs(query.total_amount - expected_amount) > 1000:
+            await query.answer(ok=False, error_message="Summa mos emas")
             return
         
-        # All quick checks passed - approve payment immediately!
-        # Database checks will be done in successful_payment_handler
+        # Approve payment immediately!
         await query.answer(ok=True)
         
-        logger.info(f"Pre-checkout approved for user {telegram_id}, plan {plan_id}")
+        logger.info(f"Pre-checkout OK: user={telegram_id}, plan={plan_id}")
         
     except Exception as e:
         logger.error(f"Pre-checkout error: {e}")
-        # Always respond even on error
         try:
-            await query.answer(ok=False, error_message="Server error")
+            await query.answer(ok=False, error_message="Xatolik")
         except:
             pass
 
@@ -210,22 +202,26 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
     payment = message.successful_payment
     
     try:
-        # Parse payload
+        # Parse payload: h_{user_id}_{plan_short}_{time}
         payload = payment.invoice_payload
         parts = payload.split('_')
         
         telegram_id = int(parts[1])
-        plan_id = '_'.join(parts[2:-1])
+        plan_short = parts[2]
+        
+        # Convert short to full plan_id
+        plan_map = {'wee': 'pro_weekly', 'mon': 'pro_monthly', 'yea': 'pro_yearly'}
+        plan_id = plan_map.get(plan_short, 'pro_monthly')
         
         # Get plan details
         plan = PRICING_PLANS.get(plan_id)
         if not plan:
-            logger.error(f"Plan not found after payment: {plan_id}")
+            logger.error(f"Plan not found: {plan_id}")
             return
         
         # Calculate subscription expiration
         now = datetime.now()
-        duration_days = plan.period.value  # Get days from SubscriptionPeriod enum
+        duration_days = plan.period.value
         expires = now + timedelta(days=duration_days)
         
         # Get database
