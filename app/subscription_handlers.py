@@ -500,24 +500,194 @@ async def show_pricing_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await show_pricing(update, context, is_required=False)
 
 
-# ==================== CLICK PAYMENT HANDLER ====================
+# ==================== PAYMENT METHOD SELECTION ====================
 
 async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle Click payment button click - send Telegram Payment invoice"""
+    """Handle Click payment button - show payment method selection"""
     query = update.callback_query
     await query.answer()
     
-    plan_id = query.data.replace("click_buy_", "")  # pro_monthly, pro_quarterly, pro_yearly
+    plan_id = query.data.replace("click_buy_", "")
+    lang = context.user_data.get("lang", "uz")
     
-    # Use Telegram Payments API instead of URL redirect
+    # Store selected plan
+    context.user_data["selected_plan"] = plan_id
+    
+    # Get plan info
+    if plan_id not in PRICING_PLANS:
+        await query.answer("❌ Tarif topilmadi", show_alert=True)
+        return
+    
+    plan = PRICING_PLANS[plan_id]
+    
+    if lang == "uz":
+        msg = (
+            f"💳 *To'lov usulini tanlang*\n\n"
+            f"📦 Tarif: *{plan.description_uz}*\n"
+            f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
+            "👇 Quyidagilardan birini tanlang:"
+        )
+        keyboard = [
+            [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
+            [InlineKeyboardButton("🔗 Click havola", callback_data=f"pay_link_{plan_id}")],
+            [InlineKeyboardButton("💳 Karta orqali (P2P)", callback_data=f"pay_card_{plan_id}")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="show_pricing")]
+        ]
+    else:
+        msg = (
+            f"💳 *Выберите способ оплаты*\n\n"
+            f"📦 Тариф: *{plan.description_ru}*\n"
+            f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
+            "👇 Выберите один из вариантов:"
+        )
+        keyboard = [
+            [InlineKeyboardButton("📱 Click (Telegram)", callback_data=f"pay_tg_{plan_id}")],
+            [InlineKeyboardButton("🔗 Click ссылка", callback_data=f"pay_link_{plan_id}")],
+            [InlineKeyboardButton("💳 Картой (P2P)", callback_data=f"pay_card_{plan_id}")],
+            [InlineKeyboardButton("◀️ Назад", callback_data="show_pricing")]
+        ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def pay_telegram_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Telegram Payment (Click Terminal) selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    plan_id = query.data.replace("pay_tg_", "")
+    
     from app.telegram_payments import send_payment_invoice
     
-    # Delete current message
     try:
         await query.message.delete()
     except:
         pass
     
+    await send_payment_invoice(update, context, plan_id)
+
+
+async def pay_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Click link payment selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    plan_id = query.data.replace("pay_link_", "")
+    lang = context.user_data.get("lang", "uz")
+    
+    if plan_id not in PRICING_PLANS:
+        return
+    
+    plan = PRICING_PLANS[plan_id]
+    
+    # Generate Click payment URL
+    from app.click_payment import generate_click_payment_url
+    
+    order_id = f"halos_{update.effective_user.id}_{plan_id}"
+    click_url = generate_click_payment_url(
+        amount=plan.price_uzs,
+        order_id=order_id,
+        return_url="https://t.me/HalosRobot",
+        description=plan.description_uz
+    )
+    
+    if lang == "uz":
+        msg = (
+            f"🔗 *Click havola orqali to'lov*\n\n"
+            f"📦 Tarif: *{plan.description_uz}*\n"
+            f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
+            "👇 Quyidagi tugmani bosing va Click orqali to'lang.\n\n"
+            "⚠️ To'lovdan keyin /start bosing."
+        )
+        pay_btn = "💳 Click orqali to'lash"
+    else:
+        msg = (
+            f"🔗 *Оплата по ссылке Click*\n\n"
+            f"📦 Тариф: *{plan.description_ru}*\n"
+            f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
+            "👇 Нажмите кнопку и оплатите через Click.\n\n"
+            "⚠️ После оплаты нажмите /start."
+        )
+        pay_btn = "💳 Оплатить через Click"
+    
+    keyboard = [
+        [InlineKeyboardButton(pay_btn, url=click_url)],
+        [InlineKeyboardButton("◀️ Orqaga" if lang == "uz" else "◀️ Назад", callback_data=f"click_buy_{plan_id}")]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def pay_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle P2P card payment selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    plan_id = query.data.replace("pay_card_", "")
+    lang = context.user_data.get("lang", "uz")
+    
+    if plan_id not in PRICING_PLANS:
+        return
+    
+    plan = PRICING_PLANS[plan_id]
+    
+    # P2P to'lov kartasi
+    CARD_NUMBER = "9860 1701 0444 4616"  # O'zingizning karta raqamingiz
+    CARD_HOLDER = "HALOS"
+    
+    if lang == "uz":
+        msg = (
+            f"💳 *Karta orqali to'lov (P2P)*\n\n"
+            f"📦 Tarif: *{plan.description_uz}*\n"
+            f"💰 Summa: *{plan.price_uzs:,} so'm*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 Karta: `{CARD_NUMBER}`\n"
+            f"👤 Egasi: *{CARD_HOLDER}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📝 *Qadamlar:*\n"
+            "1️⃣ Yuqoridagi karta raqamini nusxalang\n"
+            f"2️⃣ *{plan.price_uzs:,} so'm* o'tkazing\n"
+            "3️⃣ Chekni rasmga olib yuboring\n\n"
+            "⚠️ Chekni admin tekshirgach PRO ochiladi."
+        )
+    else:
+        msg = (
+            f"💳 *Оплата картой (P2P)*\n\n"
+            f"📦 Тариф: *{plan.description_ru}*\n"
+            f"💰 Сумма: *{plan.price_uzs:,} сум*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 Карта: `{CARD_NUMBER}`\n"
+            f"👤 Владелец: *{CARD_HOLDER}*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📝 *Шаги:*\n"
+            "1️⃣ Скопируйте номер карты\n"
+            f"2️⃣ Переведите *{plan.price_uzs:,} сум*\n"
+            "3️⃣ Отправьте фото чека\n\n"
+            "⚠️ PRO откроется после проверки."
+        )
+    
+    # Store for photo receipt
+    context.user_data["awaiting_receipt"] = plan_id
+    
+    keyboard = [
+        [InlineKeyboardButton("📋 Karta raqamini nusxalash" if lang == "uz" else "📋 Копировать номер", 
+                              callback_data="copy_card")],
+        [InlineKeyboardButton("◀️ Orqaga" if lang == "uz" else "◀️ Назад", callback_data=f"click_buy_{plan_id}")]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     # Send payment invoice
     await send_payment_invoice(update, context, plan_id)
 
