@@ -1321,83 +1321,105 @@ def detect_expense_category(context: str) -> str:
 
 def determine_transaction_type_and_category(context_before: str, context_after: str, text_lower: str) -> Tuple[str, str, str]:
     """
-    Sync wrapper for backward compatibility
-    Kontekst asosida tranzaksiya turini va kategoriyasini aniqlash.
+    MUHIM: Faqat CONTEXT_AFTER ga qarab kategoriya aniqlanadi!
+    Chunki summa + keyingi so'z = nima uchun sarflangan
+    
+    Misol: "20 ming yo'lkira qildim, 50 minga ovqatlandim"
+    - 20 ming -> context_after = "yo'lkira qildim" -> TRANSPORT
+    - 50 ming -> context_after = "ovqatlandim" -> OZIQ-OVQAT
+    
     Returns: (transaction_type, category_key, category_name)
     """
-    full_context = f"{context_before} {context_after}".lower()
+    # MUHIM: Faqat context_after ishlatiladi - bu summadan keyingi so'zlar
+    local_context = context_after.lower().strip()
     
-    print(f"    [DETECT] Context: '{full_context}'")
+    print(f"    [DETECT] Local context (after amount): '{local_context}'")
     
-    # ==================== JISMONIY NARSA + OLDIM = XARAJAT ====================
-    PHYSICAL_ITEMS = {
-        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot', 'guruch', 'un',
-        'qand', 'shakar', 'tuz', 'yog', "yog'", 'sut', 'tuxum', 'tovuq', 'baliq', 'kolbasa',
-        'osh', 'palov', 'somsa', 'manti', 'chuchvara', 'lagmon', 'shashlik', 'kabob', 
-        'burger', 'pizza', 'lavash', 'kiyim', 'telefon', 'dori', 'benzin', 'gaz',
-    }
+    # ==================== 1. OZIQ-OVQAT TEKSHIRISH (BIRINCHI!) ====================
+    FOOD_KEYWORDS = [
+        'ovqat', 'ovqatlandim', 'yedim', 'ichdim', 'tushlik', 'nonushta', 'kechki',
+        'restoran', 'kafe', 'choyxona', 'oshxona', 'taom', 
+        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot',
+        'osh', 'palov', 'somsa', 'manti', 'chuchvara', 'lagmon', 'shashlik', 
+        'kabob', 'burger', 'pizza', 'lavash', 'hotdog'
+    ]
+    for kw in FOOD_KEYWORDS:
+        if kw in local_context:
+            print(f"    [DETECT] 🍔 Oziq-ovqat topildi: '{kw}'")
+            return "expense", "oziq_ovqat", EXPENSE_CATEGORIES.get("uz", {}).get("oziq_ovqat", "🍔 Oziq-ovqat")
     
-    if 'oldim' in full_context or 'olgan' in full_context or 'olib' in full_context:
-        for item in PHYSICAL_ITEMS:
-            if item in full_context:
-                print(f"    [DETECT] 🛒 Jismoniy narsa: '{item}' + oldim = XARAJAT")
-                category = detect_expense_category(full_context)
-                category_name = EXPENSE_CATEGORIES.get("uz", {}).get(category, "📦 Boshqa")
-                return "expense", category, category_name
-    
-    # ==================== TRANSPORT = XARAJAT ====================
-    TRANSPORT_KEYWORDS = ['taksi', 'taksiga', 'taksida', 'yolkira', "yo'lkira", 'avtobus', 'metro']
+    # ==================== 2. TRANSPORT TEKSHIRISH ====================
+    TRANSPORT_KEYWORDS = [
+        'taksi', 'taksiga', 'taksida', 'yolkira', "yo'lkira", 'yol kira',
+        'avtobus', 'metro', 'marshrutka', 'poyezd', 'samolyot',
+        'uber', 'yandex', 'bolt', 'mycar', 'benzin', 'yoqilgi'
+    ]
     for kw in TRANSPORT_KEYWORDS:
-        if kw in full_context:
+        if kw in local_context:
+            print(f"    [DETECT] 🚗 Transport topildi: '{kw}'")
             return "expense", "transport", EXPENSE_CATEGORIES.get("uz", {}).get("transport", "🚗 Transport")
     
-    # ==================== ISH = DAROMAD ====================
-    WORK_INDICATORS = ['ishlab topdim', 'ishlab oldim', 'ishlagan', 'ishladim', 'topdim', 'sotdim']
-    for indicator in WORK_INDICATORS:
-        if indicator in full_context:
+    # ==================== 3. KIYIM TEKSHIRISH ====================
+    CLOTHES_KEYWORDS = ['kiyim', "ko'ylak", 'koylak', 'shim', 'kurtka', 'palto', 
+                        'krossovka', 'tufli', 'botinka', 'oyoq kiyim']
+    for kw in CLOTHES_KEYWORDS:
+        if kw in local_context:
+            print(f"    [DETECT] 👕 Kiyim topildi: '{kw}'")
+            return "expense", "kiyim", EXPENSE_CATEGORIES.get("uz", {}).get("kiyim", "👕 Kiyim-kechak")
+    
+    # ==================== 4. DORI/SOG'LIQ TEKSHIRISH ====================
+    HEALTH_KEYWORDS = ['dori', 'apteka', 'shifoxona', 'tabletka', 'vrach', 'doktor', 'kasalxona']
+    for kw in HEALTH_KEYWORDS:
+        if kw in local_context:
+            print(f"    [DETECT] 💊 Sog'liq topildi: '{kw}'")
+            return "expense", "sog'liq", EXPENSE_CATEGORIES.get("uz", {}).get("sog'liq", "💊 Sog'liq")
+    
+    # ==================== 5. KOMMUNAL TEKSHIRISH ====================
+    KOMMUNAL_KEYWORDS = ['gaz', 'elektr', 'tok', 'suv tolov', 'kommunal', 'hududiy']
+    for kw in KOMMUNAL_KEYWORDS:
+        if kw in local_context:
+            print(f"    [DETECT] 💡 Kommunal topildi: '{kw}'")
+            return "expense", "kommunal", EXPENSE_CATEGORIES.get("uz", {}).get("kommunal", "💡 Kommunal")
+    
+    # ==================== 6. DAROMAD TEKSHIRISH ====================
+    INCOME_KEYWORDS_LOCAL = [
+        'ishlab topdim', 'ishlab oldim', 'ishlagan', 'ishladim', 
+        'topdim', 'topgan', 'maosh', 'oylik', 'ish haqi',
+        'sotdim', 'savdo', 'foyda', 'daromad'
+    ]
+    for kw in INCOME_KEYWORDS_LOCAL:
+        if kw in local_context:
+            print(f"    [DETECT] 💼 Daromad topildi: '{kw}'")
             return "income", "ish_haqi", INCOME_CATEGORIES.get("uz", {}).get("ish_haqi", "💼 Ish haqi")
     
-    # ==================== UMUMIY TAHLIL ====================
-    income_score = 0
-    expense_score = 0
+    # ==================== 7. JISMONIY NARSA + OLDIM ====================
+    PHYSICAL_ITEMS = {
+        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot',
+        'guruch', 'un', 'sut', 'tuxum', 'tovuq', 'baliq', 
+        'telefon', 'noutbuk', 'kompyuter', 'mebel'
+    }
     
-    for indicator in INCOME_INDICATORS:
-        if indicator in full_context:
-            income_score += 3
+    if 'oldim' in local_context or 'olgan' in local_context:
+        for item in PHYSICAL_ITEMS:
+            if item in local_context:
+                print(f"    [DETECT] 🛒 Jismoniy narsa: '{item}' + oldim")
+                category = detect_expense_category(local_context)
+                return "expense", category, EXPENSE_CATEGORIES.get("uz", {}).get(category, "📦 Boshqa")
     
-    for indicator in EXPENSE_INDICATORS:
-        if indicator in full_context:
-            expense_score += 2
+    # ==================== 8. UMUMIY XARAJAT INDIKATORLARI ====================
+    EXPENSE_VERBS = ['berdim', 'berib', 'sarfladim', 'to\'ladim', 'xarajat', 
+                     'ketdi', 'chiqdi', 'qildim', 'oldim']
+    for verb in EXPENSE_VERBS:
+        if verb in local_context:
+            print(f"    [DETECT] 📤 Xarajat verb topildi: '{verb}'")
+            # Kategoriyani context_before dan ham qidirish
+            combined = f"{context_before} {local_context}".lower()
+            category = detect_expense_category(combined)
+            return "expense", category, EXPENSE_CATEGORIES.get("uz", {}).get(category, "📦 Boshqa")
     
-    best_category = "boshqa"
-    best_score = 0
-    best_type = "expense"
-    
-    for cat_key, cat_info in SMART_CATEGORY_KEYWORDS.items():
-        score = 0
-        for keyword in cat_info["keywords"]:
-            if keyword in full_context:
-                score += cat_info["weight"]
-        
-        if score > best_score:
-            best_score = score
-            best_category = cat_key
-            best_type = cat_info["type"]
-    
-    if income_score > expense_score + 2 and income_score >= 3:
-        best_type = "income"
-        if SMART_CATEGORY_KEYWORDS.get(best_category, {}).get("type") == "expense":
-            best_category = "ish_haqi"
-    
-    lang = "uz"
-    if best_type == "income":
-        category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(best_category, "📦 Boshqa")
-    else:
-        category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(best_category, "📦 Boshqa")
-    
-    print(f"    [DETECT] Result: type={best_type}, category={best_category}, score={best_score}")
-    
-    return best_type, best_category, category_name
+    # ==================== 9. DEFAULT ====================
+    print(f"    [DETECT] ⚠️ Aniq kategoriya topilmadi, default: expense/boshqa")
+    return "expense", "boshqa", EXPENSE_CATEGORIES.get("uz", {}).get("boshqa", "📦 Boshqa")
 
 
 async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]:
