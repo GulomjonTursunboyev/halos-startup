@@ -151,7 +151,7 @@ async def send_payment_invoice(
 async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle pre-checkout query - validate order before payment
-    Must respond within 10 seconds!
+    Must respond within 10 seconds! Keep this handler FAST!
     """
     query = update.pre_checkout_query
     
@@ -167,7 +167,7 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         telegram_id = int(parts[1])
         plan_id = '_'.join(parts[2:-1])  # Handle plan_id with underscore
         
-        # Verify user
+        # Verify user matches
         if query.from_user.id != telegram_id:
             await query.answer(ok=False, error_message="User mismatch")
             return
@@ -177,33 +177,29 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.answer(ok=False, error_message="Plan not found")
             return
         
-        # Verify amount
+        # Verify amount (quick check, no database)
         plan = PRICING_PLANS[plan_id]
         expected_amount = int(plan.price_uzs * 100)  # tiyin
         
-        if query.total_amount != expected_amount:
+        # Allow some tolerance for rounding
+        if abs(query.total_amount - expected_amount) > 1000:  # 10 UZS tolerance
             logger.warning(f"Amount mismatch: expected {expected_amount}, got {query.total_amount}")
-            # Allow small differences due to rounding
-            if abs(query.total_amount - expected_amount) > 100:  # 1 UZS tolerance
-                await query.answer(ok=False, error_message="Amount mismatch")
-                return
-        
-        # Check if user exists
-        db = await get_database()
-        user = await db.get_user(telegram_id)
-        
-        if not user:
-            await query.answer(ok=False, error_message="User not registered")
+            await query.answer(ok=False, error_message="Amount mismatch")
             return
         
-        # All checks passed - approve payment
+        # All quick checks passed - approve payment immediately!
+        # Database checks will be done in successful_payment_handler
         await query.answer(ok=True)
         
         logger.info(f"Pre-checkout approved for user {telegram_id}, plan {plan_id}")
         
     except Exception as e:
         logger.error(f"Pre-checkout error: {e}")
-        await query.answer(ok=False, error_message="Server error. Please try again.")
+        # Always respond even on error
+        try:
+            await query.answer(ok=False, error_message="Server error")
+        except:
+            pass
 
 
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
