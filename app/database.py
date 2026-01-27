@@ -4,6 +4,7 @@ SQLite/PostgreSQL database with async support for user data and financial plans
 Supports both local SQLite and cloud PostgreSQL (Supabase/Railway)
 """
 import os
+import asyncio
 import aiosqlite
 from datetime import datetime
 from pathlib import Path
@@ -73,37 +74,54 @@ class Database:
             masked_url = f"{p.scheme}://{p.username}:****@{p.hostname}:{p.port}{p.path}"
             logger.info(f"Connecting to: {masked_url}")
             
-            try:
-                # Use DSN directly. For Supabase pooler, ssl='require' is essential.
-                # MAXIMUM SPEED pool settings
-                self._pool = await asyncpg.create_pool(
-                    dsn=db_url,
-                    min_size=10,     # Keep 10 connections ready (warm pool)
-                    max_size=50,     # Allow up to 50 concurrent connections
-                    command_timeout=10,  # Fast timeout (10 sec)
-                    ssl='require'
-                )
-                await self._create_tables_postgres()
-                logger.info("PostgreSQL connected and tables created!")
-            except Exception as e:
-                logger.error(f"PostgreSQL connection failed: {e}")
-                # Fallback: Try without explicit SSL if 'require' fails 
-                # (though Supabase usually requires it)
-                if "SSL" in str(e) or "terminal" in str(e):
-                    try:
-                        logger.info("Retrying without explicit SSL requirement...")
-                        self._pool = await asyncpg.create_pool(
-                            dsn=db_url,
-                            min_size=10,
-                            max_size=50,
-                            command_timeout=10
-                        )
-                        await self._create_tables_postgres()
-                        logger.info("PostgreSQL connected (No SSL)!")
-                        return
-                    except Exception as e2:
-                        logger.error(f"PostgreSQL retry failed: {e2}")
-                raise
+            # Retry logic for connection
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    # Supabase free tier limits - use minimal pool size
+                    self._pool = await asyncpg.create_pool(
+                        dsn=db_url,
+                        min_size=2,      # Minimal connections to avoid hitting limit
+                        max_size=10,     # Max 10 concurrent (Supabase free tier limit ~15-20)
+                        command_timeout=30,  # Longer timeout for reliability
+                        ssl='require',
+                        max_inactive_connection_lifetime=60  # Close idle connections faster
+                    )
+                    await self._create_tables_postgres()
+                    logger.info("PostgreSQL connected and tables created!")
+                    return
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"PostgreSQL connection attempt {attempt + 1}/{max_retries} failed: {e}")
+                    
+                    if "Max client connections" in error_msg:
+                        # Wait before retry - connections might be released
+                        wait_time = (attempt + 1) * 3  # 3, 6, 9, 12, 15 seconds
+                        logger.info(f"Max connections reached, waiting {wait_time}s before retry...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    
+                    # SSL error - try without explicit SSL
+                    if ("SSL" in error_msg or "terminal" in error_msg) and attempt == 0:
+                        try:
+                            logger.info("Retrying without explicit SSL requirement...")
+                            self._pool = await asyncpg.create_pool(
+                                dsn=db_url,
+                                min_size=2,
+                                max_size=10,
+                                command_timeout=30,
+                                max_inactive_connection_lifetime=60
+                            )
+                            await self._create_tables_postgres()
+                            logger.info("PostgreSQL connected (No SSL)!")
+                            return
+                        except Exception as e2:
+                            logger.error(f"PostgreSQL retry without SSL failed: {e2}")
+                    
+                    if attempt == max_retries - 1:
+                        raise
+                    
+                    await asyncio.sleep(2)
         else:
             # SQLite (Local development)
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
