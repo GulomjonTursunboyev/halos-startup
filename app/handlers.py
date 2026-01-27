@@ -6146,7 +6146,10 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("📈 Faollik", callback_data="admin_activity")
         ],
         [
-            InlineKeyboardButton("📤 Xabar yuborish", callback_data="admin_broadcast"),
+            InlineKeyboardButton("� Eslatma yuborish", callback_data="admin_send_reminders"),
+            InlineKeyboardButton("📤 Broadcast", callback_data="admin_broadcast")
+        ],
+        [
             InlineKeyboardButton("⚙️ Sozlamalar", callback_data="admin_settings")
         ]
     ]
@@ -6539,6 +6542,180 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         await query.edit_message_text(
             message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== ESLATMA YUBORISH ====================
+    if query.data == "admin_send_reminders":
+        from app.scheduler import get_debts_due_today, get_debts_due_soon
+        
+        db = await get_database()
+        
+        # Bugungi qarzlar
+        today_debts = await get_debts_due_today(db)
+        # Yaqinlashayotgan qarzlar (3 kun)
+        upcoming_debts = await get_debts_due_soon(db, days=3)
+        
+        message = (
+            "🔔 *QARZ ESLATMALARI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            f"📅 *Bugungi qarzlar:* {len(today_debts)} ta\n"
+            f"⏰ *Yaqinlashayotgan (3 kun):* {len(upcoming_debts)} ta\n\n"
+        )
+        
+        if today_debts:
+            message += "*Bugungi qarzlar:*\n"
+            for d in today_debts[:5]:
+                d = dict(d)
+                message += f"├ {d.get('person_name')}: {d.get('amount'):,.0f} so'm\n"
+            if len(today_debts) > 5:
+                message += f"└ _...va yana {len(today_debts) - 5} ta_\n"
+            message += "\n"
+        
+        message += "Eslatmalarni hozir yuborish uchun tugmani bosing:"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔔 Hozir yuborish", callback_data="admin_trigger_reminders")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== ESLATMALARNI TRIGGER QILISH ====================
+    if query.data == "admin_trigger_reminders":
+        from app.scheduler import get_debts_due_today, get_scheduler
+        
+        await query.edit_message_text(
+            "⏳ Eslatmalar yuborilmoqda...",
+            parse_mode="Markdown"
+        )
+        
+        db = await get_database()
+        today_debts = await get_debts_due_today(db)
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for debt in today_debts:
+            try:
+                debt = dict(debt)
+                lang = debt.get("language", "uz")
+                person = debt.get("person_name", "Noma'lum")
+                amount = debt.get("amount", 0)
+                debt_type = debt.get("debt_type")
+                debt_id = debt.get("id")
+                description = debt.get("description", "")
+                
+                # Valyuta formatlash
+                currency = debt.get("currency", "UZS")
+                if currency == "USD":
+                    amount_str = f"${amount:,.0f}"
+                elif currency == "RUB":
+                    amount_str = f"₽{amount:,.0f}"
+                else:
+                    amount_str = f"{amount:,.0f} so'm"
+                
+                if lang == "uz":
+                    if debt_type == "lent":
+                        msg = (
+                            "🔔 *BUGUN QARZ QAYTISH KUNI!*\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            f"👤 *{person}* sizga qarz qaytarishi kerak\n\n"
+                            f"💰 Summa: *{amount_str}*\n"
+                            f"📅 Sana: *Bugun*\n"
+                        )
+                    else:
+                        msg = (
+                            "⚠️ *BUGUN QARZ QAYTARISH KUNI!*\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            f"👤 *{person}*ga qarz qaytarishingiz kerak\n\n"
+                            f"💰 Summa: *{amount_str}*\n"
+                            f"📅 Sana: *Bugun*\n"
+                        )
+                else:
+                    if debt_type == "lent":
+                        msg = (
+                            "🔔 *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            f"👤 *{person}* должен вернуть вам долг\n\n"
+                            f"💰 Сумма: *{amount_str}*\n"
+                            f"📅 Дата: *Сегодня*\n"
+                        )
+                    else:
+                        msg = (
+                            "⚠️ *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
+                            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            f"👤 Вы должны вернуть долг *{person}*\n\n"
+                            f"💰 Сумма: *{amount_str}*\n"
+                            f"📅 Дата: *Сегодня*\n"
+                        )
+                
+                if description:
+                    if lang == "uz":
+                        msg += f"📝 Izoh: _{description}_\n"
+                    else:
+                        msg += f"📝 Заметка: _{description}_\n"
+                
+                msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                if lang == "uz":
+                    msg += "💡 _Qarz qaytarilsa, tugmani bosing_"
+                else:
+                    msg += "💡 _Нажмите кнопку когда долг вернут_"
+                
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(
+                            "✅ Qaytarildi" if lang == "uz" else "✅ Возвращён",
+                            callback_data=f"debt_reminder_returned:{debt_id}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "⏰ Ertaga eslatish" if lang == "uz" else "⏰ Напомнить завтра",
+                            callback_data=f"debt_reminder_snooze:{debt_id}"
+                        ),
+                        InlineKeyboardButton(
+                            "📋 Qarzlar" if lang == "uz" else "📋 Долги",
+                            callback_data="ai_debt_list"
+                        )
+                    ]
+                ])
+                
+                await context.bot.send_message(
+                    chat_id=debt["telegram_id"],
+                    text=msg,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard
+                )
+                sent_count += 1
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Error sending reminder: {e}")
+                failed_count += 1
+        
+        result_message = (
+            "✅ *ESLATMALAR YUBORILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"✅ Yuborildi: *{sent_count}* ta\n"
+            f"❌ Xato: *{failed_count}* ta\n\n"
+            f"⏰ _{now_uz().strftime('%H:%M:%S')}_"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            result_message,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )

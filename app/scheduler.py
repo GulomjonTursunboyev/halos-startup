@@ -47,6 +47,9 @@ class ProCareScheduler:
         self._running = True
         logger.info("Starting PRO Care Scheduler...")
         
+        # Bot ishga tushganda o'tkazib yuborilgan eslatmalarni tekshirish
+        await self._check_missed_debt_reminders()
+        
         # Start background tasks
         self._tasks = [
             asyncio.create_task(self._inactive_users_job()),
@@ -59,6 +62,132 @@ class ProCareScheduler:
         ]
         
         logger.info("PRO Care Scheduler started with 7 jobs")
+    
+    async def _check_missed_debt_reminders(self):
+        """
+        Bot ishga tushganda o'tkazib yuborilgan qarz eslatmalarini tekshirish
+        Agar bugun qaytarish sanasi bo'lgan qarzlar bo'lsa va hali eslatma yuborilmagan bo'lsa, yuborish
+        """
+        try:
+            logger.info("Checking for missed debt reminders on startup...")
+            now = now_uz()
+            
+            # Faqat 7:00 dan keyin tekshirish (6:00 da yuborilishi kerak edi)
+            if now.hour >= 7:
+                db = await get_database()
+                
+                # Bugungi qarzlarni olish
+                today_debts = await get_debts_due_today(db)
+                
+                if today_debts:
+                    logger.info(f"Found {len(today_debts)} debts due today, sending missed reminders...")
+                    
+                    for debt in today_debts:
+                        try:
+                            await self._send_debt_reminder(debt, is_today=True)
+                            await asyncio.sleep(0.5)
+                        except Exception as e:
+                            logger.error(f"Error sending missed reminder: {e}")
+                    
+                    logger.info(f"Sent {len(today_debts)} missed debt reminders")
+                else:
+                    logger.info("No debts due today")
+        except Exception as e:
+            logger.error(f"Error checking missed debt reminders: {e}")
+    
+    async def _send_debt_reminder(self, debt: Dict[str, Any], is_today: bool = True):
+        """Qarz eslatmasini yuborish - umumiy funksiya"""
+        lang = debt.get("language", "uz")
+        person = debt.get("person_name", "Noma'lum")
+        amount = debt.get("amount", 0)
+        debt_type = debt.get("debt_type")
+        debt_id = debt.get("id")
+        description = debt.get("description", "")
+        
+        # Valyuta formatlash
+        currency = debt.get("currency", "UZS")
+        if currency == "USD":
+            amount_str = f"${amount:,.0f}"
+        elif currency == "RUB":
+            amount_str = f"₽{amount:,.0f}"
+        else:
+            amount_str = f"{amount:,.0f} so'm"
+        
+        if is_today:
+            # Bugungi qarz
+            if lang == "uz":
+                if debt_type == "lent":
+                    message = (
+                        "🔔 *BUGUN QARZ QAYTISH KUNI!*\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"👤 *{person}* sizga qarz qaytarishi kerak\n\n"
+                        f"💰 Summa: *{amount_str}*\n"
+                        f"📅 Sana: *Bugun*\n"
+                    )
+                else:
+                    message = (
+                        "⚠️ *BUGUN QARZ QAYTARISH KUNI!*\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"👤 *{person}*ga qarz qaytarishingiz kerak\n\n"
+                        f"💰 Summa: *{amount_str}*\n"
+                        f"📅 Sana: *Bugun*\n"
+                    )
+            else:
+                if debt_type == "lent":
+                    message = (
+                        "🔔 *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"👤 *{person}* должен вернуть вам долг\n\n"
+                        f"💰 Сумма: *{amount_str}*\n"
+                        f"📅 Дата: *Сегодня*\n"
+                    )
+                else:
+                    message = (
+                        "⚠️ *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"👤 Вы должны вернуть долг *{person}*\n\n"
+                        f"💰 Сумма: *{amount_str}*\n"
+                        f"📅 Дата: *Сегодня*\n"
+                    )
+            
+            if description:
+                if lang == "uz":
+                    message += f"📝 Izoh: _{description}_\n"
+                else:
+                    message += f"📝 Заметка: _{description}_\n"
+            
+            message += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            if lang == "uz":
+                message += "💡 _Qarz qaytarilsa, tugmani bosing_"
+            else:
+                message += "💡 _Нажмите кнопку когда долг вернут_"
+        
+        # Tugmalar
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "✅ Qaytarildi" if lang == "uz" else "✅ Возвращён",
+                    callback_data=f"debt_reminder_returned:{debt_id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "⏰ Ertaga eslatish" if lang == "uz" else "⏰ Напомнить завтра",
+                    callback_data=f"debt_reminder_snooze:{debt_id}"
+                ),
+                InlineKeyboardButton(
+                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                    callback_data="ai_debt_list"
+                )
+            ]
+        ])
+        
+        await self.bot.send_message(
+            chat_id=debt["telegram_id"],
+            text=message,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
     
     async def stop(self):
         """Stop all scheduled jobs"""
