@@ -72,26 +72,25 @@ class ProCareScheduler:
             logger.info("Checking for missed debt reminders on startup...")
             now = now_uz()
             
-            # Faqat 7:00 dan keyin tekshirish (6:00 da yuborilishi kerak edi)
-            if now.hour >= 7:
-                db = await get_database()
+            # Bot ishga tushganda darhol bugungi qarzlar uchun eslatma yuborish
+            db = await get_database()
+            
+            # Bugungi qarzlarni olish
+            today_debts = await get_debts_due_today(db)
+            
+            if today_debts:
+                logger.info(f"Found {len(today_debts)} debts due today, sending reminders on startup...")
                 
-                # Bugungi qarzlarni olish
-                today_debts = await get_debts_due_today(db)
+                for debt in today_debts:
+                    try:
+                        await self._send_debt_reminder(debt, is_today=True)
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        logger.error(f"Error sending reminder: {e}")
                 
-                if today_debts:
-                    logger.info(f"Found {len(today_debts)} debts due today, sending missed reminders...")
-                    
-                    for debt in today_debts:
-                        try:
-                            await self._send_debt_reminder(debt, is_today=True)
-                            await asyncio.sleep(0.5)
-                        except Exception as e:
-                            logger.error(f"Error sending missed reminder: {e}")
-                    
-                    logger.info(f"Sent {len(today_debts)} missed debt reminders")
-                else:
-                    logger.info("No debts due today")
+                logger.info(f"Sent {len(today_debts)} debt reminders on startup")
+            else:
+                logger.info("No debts due today")
         except Exception as e:
             logger.error(f"Error checking missed debt reminders: {e}")
     
