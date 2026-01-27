@@ -117,14 +117,23 @@ logger = logging.getLogger(__name__)
 
 async def post_init(application: Application) -> None:
     """Initialize database and scheduler after application starts"""
+    logger.info("=" * 50)
+    logger.info("POST_INIT CALLED - Initializing services...")
+    logger.info("=" * 50)
+    
     logger.info("Initializing database...")
     await get_database()
     logger.info("Database initialized successfully")
     
     # Start PRO care scheduler
     logger.info("Starting PRO Care Scheduler...")
-    await start_scheduler(application.bot)
-    logger.info("PRO Care Scheduler started")
+    try:
+        await start_scheduler(application.bot)
+        logger.info("PRO Care Scheduler started successfully!")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 async def post_shutdown(application: Application) -> None:
@@ -478,6 +487,15 @@ def main() -> None:
                 drop_pending_updates=True,
                 poll_interval=0.0,
             )
+            
+            # Start PRO Care Scheduler (debt reminders, notifications, etc.)
+            try:
+                from app.scheduler import get_scheduler
+                scheduler = await get_scheduler(application.bot)
+                await scheduler.start()
+                logger.info("PRO Care Scheduler started successfully")
+            except Exception as e:
+                logger.error(f"Failed to start scheduler: {e}")
             
             logger.info("Bot is running with webhook server! Press Ctrl+C to stop.")
             
