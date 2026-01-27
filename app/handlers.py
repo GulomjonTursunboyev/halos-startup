@@ -4088,8 +4088,9 @@ async def cancel_expense_mode_callback(update: Update, context: ContextTypes.DEF
     
     lang = context.user_data.get("lang", "uz")
     
-    # Disable expense mode
+    # Disable expense mode and clear pending transactions
     context.user_data["expense_text_mode"] = False
+    context.user_data.pop("pending_transactions", None)
     
     await query.edit_message_text(
         "✅ Bekor qilindi" if lang == "uz" else "✅ Отменено",
@@ -4098,14 +4099,16 @@ async def cancel_expense_mode_callback(update: Update, context: ContextTypes.DEF
 
 
 async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle text messages for expense input when expense_text_mode is enabled"""
+    """
+    UNIVERSAL TEXT HANDLER - Har qanday matnni AI tahlil qiladi
     
-    # Check if expense mode is enabled
-    if not context.user_data.get("expense_text_mode"):
-        return
+    Tugmasiz ishlaydi - foydalanuvchi istalgan matn yozsa:
+    1. AI tahlil qiladi (summa, kategoriya, daromad/xarajat)
+    2. Natijani ko'rsatadi
+    3. Tasdiqlash yoki o'zgartirish imkoniyatini beradi
+    """
     
     telegram_id = update.effective_user.id
-    lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
     # Skip if it's a menu button
@@ -4113,36 +4116,43 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         if text in button_texts:
             return
     
-    logger.info(f"[TEXT_EXPENSE] User {telegram_id} sent: '{text}'")
+    # Skip commands
+    if text.startswith('/'):
+        return
+    
+    # Skip very short texts (less than 3 chars)
+    if len(text.strip()) < 3:
+        return
+    
+    lang = context.user_data.get("lang") or await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
     
     db = await get_database()
     user = await db.get_user(telegram_id)
     
-    if not user:
+    if not user or not user.get("phone_number"):
         return
     
     # Import AI functions
     from app.ai_assistant import (
-        parse_multiple_transactions, save_multiple_transactions,
-        format_multiple_transactions_message,
-        EXPENSE_CATEGORIES, INCOME_CATEGORIES
+        parse_multiple_transactions,
+        EXPENSE_CATEGORIES, INCOME_CATEGORIES,
+        extract_amount
     )
+    
+    # Quick check - does text contain any amount-like content?
+    amount = extract_amount(text)
+    if not amount:
+        # No amount found - not a transaction, ignore silently
+        return
+    
+    logger.info(f"[SMART_INPUT] User {telegram_id} sent potential transaction: '{text}'")
     
     # Show processing message
     if lang == "uz":
-        processing_text = (
-            "🤖 *AI tahlil qilmoqda...*\n\n"
-            "⏳ Matn tahlil qilinmoqda...\n"
-            "🔍 Summalar aniqlanmoqda...\n"
-            "📁 Kategoriyalar tanlanmoqda..."
-        )
+        processing_text = "🤖 *AI tahlil qilmoqda...*"
     else:
-        processing_text = (
-            "🤖 *AI анализирует...*\n\n"
-            "⏳ Анализ текста...\n"
-            "🔍 Определение сумм...\n"
-            "📁 Выбор категорий..."
-        )
+        processing_text = "🤖 *AI анализирует...*"
     
     processing_msg = await update.message.reply_text(
         processing_text,
@@ -4150,70 +4160,578 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     
     try:
-        # Parse multiple transactions from text
+        # Parse transactions from text
         transactions = await parse_multiple_transactions(text, lang)
         
         if not transactions:
-            if lang == "uz":
-                error_msg = (
-                    "❌ *Xarajat topilmadi*\n\n"
-                    "Matnda summa aniqlanmadi.\n\n"
-                    "📝 *Misol:*\n"
-                    "• `50 ming ovqatga`\n"
-                    "• `100000 taksiga`\n"
-                    "• `2 mln kredit`"
-                )
-            else:
-                error_msg = (
-                    "❌ *Расход не найден*\n\n"
-                    "В тексте не определена сумма.\n\n"
-                    "📝 *Пример:*\n"
-                    "• `50 тысяч на еду`\n"
-                    "• `100000 на такси`\n"
-                    "• `2 млн кредит`"
-                )
-            
-            await processing_msg.edit_text(error_msg, parse_mode="Markdown")
+            # Could not parse - delete processing message silently
+            try:
+                await processing_msg.delete()
+            except:
+                pass
             return
         
-        # Save transactions
-        tx_ids = await save_multiple_transactions(db, user["id"], transactions)
+        # Store pending transactions for confirmation
+        context.user_data["pending_transactions"] = transactions
+        context.user_data["pending_original_text"] = text
         
-        # Get budget status
-        from app.ai_assistant import get_user_budget_status
-        budget_status = await get_user_budget_status(db, user["id"])
+        # Format preview message
+        if lang == "uz":
+            msg = "🤖 *AI TAHLIL NATIJASI*\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            total_expense = 0
+            total_income = 0
+            
+            for i, tx in enumerate(transactions, 1):
+                if tx["type"] == "income":
+                    emoji = "📥"
+                    type_name = "Daromad"
+                    total_income += tx["amount"]
+                else:
+                    emoji = "📤"
+                    type_name = "Xarajat"
+                    total_expense += tx["amount"]
+                
+                msg += f"{emoji} *#{i} {type_name}*\n"
+                msg += f"├ Summa: *{format_number(tx['amount'])} so'm*\n"
+                msg += f"├ Kategoriya: {tx['category_name']}\n"
+                if tx.get('description'):
+                    msg += f"└ Tavsif: _{tx['description'][:30]}_\n"
+                msg += "\n"
+            
+            msg += "━━━━━━━━━━━━━━━━━━━━\n"
+            if total_income > 0:
+                msg += f"📥 Jami daromad: *{format_number(total_income)} so'm*\n"
+            if total_expense > 0:
+                msg += f"📤 Jami xarajat: *{format_number(total_expense)} so'm*\n"
+            msg += "\n"
+            msg += "👇 *To'g'rimi?*"
+        else:
+            msg = "🤖 *РЕЗУЛЬТАТ AI АНАЛИЗА*\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            total_expense = 0
+            total_income = 0
+            
+            for i, tx in enumerate(transactions, 1):
+                if tx["type"] == "income":
+                    emoji = "📥"
+                    type_name = "Доход"
+                    total_income += tx["amount"]
+                else:
+                    emoji = "📤"
+                    type_name = "Расход"
+                    total_expense += tx["amount"]
+                
+                msg += f"{emoji} *#{i} {type_name}*\n"
+                msg += f"├ Сумма: *{format_number(tx['amount'])} сум*\n"
+                msg += f"├ Категория: {tx['category_name']}\n"
+                if tx.get('description'):
+                    msg += f"└ Описание: _{tx['description'][:30]}_\n"
+                msg += "\n"
+            
+            msg += "━━━━━━━━━━━━━━━━━━━━\n"
+            if total_income > 0:
+                msg += f"📥 Всего доход: *{format_number(total_income)} сум*\n"
+            if total_expense > 0:
+                msg += f"📤 Всего расход: *{format_number(total_expense)} сум*\n"
+            msg += "\n"
+            msg += "👇 *Верно?*"
         
-        # Format success message
-        result_msg = format_multiple_transactions_message(transactions, budget_status, lang)
-        
-        # Add keyboard for more actions
+        # Create confirmation keyboard
         keyboard = [
-            [InlineKeyboardButton(
-                "➕ Yana qo'shish" if lang == "uz" else "➕ Добавить ещё",
-                callback_data="add_more_expense"
-            )],
-            [InlineKeyboardButton(
-                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                callback_data="show_expense_report"
-            )],
-            [InlineKeyboardButton(
-                "✅ Tayyor" if lang == "uz" else "✅ Готово",
-                callback_data="cancel_expense_mode"
-            )]
+            [
+                InlineKeyboardButton(
+                    "✅ Ha, saqlash" if lang == "uz" else "✅ Да, сохранить",
+                    callback_data="confirm_transaction_save"
+                ),
+                InlineKeyboardButton(
+                    "✏️ O'zgartirish" if lang == "uz" else "✏️ Изменить",
+                    callback_data="edit_pending_transaction"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🔄 Turni almashtirish" if lang == "uz" else "🔄 Поменять тип",
+                    callback_data="swap_pending_type"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
+                    callback_data="cancel_pending_transaction"
+                )
+            ]
         ]
         
         await processing_msg.edit_text(
-            result_msg,
+            msg,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
     except Exception as e:
-        logger.error(f"[TEXT_EXPENSE] Error: {e}")
-        await processing_msg.edit_text(
-            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка",
-            parse_mode="Markdown"
+        logger.error(f"[SMART_INPUT] Error: {e}")
+        try:
+            await processing_msg.delete()
+        except:
+            pass
+
+
+async def confirm_transaction_save_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Confirm and save pending transactions"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    transactions = context.user_data.get("pending_transactions")
+    if not transactions:
+        await query.edit_message_text(
+            "❌ Ma'lumot topilmadi" if lang == "uz" else "❌ Данные не найдены"
         )
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Save transactions
+    from app.ai_assistant import save_multiple_transactions, get_user_budget_status
+    
+    tx_ids = await save_multiple_transactions(db, user["id"], transactions)
+    
+    # Clear pending
+    context.user_data.pop("pending_transactions", None)
+    context.user_data.pop("pending_original_text", None)
+    
+    # Get budget status
+    budget_status = await get_user_budget_status(db, user["id"])
+    
+    # Success message
+    if lang == "uz":
+        msg = "✅ *SAQLANDI!*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        for i, tx in enumerate(transactions, 1):
+            emoji = "📥" if tx["type"] == "income" else "📤"
+            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])} so'm*\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"📊 *Bugun:*\n"
+        msg += f"├ Daromad: {format_number(budget_status.get('today_income', 0))} so'm\n"
+        msg += f"├ Xarajat: {format_number(budget_status.get('today_expense', 0))} so'm\n"
+        msg += f"└ Balans: {format_number(budget_status.get('today_balance', 0))} so'm"
+    else:
+        msg = "✅ *СОХРАНЕНО!*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        for i, tx in enumerate(transactions, 1):
+            emoji = "📥" if tx["type"] == "income" else "📤"
+            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])} сум*\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"📊 *Сегодня:*\n"
+        msg += f"├ Доход: {format_number(budget_status.get('today_income', 0))} сум\n"
+        msg += f"├ Расход: {format_number(budget_status.get('today_expense', 0))} сум\n"
+        msg += f"└ Баланс: {format_number(budget_status.get('today_balance', 0))} сум"
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+async def cancel_pending_transaction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel pending transaction"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Clear pending
+    context.user_data.pop("pending_transactions", None)
+    context.user_data.pop("pending_original_text", None)
+    
+    await query.edit_message_text(
+        "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+    )
+
+
+async def swap_pending_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Swap transaction type (income <-> expense)"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    transactions = context.user_data.get("pending_transactions")
+    if not transactions:
+        return
+    
+    from app.ai_assistant import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    # Swap types for all transactions
+    for tx in transactions:
+        if tx["type"] == "income":
+            tx["type"] = "expense"
+            # Change category
+            if tx["category"] in INCOME_CATEGORIES.get("uz", {}):
+                tx["category"] = "boshqa"
+            tx["category_name"] = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(tx["category"], "📦 Boshqa")
+        else:
+            tx["type"] = "income"
+            # Change category
+            if tx["category"] in EXPENSE_CATEGORIES.get("uz", {}):
+                tx["category"] = "boshqa"
+            tx["category_name"] = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(tx["category"], "📦 Boshqa")
+    
+    context.user_data["pending_transactions"] = transactions
+    
+    # Rebuild preview message
+    if lang == "uz":
+        msg = "🔄 *TUR ALMASHTIRILDI*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, tx in enumerate(transactions, 1):
+            if tx["type"] == "income":
+                emoji = "📥"
+                type_name = "Daromad"
+                total_income += tx["amount"]
+            else:
+                emoji = "📤"
+                type_name = "Xarajat"
+                total_expense += tx["amount"]
+            
+            msg += f"{emoji} *#{i} {type_name}*\n"
+            msg += f"├ Summa: *{format_number(tx['amount'])} so'm*\n"
+            msg += f"└ Kategoriya: {tx['category_name']}\n\n"
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "👇 *To'g'rimi?*"
+    else:
+        msg = "🔄 *ТИП ИЗМЕНЁН*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, tx in enumerate(transactions, 1):
+            if tx["type"] == "income":
+                emoji = "📥"
+                type_name = "Доход"
+                total_income += tx["amount"]
+            else:
+                emoji = "📤"
+                type_name = "Расход"
+                total_expense += tx["amount"]
+            
+            msg += f"{emoji} *#{i} {type_name}*\n"
+            msg += f"├ Сумма: *{format_number(tx['amount'])} сум*\n"
+            msg += f"└ Категория: {tx['category_name']}\n\n"
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "👇 *Верно?*"
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ Ha, saqlash" if lang == "uz" else "✅ Да, сохранить",
+                callback_data="confirm_transaction_save"
+            ),
+            InlineKeyboardButton(
+                "✏️ O'zgartirish" if lang == "uz" else "✏️ Изменить",
+                callback_data="edit_pending_transaction"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔄 Turni almashtirish" if lang == "uz" else "🔄 Поменять тип",
+                callback_data="swap_pending_type"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
+                callback_data="cancel_pending_transaction"
+            )
+        ]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def edit_pending_transaction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show options to edit pending transaction"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    transactions = context.user_data.get("pending_transactions")
+    if not transactions:
+        return
+    
+    # Show edit options
+    if lang == "uz":
+        msg = "✏️ *TAHRIRLASH*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg += "Qaysi tranzaksiyani tahrirlash kerak?\n\n"
+    else:
+        msg = "✏️ *РЕДАКТИРОВАНИЕ*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg += "Какую транзакцию редактировать?\n\n"
+    
+    keyboard = []
+    
+    for i, tx in enumerate(transactions):
+        emoji = "📥" if tx["type"] == "income" else "📤"
+        btn_text = f"{emoji} #{i+1}: {format_number(tx['amount'])} - {tx['category_name']}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"edit_tx_{i}")])
+    
+    keyboard.append([
+        InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_pending_preview"
+        )
+    ])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def edit_single_tx_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Edit a single transaction - show category options"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Get transaction index
+    tx_index = int(query.data.replace("edit_tx_", ""))
+    context.user_data["editing_tx_index"] = tx_index
+    
+    transactions = context.user_data.get("pending_transactions")
+    if not transactions or tx_index >= len(transactions):
+        return
+    
+    tx = transactions[tx_index]
+    
+    from app.ai_assistant import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    # Show category selection
+    if lang == "uz":
+        msg = f"✏️ *KATEGORIYA TANLANG*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg += f"💰 Summa: *{format_number(tx['amount'])} so'm*\n\n"
+    else:
+        msg = f"✏️ *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg += f"💰 Сумма: *{format_number(tx['amount'])} сум*\n\n"
+    
+    keyboard = []
+    
+    # Show expense categories first, then income
+    if lang == "uz":
+        msg += "📤 *Xarajat kategoriyalari:*\n"
+    else:
+        msg += "📤 *Категории расходов:*\n"
+    
+    expense_cats = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
+    row = []
+    for cat_key, cat_name in expense_cats.items():
+        btn = InlineKeyboardButton(cat_name, callback_data=f"set_cat_expense_{cat_key}")
+        row.append(btn)
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    
+    # Separator
+    keyboard.append([InlineKeyboardButton("━━━━━━━━━━━━", callback_data="noop")])
+    
+    if lang == "uz":
+        msg += "\n📥 *Daromad kategoriyalari:*\n"
+    else:
+        msg += "\n📥 *Категории доходов:*\n"
+    
+    income_cats = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"])
+    row = []
+    for cat_key, cat_name in income_cats.items():
+        btn = InlineKeyboardButton(cat_name, callback_data=f"set_cat_income_{cat_key}")
+        row.append(btn)
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    
+    keyboard.append([
+        InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="edit_pending_transaction"
+        )
+    ])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def set_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set category for a transaction"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Parse callback data: set_cat_expense_oziq_ovqat or set_cat_income_ish_haqi
+    data = query.data.replace("set_cat_", "")
+    parts = data.split("_", 1)
+    tx_type = parts[0]  # expense or income
+    category = parts[1] if len(parts) > 1 else "boshqa"
+    
+    tx_index = context.user_data.get("editing_tx_index", 0)
+    transactions = context.user_data.get("pending_transactions")
+    
+    if not transactions or tx_index >= len(transactions):
+        return
+    
+    from app.ai_assistant import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    # Update transaction
+    transactions[tx_index]["type"] = tx_type
+    transactions[tx_index]["category"] = category
+    
+    if tx_type == "income":
+        transactions[tx_index]["category_name"] = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+    else:
+        transactions[tx_index]["category_name"] = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+    
+    context.user_data["pending_transactions"] = transactions
+    
+    # Go back to preview
+    await back_to_pending_preview_callback(update, context)
+
+
+async def back_to_pending_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Go back to pending transactions preview"""
+    query = update.callback_query
+    if query.data != "noop":
+        await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    transactions = context.user_data.get("pending_transactions")
+    if not transactions:
+        return
+    
+    # Rebuild preview message
+    if lang == "uz":
+        msg = "🤖 *AI TAHLIL NATIJASI*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, tx in enumerate(transactions, 1):
+            if tx["type"] == "income":
+                emoji = "📥"
+                type_name = "Daromad"
+                total_income += tx["amount"]
+            else:
+                emoji = "📤"
+                type_name = "Xarajat"
+                total_expense += tx["amount"]
+            
+            msg += f"{emoji} *#{i} {type_name}*\n"
+            msg += f"├ Summa: *{format_number(tx['amount'])} so'm*\n"
+            msg += f"├ Kategoriya: {tx['category_name']}\n"
+            if tx.get('description'):
+                msg += f"└ Tavsif: _{tx['description'][:30]}_\n"
+            msg += "\n"
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━\n"
+        if total_income > 0:
+            msg += f"📥 Jami daromad: *{format_number(total_income)} so'm*\n"
+        if total_expense > 0:
+            msg += f"📤 Jami xarajat: *{format_number(total_expense)} so'm*\n"
+        msg += "\n👇 *To'g'rimi?*"
+    else:
+        msg = "🤖 *РЕЗУЛЬТАТ AI АНАЛИЗА*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        total_expense = 0
+        total_income = 0
+        
+        for i, tx in enumerate(transactions, 1):
+            if tx["type"] == "income":
+                emoji = "📥"
+                type_name = "Доход"
+                total_income += tx["amount"]
+            else:
+                emoji = "📤"
+                type_name = "Расход"
+                total_expense += tx["amount"]
+            
+            msg += f"{emoji} *#{i} {type_name}*\n"
+            msg += f"├ Сумма: *{format_number(tx['amount'])} сум*\n"
+            msg += f"├ Категория: {tx['category_name']}\n"
+            if tx.get('description'):
+                msg += f"└ Описание: _{tx['description'][:30]}_\n"
+            msg += "\n"
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━\n"
+        if total_income > 0:
+            msg += f"📥 Всего доход: *{format_number(total_income)} сум*\n"
+        if total_expense > 0:
+            msg += f"📤 Всего расход: *{format_number(total_expense)} сум*\n"
+        msg += "\n👇 *Верно?*"
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ Ha, saqlash" if lang == "uz" else "✅ Да, сохранить",
+                callback_data="confirm_transaction_save"
+            ),
+            InlineKeyboardButton(
+                "✏️ O'zgartirish" if lang == "uz" else "✏️ Изменить",
+                callback_data="edit_pending_transaction"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔄 Turni almashtirish" if lang == "uz" else "🔄 Поменять тип",
+                callback_data="swap_pending_type"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
+                callback_data="cancel_pending_transaction"
+            )
+        ]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def add_more_expense_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

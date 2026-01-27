@@ -41,6 +41,14 @@ from app.handlers import (
     cancel_expense_mode_callback,
     add_more_expense_callback,
     show_expense_report_callback,
+    # NEW: Transaction confirmation/edit handlers
+    confirm_transaction_save_callback,
+    cancel_pending_transaction_callback,
+    swap_pending_type_callback,
+    edit_pending_transaction_callback,
+    edit_single_tx_callback,
+    set_category_callback,
+    back_to_pending_preview_callback,
     debt_plan_free_callback,
     debt_plan_pro_callback,
     # menu_mode_callback - now handled by ConversationHandler
@@ -290,6 +298,29 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(show_expense_report_callback, pattern="^show_expense_report$")
+    )
+    
+    # Transaction confirmation/edit callbacks (SMART INPUT)
+    application.add_handler(
+        CallbackQueryHandler(confirm_transaction_save_callback, pattern="^confirm_transaction_save$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(cancel_pending_transaction_callback, pattern="^cancel_pending_transaction$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(swap_pending_type_callback, pattern="^swap_pending_type$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(edit_pending_transaction_callback, pattern="^edit_pending_transaction$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(edit_single_tx_callback, pattern="^edit_tx_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(set_category_callback, pattern="^set_cat_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(back_to_pending_preview_callback, pattern="^back_to_pending_preview$")
     )
     
     # NOTE: mode_solo/mode_family callbacks are now handled by ConversationHandler entry_points
