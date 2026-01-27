@@ -236,7 +236,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ==================== LANGUAGE SELECTION ====================
 
 async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle language selection"""
+    """Handle language selection - then start financial profile setup"""
     query = update.callback_query
     await query.answer()
     
@@ -256,24 +256,57 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except:
         pass
     
-    # Registration complete - show main menu
+    # Registration complete - NOW ASK FOR MODE SELECTION
     welcome_msg = (
         "✅ *Ro'yxatdan muvaffaqiyatli o'tdingiz!*\n\n"
-        "Endi quyidagi menyudan foydalanishingiz mumkin 👇"
+        "Keling, sizning moliyaviy holatgizni bilib olaylik.\n"
+        "Bu sizga kreditlaringizni tezroq to'lab tugatishga yordam beradi! 💪"
     ) if lang == "uz" else (
         "✅ *Вы успешно зарегистрированы!*\n\n"
-        "Теперь вы можете использовать меню ниже 👇"
+        "Давайте узнаем вашу финансовую ситуацию.\n"
+        "Это поможет вам быстрее погасить кредиты! 💪"
     )
     
     chat_id = update.effective_chat.id
     await context.bot.send_message(
         chat_id=chat_id,
         text=welcome_msg,
-        parse_mode="Markdown",
-        reply_markup=get_main_menu_keyboard(lang)
+        parse_mode="Markdown"
     )
     
-    return ConversationHandler.END
+    # Ask for mode selection
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "👤 Yolg'iz" if lang == "uz" else "👤 Один",
+                callback_data="mode_solo"
+            ),
+            InlineKeyboardButton(
+                "👨‍👩‍👧 Oila" if lang == "uz" else "👨‍👩‍👧 Семья",
+                callback_data="mode_family"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    mode_msg = (
+        "📊 *Qanday rejalashtirmoqchisiz?*\n\n"
+        "👤 *Yolg'iz* - faqat o'zingizning moliyangiz\n"
+        "👨‍👩‍👧 *Oila* - oila a'zolari bilan birgalikda"
+    ) if lang == "uz" else (
+        "📊 *Как вы планируете?*\n\n"
+        "👤 *Один* - только ваши финансы\n"
+        "👨‍👩‍👧 *Семья* - вместе с семьей"
+    )
+    
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=mode_msg,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.MODE
 
 
 # ==================== MODE SELECTION ====================
@@ -293,15 +326,12 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await db.update_user(telegram_id, mode=mode)
     
     # Confirm mode
+    chat_id = update.effective_chat.id
+    
     if mode == "solo":
-        mode_msg = await query.edit_message_text(get_message("mode_set_solo", lang))
+        await query.edit_message_text(get_message("mode_set_solo", lang))
     else:
-        mode_msg = await query.edit_message_text(get_message("mode_set_family", lang))
-    try:
-        await asyncio.sleep(1)
-        await mode_msg.delete()
-    except:
-        pass
+        await query.edit_message_text(get_message("mode_set_family", lang))
     
     # NEW 7-STEP UX: Start with Step 1 - LOAN PAYMENT
     keyboard = [
@@ -309,8 +339,9 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("input_loan_payment", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_loan_payment", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -1085,13 +1116,15 @@ async def quick_partner_income_callback(update: Update, context: ContextTypes.DE
         return await calculate_and_show_results_from_callback(update, context)
     
     # OLD FLOW: Add quick button for own home
+    chat_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("input_rent", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_rent", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -1148,6 +1181,7 @@ async def quick_rent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     lang = context.user_data.get("lang", "uz")
     
     context.user_data["rent"] = 0
+    chat_id = update.effective_chat.id
     
     await query.edit_message_text(
         get_message("cost_saved", lang).format(amount="0")
@@ -1163,8 +1197,9 @@ async def quick_rent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("input_utilities", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_utilities", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -1221,13 +1256,15 @@ async def quick_kindergarten_callback(update: Update, context: ContextTypes.DEFA
     )
     
     # Go to Step 4: Rent
+    chat_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton(get_message("btn_own_home", lang), callback_data="quick_rent_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("input_rent", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_rent", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -1286,13 +1323,15 @@ async def quick_utilities_callback(update: Update, context: ContextTypes.DEFAULT
     )
     
     # Go to Step 6: Mandatory expenses (then calculate)
+    chat_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton(get_message("btn_no_mandatory", lang), callback_data="quick_mandatory_0")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("input_mandatory_expenses", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_mandatory_expenses", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -1336,16 +1375,18 @@ async def quick_mandatory_callback(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     
     lang = context.user_data.get("lang", "uz")
+    chat_id = update.effective_chat.id
     
     context.user_data["mandatory_expenses"] = 0
     
-    await query.message.reply_text(
+    await query.edit_message_text(
         get_message("cost_saved", lang).format(amount=format_number(0))
     )
     
     # Step 7: Ask for INCOME (final step before calculate)
-    await query.message.reply_text(
-        get_message("input_income_self", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_income_self", lang),
         parse_mode="Markdown"
     )
     
@@ -1562,7 +1603,7 @@ async def katm_skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # ==================== LOAN INPUT ====================
 
 async def loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle monthly loan payment input"""
+    """Handle monthly loan payment input - Step 1/8"""
     lang = context.user_data.get("lang", "uz")
     text = update.message.text
     
@@ -1581,10 +1622,23 @@ async def loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         get_message("debt_saved", lang)
     )
     
-    # If no loan payment, skip total debt
+    # If no loan payment, skip total debt and go to Step 3 (other debts)
     if amount == 0:
         context.user_data["total_debt"] = 0
-        return await calculate_and_show_results(update, context)
+        
+        # Go to Step 3: Other debts (personal loans)
+        keyboard = [
+            [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            get_message("input_kindergarten", lang),
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        
+        return States.KINDERGARTEN
     
     # Add quick button for no debt remaining
     keyboard = [
@@ -1602,11 +1656,12 @@ async def loan_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def quick_loan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle quick button for no loans"""
+    """Handle quick button for no loans - go to Step 3 (other debts)"""
     query = update.callback_query
     await query.answer()
     
     lang = context.user_data.get("lang", "uz")
+    chat_id = update.effective_chat.id
     
     context.user_data["loan_payment"] = 0
     context.user_data["total_debt"] = 0
@@ -1615,8 +1670,20 @@ async def quick_loan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         get_message("debt_saved", lang)
     )
     
-    # Go to calculation
-    return await calculate_and_show_results_from_callback(query, context)
+    # Go to Step 3: Other debts (personal loans from friends/family)
+    keyboard = [
+        [InlineKeyboardButton(get_message("btn_no_kids", lang), callback_data="quick_kindergarten_0")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_kindergarten", lang),
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KINDERGARTEN
 
 
 async def quick_debt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1625,6 +1692,7 @@ async def quick_debt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     
     lang = context.user_data.get("lang", "uz")
+    chat_id = update.effective_chat.id
     
     context.user_data["total_debt"] = 0
     
@@ -1638,8 +1706,9 @@ async def quick_debt_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(
-        get_message("input_kindergarten", lang),
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=get_message("input_kindergarten", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
