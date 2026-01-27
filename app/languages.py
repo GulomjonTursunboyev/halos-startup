@@ -1129,6 +1129,12 @@ MESSAGES = {
             "├ /help — Yordam\n"
             "└ /language — Til o'zgartirish\n\n"
             
+            "✍️ *XARAJAT KIRITISH:*\n"
+            "├ 📝 Matn: `50 ming ovqatga`\n"
+            "├ 🎙 Ovoz: aytib yuboring (PRO)\n"
+            "├ 🤖 AI avtomatik aniqlaydi\n"
+            "└ ♾️ Limit yo'q!\n\n"
+            
             "💎 *PRO IMKONIYATLAR:*\n"
             "├ 🗓 HALOS sanangiz\n"
             "├ ⚡ Tezkor qutilish rejasi\n"
@@ -1141,13 +1147,7 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
             "Savollaringiz bormi?\n"
-            "Muammoga duch keldingizmi?\n\n"
-            
-            "👇 *Bizga yozing:*\n"
-            "🔗 @halos\\_support\n\n"
-            
-            "_Ishchi kunlari 09:00-18:00_\n"
-            "_Javob vaqti: 1-2 soat ichida_"
+            "🔗 @halos\\_support"
         ),
         "ru": (
             "❓ *ЦЕНТР ПОМОЩИ HALOS*\n"
@@ -1162,6 +1162,12 @@ MESSAGES = {
             "├ /help — Помощь\n"
             "└ /language — Сменить язык\n\n"
             
+            "✍️ *ВВОД РАСХОДОВ:*\n"
+            "├ 📝 Текст: `50 тысяч на еду`\n"
+            "├ 🎙 Голос: просто скажите (PRO)\n"
+            "├ 🤖 AI определяет автоматически\n"
+            "└ ♾️ Без лимита!\n\n"
+            
             "💎 *ВОЗМОЖНОСТИ PRO:*\n"
             "├ 🗓 Дата HALOS\n"
             "├ ⚡ План быстрого выхода\n"
@@ -1174,13 +1180,7 @@ MESSAGES = {
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
             "Есть вопросы?\n"
-            "Столкнулись с проблемой?\n\n"
-            
-            "👇 *Напишите нам:*\n"
-            "🔗 @halos\\_support\n\n"
-            
-            "_Рабочие дни 09:00-18:00_\n"
-            "_Время ответа: 1-2 часа_"
+            "🔗 @halos\\_support"
         )
     },
     

@@ -36,6 +36,11 @@ from app.handlers import (
     menu_subscription_handler,
     menu_language_handler,
     menu_help_handler,
+    menu_expense_input_handler,
+    text_expense_handler,
+    cancel_expense_mode_callback,
+    add_more_expense_callback,
+    show_expense_report_callback,
     debt_plan_free_callback,
     debt_plan_pro_callback,
     # menu_mode_callback - now handled by ConversationHandler
@@ -262,6 +267,29 @@ def main() -> None:
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
         group=2
+    )
+    
+    # Expense input button handler
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(✍️ Xarajat|✍️ Расход)$"), menu_expense_input_handler),
+        group=2
+    )
+    
+    # Text expense handler (for expense_text_mode)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, text_expense_handler),
+        group=4  # Lower priority than menu handlers
+    )
+    
+    # Expense mode callbacks
+    application.add_handler(
+        CallbackQueryHandler(cancel_expense_mode_callback, pattern="^cancel_expense_mode$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(add_more_expense_callback, pattern="^add_more_expense$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(show_expense_report_callback, pattern="^show_expense_report$")
     )
     
     # NOTE: mode_solo/mode_family callbacks are now handled by ConversationHandler entry_points

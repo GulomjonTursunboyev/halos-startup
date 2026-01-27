@@ -69,13 +69,13 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Get persistent main menu keyboard"""
     if lang == "ru":
         keyboard = [
-            ["📊 Мои отчёты"],
+            ["📊 Мои отчёты", "✍️ Расход"],
             ["👤 Профиль", "💎 PRO"],
             ["🌐 Язык", "❓ Помощь"]
         ]
     else:
         keyboard = [
-            ["📊 Hisobotlarim"],
+            ["📊 Hisobotlarim", "✍️ Xarajat"],
             ["👤 Profil", "💎 PRO"],
             ["🌐 Til", "❓ Yordam"]
         ]
@@ -85,6 +85,7 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
 # Main menu button texts for matching
 MENU_BUTTONS = {
     "plan": ["📊 Hisobotlarim", "📊 Мои отчёты"],
+    "expense_input": ["✍️ Xarajat", "✍️ Расход"],
     "profile": ["👤 Profil", "👤 Профиль"],
     "subscription": ["💎 PRO", "💎 PRO"],
     "language": ["🌐 Til", "🌐 Язык"],
@@ -3992,6 +3993,304 @@ async def menu_language_handler(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(
         "🌐 Tilni tanlang / Выберите язык:",
         reply_markup=reply_markup
+    )
+
+
+# ==================== TEXT EXPENSE INPUT HANDLER ====================
+
+async def menu_expense_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle ✍️ Xarajat button - enable text expense input mode"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    # Check if user is registered
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Enable text expense mode
+    context.user_data["expense_text_mode"] = True
+    
+    if lang == "uz":
+        msg = (
+            "✍️ *MATN ORQALI XARAJAT KIRITISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🤖 *AI yordamchi matndan avtomatik aniqlaydi:*\n"
+            "• 💰 Summalarni\n"
+            "• 📁 Kategoriyalarni\n"
+            "• 📝 Tavsiflarni\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📝 *Misol xabarlar:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• `50 ming ovqatga`\n"
+            "• `100000 taksiga`\n"
+            "• `bugun 30 mingga non oldim, 50 mingga benzin quydum`\n"
+            "• `2 mln kredit to'ladim`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎯 *Qoidalar:*\n"
+            "• Bir xabarda bir nechta xarajat yozishingiz mumkin\n"
+            "• AI avtomatik ajratib oladi\n"
+            "• Limit yo'q - xohlagancha yozing!\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎙 *Ovozli xabar* ham yuborishingiz mumkin (PRO)\n\n"
+            "👇 *Xarajatlaringizni yozing:*"
+        )
+    else:
+        msg = (
+            "✍️ *ВВОД РАСХОДОВ ТЕКСТОМ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🤖 *AI помощник автоматически определит:*\n"
+            "• 💰 Суммы\n"
+            "• 📁 Категории\n"
+            "• 📝 Описания\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📝 *Примеры сообщений:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• `50 тысяч на еду`\n"
+            "• `100000 на такси`\n"
+            "• `сегодня 30 тысяч на хлеб, 50 тысяч на бензин`\n"
+            "• `2 млн оплата кредита`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎯 *Правила:*\n"
+            "• Можно писать несколько расходов в одном сообщении\n"
+            "• AI автоматически разделит\n"
+            "• Лимита нет - пишите сколько хотите!\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🎙 *Голосовое сообщение* тоже работает (PRO)\n\n"
+            "👇 *Напишите ваши расходы:*"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
+            callback_data="cancel_expense_mode"
+        )]
+    ]
+    
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def cancel_expense_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel text expense input mode"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Disable expense mode
+    context.user_data["expense_text_mode"] = False
+    
+    await query.edit_message_text(
+        "✅ Bekor qilindi" if lang == "uz" else "✅ Отменено",
+        parse_mode="Markdown"
+    )
+
+
+async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle text messages for expense input when expense_text_mode is enabled"""
+    
+    # Check if expense mode is enabled
+    if not context.user_data.get("expense_text_mode"):
+        return
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text
+    
+    # Skip if it's a menu button
+    for button_texts in MENU_BUTTONS.values():
+        if text in button_texts:
+            return
+    
+    logger.info(f"[TEXT_EXPENSE] User {telegram_id} sent: '{text}'")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Import AI functions
+    from app.ai_assistant import (
+        parse_multiple_transactions, save_multiple_transactions,
+        format_multiple_transactions_message,
+        EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    )
+    
+    # Show processing message
+    if lang == "uz":
+        processing_text = (
+            "🤖 *AI tahlil qilmoqda...*\n\n"
+            "⏳ Matn tahlil qilinmoqda...\n"
+            "🔍 Summalar aniqlanmoqda...\n"
+            "📁 Kategoriyalar tanlanmoqda..."
+        )
+    else:
+        processing_text = (
+            "🤖 *AI анализирует...*\n\n"
+            "⏳ Анализ текста...\n"
+            "🔍 Определение сумм...\n"
+            "📁 Выбор категорий..."
+        )
+    
+    processing_msg = await update.message.reply_text(
+        processing_text,
+        parse_mode="Markdown"
+    )
+    
+    try:
+        # Parse multiple transactions from text
+        transactions = await parse_multiple_transactions(text, lang)
+        
+        if not transactions:
+            if lang == "uz":
+                error_msg = (
+                    "❌ *Xarajat topilmadi*\n\n"
+                    "Matnda summa aniqlanmadi.\n\n"
+                    "📝 *Misol:*\n"
+                    "• `50 ming ovqatga`\n"
+                    "• `100000 taksiga`\n"
+                    "• `2 mln kredit`"
+                )
+            else:
+                error_msg = (
+                    "❌ *Расход не найден*\n\n"
+                    "В тексте не определена сумма.\n\n"
+                    "📝 *Пример:*\n"
+                    "• `50 тысяч на еду`\n"
+                    "• `100000 на такси`\n"
+                    "• `2 млн кредит`"
+                )
+            
+            await processing_msg.edit_text(error_msg, parse_mode="Markdown")
+            return
+        
+        # Save transactions
+        tx_ids = await save_multiple_transactions(db, user["id"], transactions)
+        
+        # Get budget status
+        from app.ai_assistant import get_user_budget_status
+        budget_status = await get_user_budget_status(db, user["id"])
+        
+        # Format success message
+        result_msg = format_multiple_transactions_message(transactions, budget_status, lang)
+        
+        # Add keyboard for more actions
+        keyboard = [
+            [InlineKeyboardButton(
+                "➕ Yana qo'shish" if lang == "uz" else "➕ Добавить ещё",
+                callback_data="add_more_expense"
+            )],
+            [InlineKeyboardButton(
+                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                callback_data="show_expense_report"
+            )],
+            [InlineKeyboardButton(
+                "✅ Tayyor" if lang == "uz" else "✅ Готово",
+                callback_data="cancel_expense_mode"
+            )]
+        ]
+        
+        await processing_msg.edit_text(
+            result_msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+    except Exception as e:
+        logger.error(f"[TEXT_EXPENSE] Error: {e}")
+        await processing_msg.edit_text(
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка",
+            parse_mode="Markdown"
+        )
+
+
+async def add_more_expense_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Continue adding expenses"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Keep expense mode enabled
+    context.user_data["expense_text_mode"] = True
+    
+    await query.edit_message_text(
+        "👇 *Keyingi xarajatni yozing:*" if lang == "uz" else "👇 *Напишите следующий расход:*",
+        parse_mode="Markdown"
+    )
+
+
+async def show_expense_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show today's expense report"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    from app.ai_assistant import get_user_budget_status
+    budget_status = await get_user_budget_status(db, user["id"])
+    
+    if lang == "uz":
+        msg = (
+            "📊 *BUGUNGI HISOBOT*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📥 Daromad: *{format_number(budget_status.get('today_income', 0))} so'm*\n"
+            f"📤 Xarajat: *{format_number(budget_status.get('today_expense', 0))} so'm*\n"
+            f"💰 Balans: *{format_number(budget_status.get('today_balance', 0))} so'm*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 *Oylik:*\n"
+            f"├ Daromad: *{format_number(budget_status.get('monthly_income', 0))} so'm*\n"
+            f"├ Xarajat: *{format_number(budget_status.get('monthly_expense', 0))} so'm*\n"
+            f"└ Balans: *{format_number(budget_status.get('monthly_balance', 0))} so'm*"
+        )
+    else:
+        msg = (
+            "📊 *ОТЧЁТ ЗА СЕГОДНЯ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📥 Доход: *{format_number(budget_status.get('today_income', 0))} сум*\n"
+            f"📤 Расход: *{format_number(budget_status.get('today_expense', 0))} сум*\n"
+            f"💰 Баланс: *{format_number(budget_status.get('today_balance', 0))} сум*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 *За месяц:*\n"
+            f"├ Доход: *{format_number(budget_status.get('monthly_income', 0))} сум*\n"
+            f"├ Расход: *{format_number(budget_status.get('monthly_expense', 0))} сум*\n"
+            f"└ Баланс: *{format_number(budget_status.get('monthly_balance', 0))} сум*"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "➕ Yana qo'shish" if lang == "uz" else "➕ Добавить ещё",
+            callback_data="add_more_expense"
+        )],
+        [InlineKeyboardButton(
+            "✅ Tayyor" if lang == "uz" else "✅ Готово",
+            callback_data="cancel_expense_mode"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
