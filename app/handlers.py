@@ -4,7 +4,7 @@ All conversation handlers and command handlers
 """
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from telegram import (
     Update, 
@@ -29,6 +29,14 @@ import asyncio
 from app.languages import get_message, format_number
 from app.subscription_handlers import require_pro, is_user_pro, show_pricing, show_pricing_new_message, show_subscription_expiring_warning
 from app.engine import calculate_finances, format_result_message
+
+# Timezone helper for consistent Tashkent time
+UZ_TZ = timezone(timedelta(hours=5))
+
+
+def now_uz():
+    """Return current datetime in Asia/Tashkent (UTC+5)."""
+    return datetime.now(UZ_TZ)
 from app.pdf_parser import parse_katm_pdf, parse_katm_file
 from app.transaction_parser import parse_transactions, calculate_monthly_averages
 
@@ -6209,7 +6217,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             flag = "🇺🇿" if lang == "uz" else "🇷🇺"
             message += f"{prefix} {flag} {lang.upper()}: *{count:,}* ta\n"
         
-        message += f"\n⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+        message += f"\n⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
         
         keyboard = [
             [InlineKeyboardButton("🔄 Yangilash", callback_data="admin_stats")],
@@ -6263,7 +6271,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"💰 *DAROMAD (taxminiy)*\n"
             f"└ 💵 Jami: *{total_revenue:,}* so'm\n\n"
             
-            f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
         )
         
         keyboard = [
@@ -6317,7 +6325,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 "⚠️ _Balans kamaysa @HalosPaybot ga ogohlantirish yuboriladi_\n\n"
                 
-                f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+                f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             )
         else:
             message = (
@@ -6328,7 +6336,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "_API bilan bog'lanishda muammo yoki_\n"
                 "_balans API mavjud emas._\n\n"
                 
-                f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+                f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             )
         
         keyboard = [
@@ -6396,7 +6404,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             else:
                 message += "📭 _Hech qanday to'lov topilmadi_\n"
             
-            message += f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            message += f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             
         except Exception as e:
             logger.error(f"Admin payments list error: {e}")
@@ -6460,7 +6468,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     f"   👤 {username_str} | 📅 {created}\n\n"
                 )
             
-            message += f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+            message += f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             
         except Exception as e:
             logger.error(f"Admin users error: {e}")

@@ -4,7 +4,7 @@ Wolt-style caring messages and progress notifications
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,6 +15,14 @@ from app.languages import get_message, format_number
 from app.engine import format_exit_date
 
 logger = logging.getLogger(__name__)
+
+# Timezone helper for Tashkent (UTC+5)
+UZ_TZ = timezone(timedelta(hours=5))
+
+
+def now_uz():
+    """Return current datetime in Asia/Tashkent (UTC+5)."""
+    return datetime.now(UZ_TZ)
 
 
 class ProCareScheduler:
@@ -168,9 +176,9 @@ class ProCareScheduler:
                     # Mark as notified (update last_active to prevent spam)
                     db = await get_database()
                     if db.is_postgres:
-                        await db.update_user(user["telegram_id"], last_active=datetime.now())
+                        await db.update_user(user["telegram_id"], last_active=now_uz())
                     else:
-                        await db.update_user(user["telegram_id"], last_active=datetime.now().isoformat())
+                        await db.update_user(user["telegram_id"], last_active=now_uz().isoformat())
                     
                     # Small delay between messages
                     await asyncio.sleep(1)
@@ -190,7 +198,7 @@ class ProCareScheduler:
         """
         while self._running:
             try:
-                now = datetime.now()
+                now = now_uz()
                 
                 # Only run on days 1-5 of the month
                 if 1 <= now.day <= 5:
@@ -244,7 +252,7 @@ class ProCareScheduler:
         """
         while self._running:
             try:
-                now = datetime.now()
+                now = now_uz()
                 
                 # Only run on Sunday (weekday 6) at 18:00
                 if now.weekday() == 6 and 18 <= now.hour < 19:
@@ -297,7 +305,7 @@ class ProCareScheduler:
         """
         while self._running:
             try:
-                now = datetime.now()
+                now = now_uz()
                 
                 # Only run on 1st of month at 10:00
                 if now.day == 1 and 10 <= now.hour < 11:
@@ -362,7 +370,7 @@ class ProCareScheduler:
         """
         while self._running:
             try:
-                now = datetime.now()
+                now = now_uz()
                 logger.info("Checking subscription expiry...")
                 
                 # ==================== MUDDATI TUGAGAN OBUNALAR ====================
@@ -493,7 +501,7 @@ class ProCareScheduler:
         """
         while self._running:
             try:
-                now = datetime.now()
+                now = now_uz()
                 
                 # Faqat ertalab 6-7 oralig'ida ishlaydi (6:00 AM)
                 if 6 <= now.hour < 7:
