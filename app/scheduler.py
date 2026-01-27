@@ -1085,13 +1085,13 @@ async def get_debts_due_today(db) -> List[Dict[str, Any]]:
     
     if db.is_postgres:
         async with db._pool.acquire() as conn:
-            # PostgreSQL da DATE tipini ishlatish
+            # PostgreSQL - CAST ishlatib har ikki tipda (DATE va TEXT) ishlash
             rows = await conn.fetch("""
                 SELECT pd.*, u.telegram_id, u.language
                 FROM personal_debts pd
                 JOIN users u ON pd.user_id = u.id
-                WHERE pd.due_date = $1 AND pd.status = 'active'
-            """, today)  # date object yuborish
+                WHERE (pd.due_date::text = $1 OR CAST(pd.due_date AS TEXT) = $1) AND pd.status = 'active'
+            """, today_str)  # string yuborish
             logger.info(f"[Debt Reminder] Found {len(rows)} debts due today (PostgreSQL)")
             return [dict(row) for row in rows]
     else:
@@ -1115,12 +1115,13 @@ async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
     
     if db.is_postgres:
         async with db._pool.acquire() as conn:
+            # String solishtirish - CAST ishlatib
             rows = await conn.fetch("""
                 SELECT pd.*, u.telegram_id, u.language
                 FROM personal_debts pd
                 JOIN users u ON pd.user_id = u.id
-                WHERE pd.due_date > $1 AND pd.due_date <= $2 AND pd.status = 'active'
-            """, today, target_date)  # date objects
+                WHERE pd.due_date::text > $1 AND pd.due_date::text <= $2 AND pd.status = 'active'
+            """, today_str, target_str)  # string objects
             return [dict(row) for row in rows]
     else:
         async with db._connection.execute("""
