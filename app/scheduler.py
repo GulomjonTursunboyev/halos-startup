@@ -69,11 +69,29 @@ class ProCareScheduler:
         Agar bugun qaytarish sanasi bo'lgan qarzlar bo'lsa va hali eslatma yuborilmagan bo'lsa, yuborish
         """
         try:
-            logger.info("Checking for missed debt reminders on startup...")
+            logger.info("=" * 50)
+            logger.info("CHECKING DEBT REMINDERS ON STARTUP")
+            logger.info("=" * 50)
+            
             now = now_uz()
+            today = now.date()
+            logger.info(f"Today's date (Tashkent): {today}")
             
             # Bot ishga tushganda darhol bugungi qarzlar uchun eslatma yuborish
             db = await get_database()
+            
+            # DEBUG: Hamma aktiv qarzlarni ko'rish
+            if db.is_postgres:
+                async with db._pool.acquire() as conn:
+                    all_debts = await conn.fetch("""
+                        SELECT pd.id, pd.person_name, pd.amount, pd.due_date, pd.status, u.telegram_id
+                        FROM personal_debts pd
+                        JOIN users u ON pd.user_id = u.id
+                        WHERE pd.status = 'active'
+                    """)
+                    logger.info(f"All active debts in database: {len(all_debts)}")
+                    for d in all_debts:
+                        logger.info(f"  - ID:{d['id']} {d['person_name']}: {d['amount']} | due_date={d['due_date']} (type: {type(d['due_date'])}) | tg_id={d['telegram_id']}")
             
             # Bugungi qarzlarni olish
             today_debts = await get_debts_due_today(db)
