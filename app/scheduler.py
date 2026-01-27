@@ -645,13 +645,23 @@ class ProCareScheduler:
         - Bugun qaytarish sanasi bo'lganlar uchun eslatma
         - 3 kun ichida qaytarish sanasi kelayotganlar uchun oldindan ogohlantirish
         """
+        last_check_date = None  # Oxirgi tekshirilgan sana
+        
         while self._running:
             try:
                 now = now_uz()
+                today = now.date()
                 
-                # Faqat ertalab 6-7 oralig'ida ishlaydi (6:00 AM)
-                if 6 <= now.hour < 7:
-                    logger.info("Running debt reminder check at 6:00 AM...")
+                # Har kuni faqat bir marta tekshirish (6:00-9:00 oralig'ida)
+                # Agar bugun hali tekshirilmagan bo'lsa va vaqt 6:00 dan keyin
+                should_check = (
+                    last_check_date != today and  # Bugun tekshirilmagan
+                    6 <= now.hour < 21  # 6:00-21:00 oralig'ida (kun davomida)
+                )
+                
+                if should_check:
+                    logger.info(f"Running daily debt reminder check for {today}...")
+                    last_check_date = today
                     db = await get_database()
                     
                     # ==================== BUGUNGI QARZLAR ====================
@@ -871,12 +881,16 @@ class ProCareScheduler:
                             logger.error(f"Error sending upcoming debt reminder: {e}")
                     
                     logger.info(f"Sent {len(upcoming_debts)} upcoming debt reminders")
+                else:
+                    # Tekshirish vaqti kelmagan - debug log
+                    if now.hour >= 6 and now.hour < 21:
+                        logger.debug(f"Already checked today ({last_check_date}), skipping...")
                 
             except Exception as e:
                 logger.error(f"Error in debt reminder job: {e}")
             
-            # Har 1 soatda tekshirish
-            await asyncio.sleep(60 * 60)
+            # Har 30 daqiqada tekshirish (lekin kuniga faqat 1 marta eslatma yuboriladi)
+            await asyncio.sleep(30 * 60)
     
     async def _kotib_balance_job(self):
         """

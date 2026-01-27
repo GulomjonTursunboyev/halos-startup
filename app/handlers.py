@@ -6985,9 +6985,8 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
     if not user:
         return
     
-    # Update due date to tomorrow
-    from datetime import datetime, timedelta
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    # Update due date to tomorrow (Tashkent time)
+    tomorrow = (now_uz() + timedelta(days=1)).strftime("%Y-%m-%d")
     
     if db.is_postgres:
         async with db._pool.acquire() as conn:
@@ -7002,8 +7001,8 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
         )
         await db._connection.commit()
     
-    # Format tomorrow date nicely
-    tomorrow_dt = datetime.now() + timedelta(days=1)
+    # Format tomorrow date nicely (Tashkent time)
+    tomorrow_dt = now_uz() + timedelta(days=1)
     day_num = tomorrow_dt.day
     months_uz = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 
                 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
