@@ -1061,16 +1061,20 @@ _scheduler: Optional[ProCareScheduler] = None
 
 async def get_debts_due_today(db) -> List[Dict[str, Any]]:
     """Bugun qaytarish sanasi bo'lgan qarzlarni olish"""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_uz().date()  # date object
+    today_str = today.strftime("%Y-%m-%d")
+    logger.info(f"[Debt Reminder] Checking debts for today: {today_str}")
     
     if db.is_postgres:
         async with db._pool.acquire() as conn:
+            # PostgreSQL da DATE tipini ishlatish
             rows = await conn.fetch("""
                 SELECT pd.*, u.telegram_id, u.language
                 FROM personal_debts pd
                 JOIN users u ON pd.user_id = u.id
                 WHERE pd.due_date = $1 AND pd.status = 'active'
-            """, today)
+            """, today)  # date object yuborish
+            logger.info(f"[Debt Reminder] Found {len(rows)} debts due today (PostgreSQL)")
             return [dict(row) for row in rows]
     else:
         async with db._connection.execute("""
@@ -1078,16 +1082,18 @@ async def get_debts_due_today(db) -> List[Dict[str, Any]]:
             FROM personal_debts pd
             JOIN users u ON pd.user_id = u.id
             WHERE pd.due_date = ? AND pd.status = 'active'
-        """, (today,)) as cursor:
+        """, (today_str,)) as cursor:
             rows = await cursor.fetchall()
+            logger.info(f"[Debt Reminder] Found {len(rows)} debts due today (SQLite)")
             return [dict(row) for row in rows]
 
 
 async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
     """N kun ichida qaytarish sanasi keladigan qarzlarni olish"""
-    today = datetime.now()
-    target_date = (today + timedelta(days=days)).strftime("%Y-%m-%d")
+    today = now_uz().date()
+    target_date = today + timedelta(days=days)
     today_str = today.strftime("%Y-%m-%d")
+    target_str = target_date.strftime("%Y-%m-%d")
     
     if db.is_postgres:
         async with db._pool.acquire() as conn:
@@ -1096,7 +1102,7 @@ async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
                 FROM personal_debts pd
                 JOIN users u ON pd.user_id = u.id
                 WHERE pd.due_date > $1 AND pd.due_date <= $2 AND pd.status = 'active'
-            """, today_str, target_date)
+            """, today, target_date)  # date objects
             return [dict(row) for row in rows]
     else:
         async with db._connection.execute("""
@@ -1104,7 +1110,7 @@ async def get_debts_due_soon(db, days: int = 3) -> List[Dict[str, Any]]:
             FROM personal_debts pd
             JOIN users u ON pd.user_id = u.id
             WHERE pd.due_date > ? AND pd.due_date <= ? AND pd.status = 'active'
-        """, (today_str, target_date)) as cursor:
+        """, (today_str, target_str)) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 
