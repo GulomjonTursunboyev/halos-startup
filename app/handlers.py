@@ -1933,11 +1933,10 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         # Show PRO upgrade button for free users
         keyboard = [
             [InlineKeyboardButton(
-                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
+                "💎 PRO" if lang == "uz" else "💎 PRO",
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
-            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -1946,30 +1945,6 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
-    
-    # Show subscription offer for free users
-    if not is_pro:
-        offer_keyboard = [
-            [InlineKeyboardButton(
-                "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
-                callback_data="click_buy_pro_weekly"
-            )],
-            [InlineKeyboardButton(
-                "⭐ 1 oy - 29,990 so'm" if lang == "uz" else "⭐ 1 мес - 29,990 сум",
-                callback_data="click_buy_pro_monthly"
-            )],
-            [InlineKeyboardButton(
-                "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
-                callback_data="click_buy_pro_yearly"
-            )],
-        ]
-        offer_markup = InlineKeyboardMarkup(offer_keyboard)
-        
-        await update.message.reply_text(
-            get_message("offer_after_first_calc", lang),
-            parse_mode="Markdown",
-            reply_markup=offer_markup
-        )
     
     return ConversationHandler.END
 
@@ -2093,11 +2068,10 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
+                "💎 PRO" if lang == "uz" else "💎 PRO",
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
-            [InlineKeyboardButton(get_message("btn_profile", lang), callback_data="show_profile")]
+            [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
         ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -2106,30 +2080,6 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
-    
-    # Show subscription offer for free users
-    if not is_pro:
-        offer_keyboard = [
-            [InlineKeyboardButton(
-                "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
-                callback_data="click_buy_pro_weekly"
-            )],
-            [InlineKeyboardButton(
-                "⭐ 1 oy - 29,990 so'm" if lang == "uz" else "⭐ 1 мес - 29,990 сум",
-                callback_data="click_buy_pro_monthly"
-            )],
-            [InlineKeyboardButton(
-                "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
-                callback_data="click_buy_pro_yearly"
-            )],
-        ]
-        offer_markup = InlineKeyboardMarkup(offer_keyboard)
-        
-        await query.message.reply_text(
-            get_message("offer_after_first_calc", lang),
-            parse_mode="Markdown",
-            reply_markup=offer_markup
-        )
     
     return ConversationHandler.END
 
