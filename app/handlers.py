@@ -321,6 +321,9 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     mode = query.data.replace("mode_", "")
     context.user_data["mode"] = mode
     
+    # Set conversation flag - AI should not process text while in conversation
+    context.user_data["in_conversation"] = True
+    
     # Update user mode in database
     telegram_id = update.effective_user.id
     db = await get_database()
@@ -1407,6 +1410,7 @@ async def katm_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if choice == "katm_yes":
         # PRO tekshiruv
         if not await require_pro(update, context):
+            context.user_data["in_conversation"] = False
             return ConversationHandler.END
         # Show instructions for PDF upload
         await query.edit_message_text(
@@ -1795,6 +1799,8 @@ async def start_trial_callback(update, context):
         msg.format(date=expires.strftime("%d.%m.%Y")),
         parse_mode="Markdown"
     )
+    # Clear conversation flag
+    context.user_data["in_conversation"] = False
     return ConversationHandler.END
 
 async def get_user_subscription_status(telegram_id: int) -> bool:
@@ -1947,6 +1953,8 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         reply_markup=reply_markup
     )
     
+    # Clear conversation flag
+    context.user_data["in_conversation"] = False
     return ConversationHandler.END
 
 
@@ -2082,6 +2090,8 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
         reply_markup=reply_markup
     )
     
+    # Clear conversation flag
+    context.user_data["in_conversation"] = False
     return ConversationHandler.END
 
 
@@ -2189,6 +2199,8 @@ async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
     
+    # Clear conversation flag
+    context.user_data["in_conversation"] = False
     return ConversationHandler.END
 
 
@@ -2666,6 +2678,8 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=get_main_menu_keyboard(lang)
     )
     
+    # Clear conversation flag
+    context.user_data["in_conversation"] = False
     return ConversationHandler.END
 
 
@@ -5592,13 +5606,36 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if pattern in text:
             return
     
-    # Skip if user is in some editing mode
-    editing_modes = ["awaiting_income", "awaiting_partner_income", "awaiting_loan", 
-                     "awaiting_total_debt", "editing_profile", "awaiting_promo",
-                     "ai_correcting"]
+    # Skip if user is in some editing mode or ConversationHandler state
+    editing_modes = [
+        # Old modes
+        "awaiting_income", "awaiting_partner_income", "awaiting_loan", 
+        "awaiting_total_debt", "editing_profile", "awaiting_promo",
+        "ai_correcting",
+        # ConversationHandler related states
+        "in_conversation",  # General conversation flag
+        "entering_income", "entering_rent", "entering_utilities",
+        "entering_loan", "entering_debt", "entering_mandatory",
+        "entering_kindergarten", "uploading_transaction", "uploading_katm",
+        # Profile editing states
+        "editing_income_self", "editing_income_partner", "editing_rent",
+        "editing_utilities", "editing_loan", "editing_mandatory",
+        # Recurring/credit entry states  
+        "adding_recurring", "adding_credit", "adding_fixed_income",
+        "editing_recurring", "editing_credit", "editing_fixed_income",
+        # Other input states
+        "awaiting_text_input", "awaiting_number_input"
+    ]
     for mode in editing_modes:
         if context.user_data.get(mode):
             return
+    
+    # Check if currently in active ConversationHandler state
+    # ConversationHandler stores its state in user_data with special keys
+    conv_keys = [k for k in context.user_data.keys() if isinstance(k, tuple) and len(k) >= 2]
+    if conv_keys:
+        # User is in active conversation
+        return
     
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
