@@ -5256,7 +5256,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Handle voice messages for AI assistant - works automatically for PRO users
     MULTI-TRANSACTION SUPPORT: Bir ovozli xabarda bir nechta tranzaksiyalarni aniqlaydi
     
-    Faqat PRO (plus/unlimited) foydalanuvchilar uchun!
+    PRO obunasi kerak. Obunasi yo'q foydalanuvchilarga PRO taklif qilinadi.
     """
     voice = update.message.voice
     if not voice:
@@ -5280,6 +5280,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         parse_multiple_transactions, save_multiple_transactions,
         format_multiple_transactions_message
     )
+    from app.subscription_handlers import is_user_pro
     
     db = await get_database()
     user = await db.get_user(telegram_id)
@@ -5292,39 +5293,21 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     from app.config import ADMIN_IDS
     is_admin = telegram_id in ADMIN_IDS
     
-    # ==================== 1. OBUNA TEKSHIRUVI (BIRINCHI!) ====================
-    # Faqat PRO (plus/unlimited) foydalanuvchilar ovozli xabar yuborishi mumkin
-    voice_tier = user.get("voice_tier", "basic") or "basic"
-    voice_tier_expires = user.get("voice_tier_expires")
+    # ==================== 1. PRO OBUNA TEKSHIRUVI ====================
+    # PRO obunasi bormi tekshirish (subscription_expires)
+    is_pro = await is_user_pro(telegram_id) if not is_admin else True
     
-    # Check if voice tier has expired - revert to basic
-    if voice_tier != "basic" and voice_tier_expires:
-        from datetime import datetime
-        if isinstance(voice_tier_expires, str):
-            try:
-                voice_tier_expires = datetime.fromisoformat(voice_tier_expires.replace("Z", "+00:00"))
-            except:
-                voice_tier_expires = None
-        
-        if voice_tier_expires and datetime.now() > voice_tier_expires.replace(tzinfo=None):
-            voice_tier = "basic"
-            logger.info(f"[VOICE] User {telegram_id} voice tier expired, reverted to basic")
-    
-    # ==================== BASIC FOYDALANUVCHILAR UCHUN PRO TAKLIF ====================
-    # Admin bo'lmasa va basic tier bo'lsa - PRO taklif qilish
-    if not is_admin and voice_tier == "basic":
+    if not is_pro:
+        # PRO obunasi yo'q - taklif qilish
         if lang == "uz":
             msg = (
                 "🎤 *Ovozli kiritish - PRO funksiya*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
                 "Ovozli xabarlar orqali xarajatlarni kiritish "
                 "faqat PRO foydalanuvchilar uchun mavjud.\n\n"
-                "✨ *PRO afzalliklari:*\n"
-                "├ 🎤 Ovozli kiritish\n"
-                "├ ⏱ Uzunroq ovozli xabarlar\n"
-                "├ 📊 Kengaytirilgan hisobotlar\n"
-                "└ 🚀 Ustuvor qo'llab-quvvatlash\n\n"
-                "💡 _Matnli kiritish BEPUL va cheksiz!_"
+                "✅ Matnli kiritish *BEPUL* va cheksiz!\n"
+                "Shunchaki yozing: _\"non 5000, choy 3000\"_\n\n"
+                "💎 PRO bilan ovoz orqali ham kiritishingiz mumkin!"
             )
         else:
             msg = (
@@ -5332,22 +5315,15 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
                 "Ввод расходов голосом доступен "
                 "только для PRO пользователей.\n\n"
-                "✨ *Преимущества PRO:*\n"
-                "├ 🎤 Голосовой ввод\n"
-                "├ ⏱ Более длинные сообщения\n"
-                "├ 📊 Расширенные отчёты\n"
-                "└ 🚀 Приоритетная поддержка\n\n"
-                "💡 _Текстовый ввод БЕСПЛАТНО!_"
+                "✅ Текстовый ввод *БЕСПЛАТНО* и без лимитов!\n"
+                "Просто напишите: _\"хлеб 5000, чай 3000\"_\n\n"
+                "💎 С PRO можете вводить и голосом!"
             )
         
         keyboard = [
             [InlineKeyboardButton(
-                f"🎤 Voice+ (60 ta/oy) - {format_number(VOICE_PLUS_PRICE)} so'm" if lang == "uz" else f"🎤 Voice+ (60/мес) - {format_number(VOICE_PLUS_PRICE)} сум",
-                callback_data="buy_voice_plus"
-            )],
-            [InlineKeyboardButton(
-                f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
-                callback_data="buy_voice_unlimited"
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
+                callback_data="show_pricing"
             )]
         ]
         
@@ -5358,7 +5334,29 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
     
-    # ==================== 2. OVOZ UZUNLIGI TEKSHIRUVI ====================
+    # ==================== 2. VOICE TIER VA LIMITLAR ====================
+    # PRO foydalanuvchi - voice tier tekshirish
+    voice_tier = user.get("voice_tier", "plus") or "plus"  # PRO default = plus
+    voice_tier_expires = user.get("voice_tier_expires")
+    
+    # Check if voice tier has expired - revert to plus (PRO default)
+    if voice_tier not in ["plus", "unlimited"] and voice_tier_expires:
+        from datetime import datetime
+        if isinstance(voice_tier_expires, str):
+            try:
+                voice_tier_expires = datetime.fromisoformat(voice_tier_expires.replace("Z", "+00:00"))
+            except:
+                voice_tier_expires = None
+        
+        if voice_tier_expires and datetime.now() > voice_tier_expires.replace(tzinfo=None):
+            voice_tier = "plus"  # PRO default
+            logger.info(f"[VOICE] User {telegram_id} voice tier expired, reverted to plus")
+    
+    # PRO foydalanuvchi uchun minimal tier = plus
+    if voice_tier == "basic":
+        voice_tier = "plus"
+    
+    # ==================== 3. OVOZ UZUNLIGI TEKSHIRUVI ====================
     # Get tier limits
     tier_limits = get_voice_tier_limits(voice_tier)
     max_duration = tier_limits["max_duration"]
@@ -5379,7 +5377,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
     
-    # Check monthly voice limit (based on tier) - Admin uchun skip
+    # ==================== 4. OYLIK LIMIT TEKSHIRUVI ====================
     if not is_admin:
         limit_info = await check_voice_limit(db, user["id"], voice_tier=voice_tier, bonus_voice=bonus_voice)
     else:
@@ -5387,39 +5385,52 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         limit_info = {"allowed": True, "remaining": 999, "limit": 999, "used": 0}
     
     if not limit_info["allowed"]:
-        # Limit tugagan - tier ga qarab upgrade opsiyalarini ko'rsatish
-        keyboard = []
-        
-        # Basic userlar bu yerga kelmaydi (yuqorida to'xtatiladi)
-        # Faqat plus tier uchun upgrade taklif
+        # Limit tugagan - qo'shimcha ovozli paket taklif qilish
         if voice_tier == "plus":
             # Voice+ userga Voice Unlimited taklif qilish
+            if lang == "uz":
+                msg = (
+                    "🎤 *Oylik limit tugadi*\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"Siz bu oyda *{limit_info['limit']} ta* ovozli xabar ishlatdingiz.\n\n"
+                    "🚀 *Voice Unlimited* bilan cheksiz ovozli xabar yuboring!"
+                )
+            else:
+                msg = (
+                    "🎤 *Месячный лимит исчерпан*\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"Вы использовали *{limit_info['limit']}* голосовых сообщений в этом месяце.\n\n"
+                    "🚀 С *Voice Unlimited* отправляйте без ограничений!"
+                )
+            
             keyboard = [
                 [InlineKeyboardButton(
                     f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
                     callback_data="buy_voice_unlimited"
                 )]
             ]
+            
+            await update.message.reply_text(
+                msg,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
         # unlimited tier uchun limit yo'q, bu yerga kelmaydi
-        
-        await update.message.reply_text(
-            format_voice_limit_message(limit_info, lang),
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-        )
         return
     
     try:
         # ==================== BOSQICH 1: Ovoz qabul qilindi ====================
-        tier_name = VOICE_TIERS[voice_tier]["name_uz"] if lang == "uz" else VOICE_TIERS[voice_tier]["name_ru"]
+        # Limit ma'lumotini "AI tahlil qilmoqda" joyida ko'rsatish uchun
+        used = limit_info.get('used', 0) + 1  # hozirgi xabar ham
+        limit = limit_info.get('limit', 60)
         
         # Admin uchun limit ko'rsatmaslik
         if is_admin:
             limit_text = ""
         elif voice_tier == "unlimited":
-            limit_text = f"\n\n🎤 _{tier_name} (cheksiz)_" if lang == "uz" else f"\n\n🎤 _{tier_name} (безлимит)_"
+            limit_text = " _(cheksiz)_" if lang == "uz" else " _(безлимит)_"
         else:
-            limit_text = f"\n\n🎤 _{limit_info['remaining']}/{limit_info['limit']} ta qoldi_" if lang == "uz" else f"\n\n🎤 _{limit_info['remaining']}/{limit_info['limit']} осталось_"
+            limit_text = f" _({used}/{limit})_"
         
         if lang == "uz":
             step1_text = "🎤 _Ovoz qabul qilindi..._"
@@ -5439,11 +5450,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await voice_file.download_to_drive(tmp_path)
         logger.info(f"[VOICE] Downloaded to: {tmp_path}")
         
-        # Update message - AI tahlil qilmoqda
+        # Update message - AI tahlil qilmoqda + limit ko'rsatish
         if lang == "uz":
-            step2_text = "🤖 _AI tahlil qilmoqda..._"
+            step2_text = f"🤖 _AI tahlil qilmoqda..._{limit_text}"
         else:
-            step2_text = "🤖 _AI анализирует..._"
+            step2_text = f"🤖 _AI анализирует..._{limit_text}"
         
         await processing_msg.edit_text(step2_text, parse_mode="Markdown")
         
