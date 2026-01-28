@@ -6230,9 +6230,6 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     
                     # Aniqlashtirish tugmasi - agar kerak bo'lsa
                     if needs_clarification_list:
-                        # Birinchi aniqlashtirish kerak bo'lgan tranzaksiya uchun
-                        first_idx, first_tx, clarification_type = needs_clarification_list[0]
-                        clarify_tx_id = transaction_ids[first_idx - 1] if first_idx <= len(transaction_ids) else transaction_ids[0]
                         keyboard.append([InlineKeyboardButton(
                             f"🔍 Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"🔍 Уточнить ({len(needs_clarification_list)})",
                             callback_data=f"ai_clarify_multi_{ids_str}"
@@ -6262,6 +6259,29 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         # ==================== QARZ TEKSHIRISH (BITTA SUMMA BO'LGANDA) ====================
         # Faqat bitta summa bo'lganda qarz tekshiruvi
+        debt_info = await parse_debt_transaction(text, lang)
+        
+        if debt_info:
+            # Bu qarz tranzaksiyasi
+            debt_id = await save_personal_debt(db, user["id"], debt_info)
+            
+            # Qarz xulosasini olish
+            debt_summary = await get_debt_summary(db, user["id"])
+            
+            # Xabarni formatlash
+            msg = format_debt_saved_message(debt_info, lang)
+            msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
+            
+            # Get updated voice limit info (Admin uchun ko'rsatmaslik)
+            if not is_admin:
+                new_limit_info = await check_voice_limit(db, user["id"])
+                msg += f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+            
+            await update.message.reply_text(
+                msg,
+                parse_mode="Markdown"
+            )
+            return
         debt_info = await parse_debt_transaction(text, lang)
         
         if debt_info:
