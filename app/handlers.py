@@ -5606,12 +5606,98 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if pattern in text:
             return
     
+    # ========== YANGI KATEGORIYA KIRITISH ==========
+    if context.user_data.get("awaiting_new_category"):
+        transaction_id = context.user_data.get("new_category_transaction_id")
+        if transaction_id:
+            # Yangi kategoriya nomini saqlash
+            new_category_name = text.strip()
+            
+            # Kategoriya kalitini yaratish (emoji va nomdan)
+            import re
+            # Emoji ni ajratish
+            emoji_match = re.match(r'^([\U0001F300-\U0001F9FF\U00002600-\U000027BF]+)\s*(.+)$', new_category_name)
+            if emoji_match:
+                emoji = emoji_match.group(1)
+                name = emoji_match.group(2)
+                category_key = f"custom_{name.lower().replace(' ', '_')}"
+            else:
+                emoji = "📦"
+                name = new_category_name
+                category_key = f"custom_{name.lower().replace(' ', '_')}"
+                new_category_name = f"{emoji} {name}"
+            
+            from app.ai_assistant import get_transaction_by_id, confirm_and_learn
+            
+            db = await get_database()
+            user = await db.get_user(telegram_id)
+            
+            if user:
+                transaction = await get_transaction_by_id(db, transaction_id)
+                
+                if transaction and transaction["user_id"] == user["id"]:
+                    # Database'ni yangilash
+                    try:
+                        if db._use_postgres:
+                            async with db._pool.acquire() as conn:
+                                await conn.execute("""
+                                    UPDATE transactions 
+                                    SET category = $1, category_key = $2
+                                    WHERE id = $3 AND user_id = $4
+                                """, new_category_name, category_key, transaction_id, user["id"])
+                        else:
+                            await db._connection.execute("""
+                                UPDATE transactions 
+                                SET category = ?, category_key = ?
+                                WHERE id = ? AND user_id = ?
+                            """, (new_category_name, category_key, transaction_id, user["id"]))
+                            await db._connection.commit()
+                        
+                        # AI'ga o'rgatish
+                        original_text = transaction.get("description", "")
+                        if original_text:
+                            await confirm_and_learn(original_text, {
+                                "type": transaction["type"],
+                                "category": category_key,
+                                "amount": transaction["amount"],
+                                "description": transaction.get("description", "")
+                            })
+                        
+                        lang = context.user_data.get("lang", "uz")
+                        if lang == "uz":
+                            msg = (
+                                "✅ *YANGI KATEGORIYA YARATILDI*\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                f"📂 Kategoriya: *{new_category_name}*\n"
+                                f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
+                                "🧠 _AI bu kategoriyani o'rgandi!_"
+                            )
+                        else:
+                            msg = (
+                                "✅ *НОВАЯ КАТЕГОРИЯ СОЗДАНА*\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                                f"📂 Категория: *{new_category_name}*\n"
+                                f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
+                                "🧠 _AI запомнил эту категорию!_"
+                            )
+                        
+                        await update.message.reply_text(msg, parse_mode="Markdown")
+                        
+                    except Exception as e:
+                        print(f"[NEW-CATEGORY] Error: {e}")
+                        await update.message.reply_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+            
+            # Flaglarni tozalash
+            context.user_data["awaiting_new_category"] = False
+            context.user_data["new_category_transaction_id"] = None
+            return
+    
     # Skip if user is in some editing mode or ConversationHandler state
     editing_modes = [
         # Old modes
         "awaiting_income", "awaiting_partner_income", "awaiting_loan", 
         "awaiting_total_debt", "editing_profile", "awaiting_promo",
-        "ai_correcting",
+        "ai_correcting", "awaiting_new_category",
         # ConversationHandler related states
         "in_conversation",  # General conversation flag
         "entering_income", "entering_rent", "entering_utilities",
@@ -6374,12 +6460,57 @@ async def ai_change_category_callback(update: Update, context: ContextTypes.DEFA
             callback_data=f"ai_set_category_{transaction_id}_{cat_key}"
         )])
     
+    # Yangi kategoriya yaratish tugmasi
+    keyboard.append([InlineKeyboardButton(
+        "➕ Yangi kategoriya" if lang == "uz" else "➕ Новая категория",
+        callback_data=f"ai_new_category_{transaction_id}"
+    )])
+    
     keyboard.append([InlineKeyboardButton(
         "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
         callback_data=f"ai_correct_{transaction_id}"
     )])
     
     await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def ai_new_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Yangi kategoriya yaratish - foydalanuvchi o'zi nom beradi"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID
+    callback_data = query.data  # ai_new_category_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    # Yangi kategoriya kiritish so'rovi
+    context.user_data["awaiting_new_category"] = True
+    context.user_data["new_category_transaction_id"] = transaction_id
+    
+    if lang == "uz":
+        msg = (
+            "➕ *YANGI KATEGORIYA*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Yangi kategoriya nomini kiriting:\n"
+            "_Masalan: 🎮 O'yinlar, 🐱 Uy hayvonlari_\n\n"
+            "⚠️ Bekor qilish uchun /cancel"
+        )
+    else:
+        msg = (
+            "➕ *НОВАЯ КАТЕГОРИЯ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Введите название новой категории:\n"
+            "_Например: 🎮 Игры, 🐱 Домашние животные_\n\n"
+            "⚠️ Для отмены /cancel"
+        )
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
 
 
 async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

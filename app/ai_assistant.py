@@ -74,7 +74,7 @@ EXPENSE_CATEGORIES = {
     "uz": {
         "oziq_ovqat": "🍔 Oziq-ovqat",
         "transport": "🚗 Transport",
-        "uy_joy": "🏠 Uy-joy",
+        "uy_joy": "🏠 Uy-joy/Ijara",
         "kommunal": "💡 Kommunal",
         "sog'liq": "💊 Sog'liq",
         "kiyim": "👕 Kiyim-kechak",
@@ -82,13 +82,14 @@ EXPENSE_CATEGORIES = {
         "ko'ngilochar": "🎬 Ko'ngilochar",
         "aloqa": "📱 Aloqa",
         "kredit": "💳 Kredit to'lovi",
+        "qarz_berdim": "💸 Qarz berdim",
         "obuna": "💎 Obuna",
         "boshqa": "📦 Boshqa"
     },
     "ru": {
         "oziq_ovqat": "🍔 Еда",
         "transport": "🚗 Транспорт",
-        "uy_joy": "🏠 Жильё",
+        "uy_joy": "🏠 Жильё/Аренда",
         "kommunal": "💡 Коммунальные",
         "sog'liq": "💊 Здоровье",
         "kiyim": "👕 Одежда",
@@ -96,6 +97,7 @@ EXPENSE_CATEGORIES = {
         "ko'ngilochar": "🎬 Развлечения",
         "aloqa": "📱 Связь",
         "kredit": "💳 Платёж по кредиту",
+        "qarz_berdim": "💸 Дал в долг",
         "obuna": "💎 Подписка",
         "boshqa": "📦 Прочее"
     }
@@ -110,6 +112,7 @@ INCOME_CATEGORIES = {
         "freelance": "💻 Frilanserlik",
         "sovg'a": "🎁 Sovg'a",
         "qarz_qaytarish": "💰 Qarz qaytarish",
+        "ijara_daromad": "🏠 Ijara daromadi",
         "boshqa": "📦 Boshqa"
     },
     "ru": {
@@ -119,6 +122,7 @@ INCOME_CATEGORIES = {
         "freelance": "💻 Фриланс",
         "sovg'a": "🎁 Подарок",
         "qarz_qaytarish": "💰 Возврат долга",
+        "ijara_daromad": "🏠 Доход от аренды",
         "boshqa": "📦 Прочее"
     }
 }
@@ -1710,32 +1714,38 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
     return "expense", "boshqa", EXPENSE_CATEGORIES.get("uz", {}).get("boshqa", "📦 Boshqa")
 
 
-async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]:
+async def parse_multiple_transactions(text: str, lang: str = "uz", user_context: Dict = None) -> List[Dict]:
     """
-    ASOSIY MULTI-TRANSACTION PARSING FUNKSIYASI v3.0
+    ASOSIY MULTI-TRANSACTION PARSING FUNKSIYASI v4.0
     
     Bir matndan BARCHA tranzaksiyalarni (daromad va xarajat) aniqlaydi.
     GEMINI AI integratsiyasi bilan kuchaytirilgan!
+    Aniqlashtirish kerak bo'lgan tranzaksiyalarni belgilaydi!
     
-    Misol: "bugun yuz ming ishlab topdim on minga non oldim yigirma ming yolkira qildim 5 minga suv ichdim"
+    Misol: "bugun 3 million oylik tushdi, 1 million qarzimga berdim, 
+           500 ming arendaga berdim, 300 mingga go'sht oldim, 100 mingga tovuq oldim"
     
     Natija:
     [
-        {"type": "income", "category": "ish_haqi", "amount": 100000, "description": "ishlab topdim"},
-        {"type": "expense", "category": "oziq_ovqat", "amount": 10000, "description": "non oldim"},
-        {"type": "expense", "category": "transport", "amount": 20000, "description": "yo'lkira qildim"},
-        {"type": "expense", "category": "oziq_ovqat", "amount": 5000, "description": "suv ichdim"}
+        {"type": "income", "category": "ish_haqi", "amount": 3000000, "description": "Oylik maosh"},
+        {"type": "expense", "category": "qarz_berdim", "amount": 1000000, "description": "Qarzga berdim", 
+         "needs_clarification": True, "clarification_type": "debt_recipient"},
+        {"type": "expense", "category": "uy_joy", "amount": 500000, "description": "Ijara to'lovi", 
+         "is_rent_payment": True},
+        {"type": "expense", "category": "oziq_ovqat", "amount": 300000, "description": "Go'sht"},
+        {"type": "expense", "category": "oziq_ovqat", "amount": 100000, "description": "Tovuq go'shti", 
+         "needs_clarification": True, "clarification_type": "chicken_type"}
     ]
     """
     print(f"\n{'='*60}")
-    print(f"[MULTI-PARSE v3.0] Matn: '{text}'")
+    print(f"[MULTI-PARSE v4.0] Matn: '{text}'")
     print(f"{'='*60}")
     
     # ========== GEMINI AI BILAN MULTI-TRANSACTION TAHLIL ==========
     if GEMINI_ENABLED and is_gemini_available():
         try:
             from app.gemini_ai import analyze_multiple_transactions
-            gemini_results = await analyze_multiple_transactions(text, lang)
+            gemini_results = await analyze_multiple_transactions(text, lang, user_context)
             
             if gemini_results and len(gemini_results) > 0:
                 transactions = []
@@ -1751,7 +1761,7 @@ async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]
                     else:
                         category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
                     
-                    transactions.append({
+                    tx = {
                         "type": tx_type,
                         "category": category,
                         "category_name": category_name,
@@ -1759,13 +1769,35 @@ async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]
                         "description": description,
                         "original_text": text[:100],
                         "timestamp": datetime.now().isoformat(),
+                        "created_at": item.get("created_at", datetime.now().isoformat()),
                         "ai_source": "gemini"
-                    })
+                    }
+                    
+                    # Maxsus flaglarni qo'shish
+                    if item.get("needs_clarification"):
+                        tx["needs_clarification"] = True
+                        tx["clarification_type"] = item.get("clarification_type", "unknown")
+                    
+                    if item.get("is_rent_payment"):
+                        tx["is_rent_payment"] = True
+                    
+                    if item.get("is_debt_payment"):
+                        tx["is_debt_payment"] = True
+                    
+                    transactions.append(tx)
                 
                 print(f"[MULTI-PARSE] Gemini: {len(transactions)} ta tranzaksiya topildi")
+                
+                # Aniqlashtirish kerakli tranzaksiyalarni chiqarish
+                needs_clarification = [t for t in transactions if t.get("needs_clarification")]
+                if needs_clarification:
+                    print(f"[MULTI-PARSE] Aniqlashtirish kerak: {len(needs_clarification)} ta")
+                
                 return transactions
         except Exception as e:
             logger.warning(f"[MULTI-PARSE] Gemini xatosi, oddiy algoritmga o'tilmoqda: {e}")
+            import traceback
+            traceback.print_exc()
     
     # ========== ODDIY ALGORITM (FALLBACK) ==========
     # 1. Barcha summalarni va kontekstlarini topish
@@ -1858,13 +1890,31 @@ async def save_multiple_transactions(db, user_id: int, transactions: List[Dict])
 
 def format_multiple_transactions_message(transactions: List[Dict], budget_status: Dict, lang: str = "uz") -> str:
     """
-    Bir nechta tranzaksiyalar uchun xabar formatlash - YAXSHILANGAN
+    Bir nechta tranzaksiyalar uchun xabar formatlash - YAXSHILANGAN v2.0
+    Aniqlashtirish kerak bo'lgan tranzaksiyalarni ko'rsatadi
     """
+    # Aniqlashtirish turlari uchun matnlar
+    clarification_texts = {
+        "uz": {
+            "chicken_type": "🐔 Bu tovuq go'shtimi yoki jonli hayvonmi?",
+            "debt_recipient": "💰 Qarzni kimga berdingiz?",
+            "payment_reason": "💳 Bu to'lov nima uchun?",
+            "unknown": "❓ Qo'shimcha ma'lumot kerak"
+        },
+        "ru": {
+            "chicken_type": "🐔 Это куриное мясо или живая птица?",
+            "debt_recipient": "💰 Кому вы дали в долг?",
+            "payment_reason": "💳 За что этот платёж?",
+            "unknown": "❓ Нужна дополнительная информация"
+        }
+    }
+    
     if lang == "uz":
         msg = "✅ *AI yordamchi - Tranzaksiyalar saqlandi*\n\n"
         
         total_expense = 0
         total_income = 0
+        needs_clarification_list = []
         
         for i, tx in enumerate(transactions, 1):
             if tx["type"] == "income":
@@ -1878,6 +1928,20 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
             msg += f"   💵 {tx['amount']:,} so'm ({type_label})\n"
             if tx.get('description') and tx['description'] != "Noma'lum" and len(tx['description']) > 2:
                 msg += f"   📝 _{tx['description'][:40]}_\n"
+            
+            # Maxsus flaglarni ko'rsatish
+            if tx.get("is_rent_payment"):
+                msg += f"   🏠 _Ijara to'lovi sifatida belgilandi_\n"
+            if tx.get("is_debt_payment"):
+                msg += f"   💰 _Qarz to'lovi sifatida belgilandi_\n"
+            
+            # Aniqlashtirish kerakmi
+            if tx.get("needs_clarification"):
+                clarification_type = tx.get("clarification_type", "unknown")
+                clarification_text = clarification_texts["uz"].get(clarification_type, clarification_texts["uz"]["unknown"])
+                msg += f"   ⚠️ _{clarification_text}_\n"
+                needs_clarification_list.append((i, tx, clarification_type))
+            
             msg += "\n"
             
             if tx["type"] == "expense":
@@ -1911,11 +1975,18 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
                 
                 if remaining < 0:
                     msg += " ⚠️"
+        
+        # Aniqlashtirish kerak bo'lgan tranzaksiyalar haqida xabar
+        if needs_clarification_list:
+            msg += f"\n\n⚠️ *Aniqlashtirish kerak:* {len(needs_clarification_list)} ta\n"
+            msg += "_Tugmalardan foydalanib to'g'rilashingiz mumkin_"
+    
     else:
         msg = "✅ *AI помощник - Транзакции сохранены*\n\n"
         
         total_expense = 0
         total_income = 0
+        needs_clarification_list = []
         
         for i, tx in enumerate(transactions, 1):
             if tx["type"] == "income":
@@ -1929,6 +2000,20 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
             msg += f"   💵 {tx['amount']:,} сум ({type_label})\n"
             if tx.get('description') and tx['description'] != "Noma'lum" and len(tx['description']) > 2:
                 msg += f"   📝 _{tx['description'][:40]}_\n"
+            
+            # Maxsus flaglarni ko'rsatish
+            if tx.get("is_rent_payment"):
+                msg += f"   🏠 _Отмечено как оплата аренды_\n"
+            if tx.get("is_debt_payment"):
+                msg += f"   💰 _Отмечено как оплата долга_\n"
+            
+            # Aniqlashtirish kerakmi
+            if tx.get("needs_clarification"):
+                clarification_type = tx.get("clarification_type", "unknown")
+                clarification_text = clarification_texts["ru"].get(clarification_type, clarification_texts["ru"]["unknown"])
+                msg += f"   ⚠️ _{clarification_text}_\n"
+                needs_clarification_list.append((i, tx, clarification_type))
+            
             msg += "\n"
             
             if tx["type"] == "expense":
@@ -1947,6 +2032,11 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
         if total_income > 0 and total_expense > 0:
             balance_emoji = "📈" if balance >= 0 else "📉"
             msg += f"{balance_emoji} Баланс: *{balance:+,}* сум\n"
+        
+        # Aniqlashtirish kerak bo'lgan tranzaksiyalar haqida xabar
+        if needs_clarification_list:
+            msg += f"\n\n⚠️ *Требуется уточнение:* {len(needs_clarification_list)}\n"
+            msg += "_Используйте кнопки для исправления_"
     
     return msg
 

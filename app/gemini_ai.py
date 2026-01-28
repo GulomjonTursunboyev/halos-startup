@@ -6,13 +6,15 @@ Tranzaksiyalarni aqlli tahlil qilish
 FREE TIER LIMITS:
 - 60 so'rov/minutiga
 - 1500 so'rov/kuniga
-- Gemini 1.5 Flash (tez va bepul)
+- Gemini 2.0 Flash (tez va bepul)
 """
 
 import aiohttp
 import json
 import logging
 import os
+import re
+from datetime import datetime
 from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
@@ -21,28 +23,134 @@ logger = logging.getLogger(__name__)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-# Kategoriyalar (AI uchun yo'riqnoma)
+# ==================== TIL NORMALIZATSIYASI ====================
+# O'zbek tilida qo'llaniladigan chet til so'zlari va ularning tarjimalari
+WORD_NORMALIZATIONS = {
+    # Rus tilidan
+    "arenda": "ijara",
+    "arendaga": "ijaraga",
+    "kvartira": "kvartira",
+    "remont": "ta'mirlash",
+    "zarplata": "maosh",
+    "zp": "maosh",
+    "pensiya": "nafaqa",
+    "stipendiya": "stipendiya",
+    "avans": "avans",
+    "kredit": "kredit",
+    "ipoteka": "ipoteka",
+    "dostavka": "yetkazib berish",
+    "zakaz": "buyurtma",
+    "produkt": "mahsulot",
+    "produkti": "mahsulotlar",
+    "benzin": "benzin",
+    "mashina": "mashina",
+    
+    # Ingliz tilidan
+    "taxi": "taksi",
+    "rent": "ijara",
+    "food": "ovqat",
+    "phone": "telefon",
+    "internet": "internet",
+    
+    # O'zbek tilidagi variantlar (o', g', sh va hokazo)
+    "go'sht": "go'sht",
+    "gusht": "go'sht",
+    "gosht": "go'sht",
+    "go`sht": "go'sht",
+    "go′sht": "go'sht",
+    "tovuq": "tovuq",
+    "tovuk": "tovuq",
+    "to'vuk": "tovuq",
+    "mol": "mol go'shti",
+    "qo'y": "qo'y go'shti",
+    "baliq": "baliq",
+}
+
+# O'zbek harflarini normalizatsiya qilish
+CHAR_NORMALIZATIONS = {
+    "o'": "o'",
+    "o`": "o'",
+    "o′": "o'",
+    "oʻ": "o'",
+    "g'": "g'",
+    "g`": "g'",
+    "g′": "g'",
+    "gʻ": "g'",
+    "sh": "sh",
+    "ch": "ch",
+}
+
+def normalize_text(text: str) -> str:
+    """Matnni normalizatsiya qilish - turli til va belgilarni to'g'rilash"""
+    result = text.lower()
+    
+    # Maxsus belgilarni normalizatsiya
+    for old, new in CHAR_NORMALIZATIONS.items():
+        result = result.replace(old, new)
+    
+    # So'zlarni normalizatsiya (ixtiyoriy - description uchun)
+    # for old, new in WORD_NORMALIZATIONS.items():
+    #     result = re.sub(rf'\b{old}\b', new, result, flags=re.IGNORECASE)
+    
+    return result
+
+
+def fix_spelling(text: str) -> str:
+    """Imlo xatolarini tuzatish - izohlar uchun"""
+    corrections = {
+        # O'zbek so'zlari
+        "gusht": "go'sht",
+        "gosht": "go'sht", 
+        "tovuk": "tovuq",
+        "tuvuk": "tovuq",
+        "arendaga": "ijaraga",
+        "arenda": "ijara",
+        "kvartiraga": "kvartirada",
+        "oldm": "oldim",
+        "berdm": "berdim",
+        "topdm": "topdim",
+        "qildm": "qildim",
+        "ketdm": "ketdim",
+        "keldm": "keldim",
+        "yedm": "yedim",
+        "ichdm": "ichdim",
+        # Sonlar
+        "mln": "million",
+        "ming": "ming",
+        "mng": "ming",
+    }
+    
+    result = text
+    for wrong, correct in corrections.items():
+        result = re.sub(rf'\b{wrong}\b', correct, result, flags=re.IGNORECASE)
+    
+    return result
+
+
+# Kategoriyalar (AI uchun yo'riqnoma) - KENGAYTIRILGAN
 EXPENSE_CATEGORIES_AI = {
-    "oziq_ovqat": "Ovqat, restoran, kafe, bozor, go'sht, meva, sabzavot, non, ichimlik",
-    "transport": "Taksi, avtobus, metro, benzin, yo'l kira, Yandex, Uber",
-    "uy_joy": "Ijara, kvartira, uy, remont, mebel",
-    "kommunal": "Gaz, suv, elektr, tok, issiqlik, internet to'lov",
-    "sog'liq": "Dori, shifoxona, doktor, apteka, davolash",
-    "kiyim": "Kiyim, oyoq kiyim, ko'ylak, shim, kurtka",
-    "ta'lim": "Kurs, kitob, maktab, universitet, o'qish",
-    "ko'ngilochar": "Kino, teatr, dam olish, sayohat, o'yin",
-    "aloqa": "Telefon, mobil, internet, SIM karta",
-    "kredit": "Kredit, qarz, bank to'lovi, nasiya",
+    "oziq_ovqat": "Ovqat, restoran, kafe, bozor, go'sht (mol, qo'y, tovuq), meva, sabzavot, non, ichimlik, tushlik, kechki ovqat, nonushta",
+    "transport": "Taksi, avtobus, metro, benzin, yo'l kira, Yandex, Uber, Bolt, mashina ta'miri",
+    "uy_joy": "Ijara, arenda, kvartira, uy, remont, mebel, uy-ro'zg'or buyumlari",
+    "kommunal": "Gaz, suv, elektr, tok, issiqlik, internet to'lov, kommunal xizmatlar",
+    "sog'liq": "Dori, shifoxona, doktor, apteka, davolash, tibbiy xizmatlar",
+    "kiyim": "Kiyim, oyoq kiyim, ko'ylak, shim, kurtka, palto, ust kiyim",
+    "ta'lim": "Kurs, kitob, maktab, universitet, o'qish, ta'lim to'lovlari",
+    "ko'ngilochar": "Kino, teatr, dam olish, sayohat, o'yin, konsert",
+    "aloqa": "Telefon, mobil, internet, SIM karta, aloqa xizmatlari",
+    "kredit": "Kredit to'lovi, bank to'lovi, nasiya to'lovi, ipoteka",
+    "qarz_berdim": "Qarzga berdim, qarz berdim, odam qarzga oldi, kimgadir berdim",
     "boshqa": "Boshqa xarajatlar"
 }
 
 INCOME_CATEGORIES_AI = {
-    "ish_haqi": "Maosh, oylik, ish haqi, avans, bonus",
-    "biznes": "Biznes daromadi, savdo, sotish, do'kon tushumi",
-    "investitsiya": "Dividend, foiz, aksiya, depozit",
-    "freelance": "Frilanserlik, buyurtma, loyiha, IT ish",
-    "sovg'a": "Sovg'a, hadya, tug'ilgan kun, tortiq",
-    "qarz_qaytarish": "Qarz qaytarish, qarzimni berdi",
+    "ish_haqi": "Maosh, oylik, ish haqi, avans, bonus, zarplata, ish puli",
+    "biznes": "Biznes daromadi, savdo, sotish, do'kon tushumi, foyda",
+    "investitsiya": "Dividend, foiz, aksiya, depozit daromadi",
+    "freelance": "Frilanserlik, buyurtma, loyiha, IT ish, zakaz",
+    "sovg'a": "Sovg'a, hadya, tug'ilgan kun, tortiq, pul sovg'asi",
+    "qarz_qaytarish": "Qarz qaytarish, qarzni qaytarishdi, pul qaytardi",
+    "ijara_daromad": "Ijara daromadi, kvartirani ijaraga berdim, uy ijarasi",
     "boshqa": "Boshqa daromadlar"
 }
 
@@ -147,31 +255,45 @@ Faqat JSON qaytar:
         return None
 
 
-async def analyze_multiple_transactions(text: str, lang: str = "uz") -> Optional[List[Dict]]:
+async def analyze_multiple_transactions(text: str, lang: str = "uz", user_context: Dict = None) -> Optional[List[Dict]]:
     """
-    Bir xabarda bir nechta tranzaksiyalarni tahlil qilish
+    Bir xabarda bir nechta tranzaksiyalarni tahlil qilish - KENGAYTIRILGAN v2.0
     
-    Misol: "bugun 100 ming ishlab topdim, 20 mingga ovqat oldim, 10 ming taksi"
+    Misol: "bugun 3 million oylik tushdi, 1 million qarzimga berdim, 
+           500 ming arendaga berdim, 300 mingga go'sht oldim, 100 mingga tovuq oldim"
     
-    Returns:
-        [
-            {"type": "income", "category": "ish_haqi", "amount": 100000, ...},
-            {"type": "expense", "category": "oziq_ovqat", "amount": 20000, ...},
-            {"type": "expense", "category": "transport", "amount": 10000, ...}
-        ]
+    Natija:
+    [
+        {"type": "income", "category": "ish_haqi", "amount": 3000000, "description": "Oylik maosh"},
+        {"type": "expense", "category": "qarz_berdim", "amount": 1000000, "description": "Qarzga berdim", "needs_clarification": true, "clarification_type": "debt_recipient"},
+        {"type": "expense", "category": "uy_joy", "amount": 500000, "description": "Ijara to'lovi", "is_rent_payment": true},
+        {"type": "expense", "category": "oziq_ovqat", "amount": 300000, "description": "Go'sht"},
+        {"type": "expense", "category": "oziq_ovqat", "amount": 100000, "description": "Tovuq", "needs_clarification": true, "clarification_type": "chicken_type"}
+    ]
     """
     if not GEMINI_API_KEY:
         logger.warning("[Gemini] API key topilmadi")
         return None
     
-    expense_cats = ", ".join([f"{k}: {v}" for k, v in EXPENSE_CATEGORIES_AI.items()])
-    income_cats = ", ".join([f"{k}: {v}" for k, v in INCOME_CATEGORIES_AI.items()])
+    # Matnni normalizatsiya qilish
+    normalized_text = normalize_text(text)
     
-    prompt = f"""Sen moliyaviy tranzaksiyalarni tahlil qiluvchi AI assistantisin.
-
-Quyidagi matnda BIR NECHTA tranzaksiya bo'lishi mumkin. Har birini alohida aniqla.
+    expense_cats = "\n".join([f"- {k}: {v}" for k, v in EXPENSE_CATEGORIES_AI.items()])
+    income_cats = "\n".join([f"- {k}: {v}" for k, v in INCOME_CATEGORIES_AI.items()])
+    
+    # Foydalanuvchi konteksti (ijara summasi va hokazo)
+    context_info = ""
+    if user_context:
+        if user_context.get("rent_amount"):
+            context_info += f"\n- Foydalanuvchi oylik ijara summasi: {user_context['rent_amount']} so'm"
+        if user_context.get("loan_payment"):
+            context_info += f"\n- Foydalanuvchi oylik kredit to'lovi: {user_context['loan_payment']} so'm"
+    
+    prompt = f"""Sen o'zbek tilida moliyaviy tranzaksiyalarni tahlil qiluvchi AI assistantisin.
 
 MATN: "{text}"
+
+FOYDALANUVCHI KONTEKSTI:{context_info if context_info else " (ma'lumot yo'q)"}
 
 XARAJAT KATEGORIYALARI:
 {expense_cats}
@@ -179,18 +301,56 @@ XARAJAT KATEGORIYALARI:
 DAROMAD KATEGORIYALARI:
 {income_cats}
 
-QOIDALAR:
-- Har bir summani alohida tranzaksiya sifatida ajrat
-- "oldim", "to'ladim", "berdim" = XARAJAT
-- "sotdim", "topdim", "ishladim", "maosh" = DAROMAD
-- "pul oldim" = DAROMAD, "non oldim" = XARAJAT
-- ming = 1000, million = 1000000
+MUHIM QOIDALAR:
+1. HAR BIR SUMMA = ALOHIDA TRANZAKSIYA. Bitta gap ichida 5 ta summa bo'lsa, 5 ta tranzaksiya bo'ladi.
 
-JAVOB FORMATI (faqat JSON array):
-[{{"type": "expense|income", "category": "kategoriya", "amount": 12345, "description": "tavsif"}}]
+2. DAROMAD BELGILARI:
+   - "oylik tushdi", "maosh tushdi/oldim", "ishlab topdim" = income (ish_haqi)
+   - "sotdim", "pul tushdi", "biznesdan" = income
+   
+3. XARAJAT BELGILARI:
+   - "oldim" + NARSA (go'sht, non, kiyim) = expense (oziq_ovqat yoki kiyim)
+   - "berdim", "to'ladim" = expense
+   - "arendaga/ijaraga berdim" = expense (uy_joy), ijara to'lovi
+   - "qarzimga berdim" = expense (qarz_berdim), kimgadir qarz berish
 
-Agar faqat 1 ta tranzaksiya bo'lsa, array ichida 1 ta element qaytaring.
-MUHIM: Faqat JSON array qaytaring!"""
+4. ANIQLASHTIRISH KERAK BO'LGAN HOLATLAR:
+   - "tovuq oldim" - bu go'shtmi yoki jonli hayvonmi? needs_clarification: true, clarification_type: "chicken_type"
+   - "qarzimga berdim" - kimga berildi? needs_clarification: true, clarification_type: "debt_recipient"
+   - "pul berdim" - nima uchun? needs_clarification: true, clarification_type: "payment_reason"
+
+5. SUMMALAR:
+   - "ming" = 1,000
+   - "million" / "mln" = 1,000,000
+   - "3 million" = 3,000,000
+   - "500 ming" = 500,000
+
+6. TIL NORMALIZATSIYASI:
+   - "arenda" = "ijara" (rus tilidan)
+   - "go'sht", "gusht", "gosht" = hammasi bir xil
+   - "tovuq", "tovuk" = hammasi bir xil
+   - O'zbek va rus so'zlari aralash bo'lishi mumkin
+
+7. DESCRIPTION (IZOH):
+   - To'g'ri imlo bilan yozing
+   - Qisqa va aniq bo'lsin
+   - Masalan: "Go'sht sotib olish", "Ijara to'lovi", "Oylik maosh"
+
+8. MAXSUS FLAGLAR:
+   - is_rent_payment: true - agar ijara to'lovi bo'lsa
+   - is_debt_payment: true - agar qarz qaytarish/berish bo'lsa
+   - needs_clarification: true - agar aniqlashtirish kerak bo'lsa
+
+JAVOB FORMATI (faqat JSON array, hech qanday izoh yo'q):
+[
+  {{"type": "income", "category": "ish_haqi", "amount": 3000000, "description": "Oylik maosh"}},
+  {{"type": "expense", "category": "qarz_berdim", "amount": 1000000, "description": "Qarzga berdim", "needs_clarification": true, "clarification_type": "debt_recipient"}},
+  {{"type": "expense", "category": "uy_joy", "amount": 500000, "description": "Ijara to'lovi", "is_rent_payment": true}},
+  {{"type": "expense", "category": "oziq_ovqat", "amount": 300000, "description": "Go'sht"}},
+  {{"type": "expense", "category": "oziq_ovqat", "amount": 100000, "description": "Tovuq go'shti", "needs_clarification": true, "clarification_type": "chicken_type"}}
+]
+
+MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -199,47 +359,63 @@ MUHIM: Faqat JSON array qaytaring!"""
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
                     "temperature": 0.1,
-                    "topP": 0.8,
-                    "maxOutputTokens": 1024
+                    "topP": 0.9,
+                    "maxOutputTokens": 2048
                 }
             }
             
             url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
             
-            async with session.post(url, headers=headers, json=data, timeout=15) as response:
+            async with session.post(url, headers=headers, json=data, timeout=20) as response:
                 if response.status == 200:
                     result = await response.json()
                     
                     if "candidates" in result and result["candidates"]:
                         text_response = result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "")
                         
-                        # Clean up
+                        # Clean up JSON
                         text_response = text_response.strip()
-                        if text_response.startswith("```json"):
-                            text_response = text_response[7:]
-                        if text_response.startswith("```"):
-                            text_response = text_response[3:]
-                        if text_response.endswith("```"):
-                            text_response = text_response[:-3]
+                        if "```json" in text_response:
+                            text_response = text_response.split("```json")[-1]
+                        if "```" in text_response:
+                            text_response = text_response.split("```")[0]
                         text_response = text_response.strip()
+                        
+                        # JSON array ni topish
+                        json_match = re.search(r'\[[\s\S]*\]', text_response)
+                        if json_match:
+                            text_response = json_match.group()
                         
                         try:
                             parsed = json.loads(text_response)
                             if isinstance(parsed, list):
+                                # Imlo tuzatish va vaqt qo'shish
+                                for item in parsed:
+                                    if "description" in item:
+                                        item["description"] = fix_spelling(item["description"])
+                                    item["created_at"] = datetime.now().isoformat()
+                                
                                 logger.info(f"[Gemini] Multi-tranzaksiya: {len(parsed)} ta topildi")
                                 return parsed
                             else:
                                 return [parsed]
                         except json.JSONDecodeError as e:
-                            logger.error(f"[Gemini] JSON parse xato: {e}")
+                            logger.error(f"[Gemini] JSON parse xato: {e}, response: {text_response[:300]}")
                             return None
                             
                 elif response.status == 429:
                     logger.warning("[Gemini] Rate limit")
                     return None
                 else:
-                    logger.error(f"[Gemini] API xato {response.status}")
+                    error_text = await response.text()
+                    logger.error(f"[Gemini] API xato {response.status}: {error_text[:200]}")
                     return None
+                    
+    except Exception as e:
+        logger.error(f"[Gemini] So'rov xatosi: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
                     
     except Exception as e:
         logger.error(f"[Gemini] So'rov xatosi: {e}")
