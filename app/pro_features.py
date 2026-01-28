@@ -720,16 +720,20 @@ async def show_report_settings(update: Update, context: ContextTypes.DEFAULT_TYP
     weekly = user.get("reports_weekly", False)
     monthly = user.get("reports_monthly", True)
     
+    off_text = "O'chirilgan"
+    off_btn = "O'chirish"
+    on_btn = "Yoqish"
+    
     if lang == "uz":
         msg = (
             "📊 *HISOBOT SOZLAMALARI*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🔔 Avtomatik hisobotlar:\n\n"
-            f"📅 *Kunlik hisobot:* {'✅ Yoqilgan' if daily else '❌ O\'chirilgan'}\n"
+            f"📅 *Kunlik hisobot:* {'✅ Yoqilgan' if daily else '❌ ' + off_text}\n"
             f"   _Har kuni soat 21:00 da_\n\n"
-            f"📆 *Haftalik hisobot:* {'✅ Yoqilgan' if weekly else '❌ O\'chirilgan'}\n"
+            f"📆 *Haftalik hisobot:* {'✅ Yoqilgan' if weekly else '❌ ' + off_text}\n"
             f"   _Har yakshanba soat 20:00 da_\n\n"
-            f"🗓 *Oylik hisobot:* {'✅ Yoqilgan' if monthly else '❌ O\'chirilgan'}\n"
+            f"🗓 *Oylik hisobot:* {'✅ Yoqilgan' if monthly else '❌ ' + off_text}\n"
             f"   _Har oyning 1-sanasi soat 19:00 da_\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💡 _Yoqish/o'chirish uchun tugmalarni bosing_"
@@ -737,15 +741,15 @@ async def show_report_settings(update: Update, context: ContextTypes.DEFAULT_TYP
         
         keyboard = [
             [InlineKeyboardButton(
-                f"{'🔕 O\'chirish' if daily else '✅ Yoqish'} - Kunlik",
+                f"{'🔕 ' + off_btn if daily else '✅ ' + on_btn} - Kunlik",
                 callback_data=f"toggle_report_daily_{'off' if daily else 'on'}"
             )],
             [InlineKeyboardButton(
-                f"{'🔕 O\'chirish' if weekly else '✅ Yoqish'} - Haftalik",
+                f"{'🔕 ' + off_btn if weekly else '✅ ' + on_btn} - Haftalik",
                 callback_data=f"toggle_report_weekly_{'off' if weekly else 'on'}"
             )],
             [InlineKeyboardButton(
-                f"{'🔕 O\'chirish' if monthly else '✅ Yoqish'} - Oylik",
+                f"{'🔕 ' + off_btn if monthly else '✅ ' + on_btn} - Oylik",
                 callback_data=f"toggle_report_monthly_{'off' if monthly else 'on'}"
             )],
             [InlineKeyboardButton("◀️ Orqaga", callback_data="pro_menu")]
