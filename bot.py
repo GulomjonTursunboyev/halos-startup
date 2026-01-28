@@ -36,7 +36,6 @@ from app.handlers import (
     menu_subscription_handler,
     menu_language_handler,
     menu_help_handler,
-    menu_expense_input_handler,
     text_expense_handler,
     cancel_expense_mode_callback,
     add_more_expense_callback,
@@ -363,12 +362,6 @@ def main() -> None:
     )
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
-        group=2
-    )
-    
-    # Expense input button handler
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(✍️ Xarajat|✍️ Расход)$"), menu_expense_input_handler),
         group=2
     )
     

@@ -38,7 +38,6 @@ from app.handlers import (
     menu_language_handler,
     menu_help_handler,
     # Smart input handlers - transaction confirmation
-    menu_expense_input_handler,
     text_expense_handler,
     cancel_expense_mode_callback,
     add_more_expense_callback,
