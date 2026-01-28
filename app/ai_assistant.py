@@ -3094,30 +3094,12 @@ def format_voice_limit_message(limit_info: Dict, lang: str = "uz") -> str:
 
 def format_voice_duration_error(duration: int, max_duration: int = 30, lang: str = "uz") -> str:
     """
-    Ovozli xabar juda uzun bo'lganda xato xabari
+    Ovozli xabar juda uzun bo'lganda xato xabari - QISQA
     """
     if lang == "uz":
-        return (
-            "⚠️ *OVOZ JUDA UZUN*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"Ovozli xabar uzunligi: *{duration}* sekund\n"
-            f"Sizning limitingiz: *{max_duration}* sekund\n\n"
-            "💡 *Uzunroq ovoz uchun:*\n"
-            f"├ Voice+ — 60 sekund (`{format_number(VOICE_PLUS_PRICE)} so'm/oy`)\n"
-            f"└ Voice Unlimited — 60 sekund (`{format_number(VOICE_UNLIMITED_PRICE)} so'm/oy`)\n\n"
-            "✍️ Yoki matnli xabar yuboring (bepul!)"
-        )
+        return f"⚠️ Ovoz juda uzun ({duration}s). Max {max_duration}s."
     else:
-        return (
-            "⚠️ *СЛИШКОМ ДЛИННОЕ СООБЩЕНИЕ*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"Длительность: *{duration}* секунд\n"
-            f"Ваш лимит: *{max_duration}* секунд\n\n"
-            "💡 *Для более длинных:*\n"
-            f"├ Voice+ — 60 сек (`{format_number(VOICE_PLUS_PRICE)} сум/мес`)\n"
-            f"└ Voice Unlimited — 60 сек (`{format_number(VOICE_UNLIMITED_PRICE)} сум/мес`)\n\n"
-            "✍️ Или напишите текстом (бесплатно!)"
-        )
+        return f"⚠️ Слишком длинное ({duration}с). Макс {max_duration}с."
 
 
 # ==================== TRANSACTION MANAGEMENT ====================

@@ -69,15 +69,15 @@ def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
     """Get persistent main menu keyboard"""
     if lang == "ru":
         keyboard = [
-            ["📊 Мои отчёты", "👤 Профиль"],
-            ["💎 PRO", "❓ Помощь"],
-            ["🌐 Язык"]
+            ["📊 Мои отчёты"],
+            ["👤 Профиль", "💎 PRO"],
+            ["🌐 Язык", "❓ Помощь"]
         ]
     else:
         keyboard = [
-            ["📊 Hisobotlarim", "👤 Profil"],
-            ["💎 PRO", "❓ Yordam"],
-            ["🌐 Til"]
+            ["📊 Hisobotlarim"],
+            ["👤 Profil", "💎 PRO"],
+            ["🌐 Til", "❓ Yordam"]
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -5380,17 +5380,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             limit_text = f"\n\n🎤 _{limit_info['remaining']}/{limit_info['limit']} ta qoldi_" if lang == "uz" else f"\n\n🎤 _{limit_info['remaining']}/{limit_info['limit']} осталось_"
         
         if lang == "uz":
-            step1_text = (
-                "🎙 *Ovoz qabul qilindi*\n\n"
-                f"⏱ Davomiyligi: {voice_duration} sekund\n\n"
-                "⏳ _Yuklanmoqda..._"
-            )
+            step1_text = "🎤 _Ovoz qabul qilindi..._"
         else:
-            step1_text = (
-                "🎙 *Голос получен*\n\n"
-                f"⏱ Длительность: {voice_duration} сек\n\n"
-                "⏳ _Загрузка..._"
-            )
+            step1_text = "🎤 _Голос получен..._"
         
         processing_msg = await update.message.reply_text(step1_text, parse_mode="Markdown")
         
@@ -5407,17 +5399,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         # Update message - AI tahlil qilmoqda
         if lang == "uz":
-            step2_text = (
-                "🎙 *Ovoz qabul qilindi*\n\n"
-                f"⏱ Davomiyligi: {voice_duration} sekund\n\n"
-                "🤖 _AI tahlil qilmoqda..._"
-            )
+            step2_text = "🤖 _AI tahlil qilmoqda..._"
         else:
-            step2_text = (
-                "🎙 *Голос получен*\n\n"
-                f"⏱ Длительность: {voice_duration} сек\n\n"
-                "🤖 _AI анализирует..._"
-            )
+            step2_text = "🤖 _AI анализирует..._"
         
         await processing_msg.edit_text(step2_text, parse_mode="Markdown")
         
