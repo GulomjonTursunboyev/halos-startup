@@ -5243,8 +5243,8 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     from app.ai_assistant import (
         transcribe_voice, parse_voice_transaction, save_transaction,
         EXPENSE_CATEGORIES, INCOME_CATEGORIES,
-        MAX_VOICE_DURATION, MONTHLY_VOICE_LIMIT, VOICE_PACK_PRICE,
-        check_voice_limit, increment_voice_usage,
+        VOICE_TIERS, VOICE_PLUS_PRICE, VOICE_UNLIMITED_PRICE,
+        check_voice_limit, increment_voice_usage, get_voice_tier_limits,
         format_voice_limit_message, format_voice_duration_error,
         # Multi-transaction imports
         parse_multiple_transactions, save_multiple_transactions,
@@ -5258,54 +5258,86 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.warning(f"[VOICE] User {telegram_id} not found in DB")
         return
     
-    # Check PRO status
-    from app.subscription_handlers import is_user_pro
-    is_pro = await is_user_pro(telegram_id)
+    # Get user's voice tier (basic, plus, unlimited)
+    voice_tier = user.get("voice_tier", "basic") or "basic"
+    voice_tier_expires = user.get("voice_tier_expires")
+    
+    # Check if voice tier has expired - revert to basic
+    if voice_tier != "basic" and voice_tier_expires:
+        from datetime import datetime
+        if isinstance(voice_tier_expires, str):
+            try:
+                voice_tier_expires = datetime.fromisoformat(voice_tier_expires.replace("Z", "+00:00"))
+            except:
+                voice_tier_expires = None
+        
+        if voice_tier_expires and datetime.now() > voice_tier_expires.replace(tzinfo=None):
+            voice_tier = "basic"
+            logger.info(f"[VOICE] User {telegram_id} voice tier expired, reverted to basic")
+    
+    # Get tier limits
+    tier_limits = get_voice_tier_limits(voice_tier)
+    max_duration = tier_limits["max_duration"]
     
     # Get bonus voice count
     bonus_voice = user.get("bonus_voice_count", 0) or 0
     
-    logger.info(f"[VOICE] User {telegram_id} - PRO: {is_pro}, Bonus: {bonus_voice}")
+    logger.info(f"[VOICE] User {telegram_id} - Tier: {voice_tier}, Max Duration: {max_duration}s, Bonus: {bonus_voice}")
     
-    # Check voice duration limit
+    # Check voice duration limit (based on tier)
     voice_duration = voice.duration or 0
-    if voice_duration > MAX_VOICE_DURATION:
+    if voice_duration > max_duration:
         await update.message.reply_text(
-            format_voice_duration_error(voice_duration, lang),
+            format_voice_duration_error(voice_duration, voice_tier, lang),
             parse_mode="Markdown"
         )
         return
     
-    # Check monthly voice limit (PRO = cheksiz)
-    limit_info = await check_voice_limit(db, user["id"], is_pro=is_pro, bonus_voice=bonus_voice)
+    # Check monthly voice limit (based on tier)
+    limit_info = await check_voice_limit(db, user["id"], voice_tier=voice_tier, bonus_voice=bonus_voice)
     
     if not limit_info["allowed"]:
-        # Limit tugagan - sotib olish tugmalarini ko'rsatish
-        keyboard = [
-            [InlineKeyboardButton(
-                "💎 PRO obuna (cheksiz)" if lang == "uz" else "💎 PRO подписка (безлимит)",
-                callback_data="show_pricing"
-            )],
-            [InlineKeyboardButton(
-                f"🎤 Voice Pack (+100) - {format_number(VOICE_PACK_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Pack (+100) - {format_number(VOICE_PACK_PRICE)} сум",
-                callback_data="buy_voice_pack"
-            )]
-        ]
+        # Limit tugagan - tier ga qarab upgrade opsiyalarini ko'rsatish
+        keyboard = []
+        
+        if voice_tier == "basic":
+            # Basic userga Voice+ va Voice Unlimited taklif qilish
+            keyboard = [
+                [InlineKeyboardButton(
+                    f"🎤 Voice+ (60 ta/oy) - {format_number(VOICE_PLUS_PRICE)} so'm" if lang == "uz" else f"🎤 Voice+ (60/мес) - {format_number(VOICE_PLUS_PRICE)} сум",
+                    callback_data="buy_voice_plus"
+                )],
+                [InlineKeyboardButton(
+                    f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
+                    callback_data="buy_voice_unlimited"
+                )]
+            ]
+        elif voice_tier == "plus":
+            # Voice+ userga Voice Unlimited taklif qilish
+            keyboard = [
+                [InlineKeyboardButton(
+                    f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
+                    callback_data="buy_voice_unlimited"
+                )]
+            ]
+        # unlimited tier uchun limit yo'q, bu yerga kelmaydi
         
         await update.message.reply_text(
             format_voice_limit_message(limit_info, lang),
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
         )
         return
     
     try:
         # Send beautiful processing message
+        tier_name = VOICE_TIERS[voice_tier]["name_uz"] if lang == "uz" else VOICE_TIERS[voice_tier]["name_ru"]
+        
         if lang == "uz":
-            if limit_info.get("is_pro"):
-                limit_text = "♾️ _PRO: Cheksiz ovozli xabar_"
+            if voice_tier == "unlimited":
+                limit_text = f"🎤 _Voice Tier: {tier_name} (cheksiz)_"
             else:
-                limit_text = f"📊 _Qolgan limit: {limit_info['remaining']}/{limit_info['limit']} ta_"
+                limit_text = f"📊 _Qolgan: {limit_info['remaining']}/{limit_info['limit']} ta | Tier: {tier_name}_"
             
             processing_text = (
                 "🤖 *AI Yordamchi*\n\n"
@@ -5317,10 +5349,10 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 f"{limit_text}"
             )
         else:
-            if limit_info.get("is_pro"):
-                limit_text = "♾️ _PRO: Безлимит голосовых_"
+            if voice_tier == "unlimited":
+                limit_text = f"🎤 _Voice Tier: {tier_name} (безлимит)_"
             else:
-                limit_text = f"📊 _Осталось: {limit_info['remaining']}/{limit_info['limit']}_"
+                limit_text = f"📊 _Осталось: {limit_info['remaining']}/{limit_info['limit']} | Tier: {tier_name}_"
             
             processing_text = (
                 "🤖 *AI Помощник*\n\n"

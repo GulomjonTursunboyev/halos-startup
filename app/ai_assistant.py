@@ -24,11 +24,40 @@ logger = logging.getLogger(__name__)
 KOTIB_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55IjoiZWJkYWYyZjctZDc0My00NDUwLTg2MzItOTdhODM0YjE4MTdjIn0.NdyeqX2L61FU6PpBQBo4uYKRSZWS8bXlygJYVlgkrn0"
 KOTIB_STT_URL = "https://developer.kotib.ai/api/v1/stt"
 
-# ==================== LIMITS ====================
-MAX_VOICE_DURATION = 60  # Maksimal ovozli xabar uzunligi (sekundda)
-MONTHLY_VOICE_LIMIT = 30  # Bepul oylik ovozli xabar limiti
-VOICE_PACK_COUNT = 100   # Voice Pack - 100 ta qo'shimcha ovozli xabar
-VOICE_PACK_PRICE = 9990  # Voice Pack narxi (so'm)
+# ==================== VOICE LIMITS & TIERS ====================
+# Voice Tier System:
+# - basic: 30 ta/oy, 30 soniya max (FREE va PRO Basic)
+# - plus: 60 ta/oy, 60 soniya max (Voice+ obuna)
+# - unlimited: cheksiz, 60 soniya max (Voice Unlimited obuna)
+
+VOICE_TIERS = {
+    "basic": {
+        "monthly_limit": 30,
+        "max_duration": 30,  # soniya
+        "name_uz": "Asosiy",
+        "name_ru": "Базовый"
+    },
+    "plus": {
+        "monthly_limit": 60,
+        "max_duration": 60,  # soniya
+        "name_uz": "Voice+",
+        "name_ru": "Voice+"
+    },
+    "unlimited": {
+        "monthly_limit": -1,  # cheksiz
+        "max_duration": 60,  # soniya
+        "name_uz": "Cheksiz",
+        "name_ru": "Безлимит"
+    }
+}
+
+# Voice upgrade prices
+VOICE_PLUS_PRICE = 14990      # Voice+ (60 ta, 60 sek) - 1 oy
+VOICE_UNLIMITED_PRICE = 29990  # Voice Unlimited - 1 oy
+
+# Legacy constants for backward compatibility
+MAX_VOICE_DURATION = 30  # Default max (basic tier)
+MONTHLY_VOICE_LIMIT = 30  # Default limit (basic tier)
 
 # Xarajat kategoriyalari
 EXPENSE_CATEGORIES = {
@@ -2640,29 +2669,47 @@ async def increment_voice_usage(db, user_id: int, duration: int = 0) -> bool:
     return True
 
 
-async def check_voice_limit(db, user_id: int, is_pro: bool = False, bonus_voice: int = 0) -> Dict:
+def get_voice_tier_limits(voice_tier: str = "basic") -> Dict:
+    """Get limits for voice tier"""
+    tier_config = VOICE_TIERS.get(voice_tier, VOICE_TIERS["basic"])
+    return {
+        "monthly_limit": tier_config["monthly_limit"],
+        "max_duration": tier_config["max_duration"],
+        "tier": voice_tier,
+        "name_uz": tier_config["name_uz"],
+        "name_ru": tier_config["name_ru"]
+    }
+
+
+async def check_voice_limit(db, user_id: int, voice_tier: str = "basic", bonus_voice: int = 0) -> Dict:
     """
-    Ovozli xabar limitini tekshirish
+    Ovozli xabar limitini tekshirish (YANGI TIZIM)
     
-    PRO foydalanuvchilar - CHEKSIZ
-    FREE foydalanuvchilar - 30 ta asosiy + bonus_voice_count
+    Voice Tiers:
+    - basic: 30 ta/oy, 30 soniya max
+    - plus: 60 ta/oy, 60 soniya max  
+    - unlimited: cheksiz, 60 soniya max
     
-    Returns: {"allowed": bool, "remaining": int, "used": int, "limit": int, "is_pro": bool}
+    Returns: {"allowed": bool, "remaining": int, "used": int, "limit": int, "max_duration": int, "tier": str}
     """
-    # PRO foydalanuvchilar - cheksiz
-    if is_pro:
-        usage = await get_voice_usage(db, user_id)
+    tier_limits = get_voice_tier_limits(voice_tier)
+    usage = await get_voice_usage(db, user_id)
+    
+    # Unlimited tier
+    if tier_limits["monthly_limit"] == -1:
         return {
             "allowed": True,
             "remaining": -1,  # -1 = cheksiz
             "used": usage["voice_count"],
-            "limit": -1,  # -1 = cheksiz
-            "is_pro": True
+            "limit": -1,
+            "max_duration": tier_limits["max_duration"],
+            "tier": voice_tier,
+            "tier_name_uz": tier_limits["name_uz"],
+            "tier_name_ru": tier_limits["name_ru"]
         }
     
-    # FREE foydalanuvchilar - asosiy limit + bonus
-    usage = await get_voice_usage(db, user_id)
-    total_limit = MONTHLY_VOICE_LIMIT + bonus_voice
+    # Basic or Plus tier with limit
+    total_limit = tier_limits["monthly_limit"] + bonus_voice
     remaining = max(0, total_limit - usage["voice_count"])
     
     if usage["voice_count"] >= total_limit:
@@ -2671,8 +2718,11 @@ async def check_voice_limit(db, user_id: int, is_pro: bool = False, bonus_voice:
             "remaining": 0,
             "used": usage["voice_count"],
             "limit": total_limit,
-            "bonus": bonus_voice,
-            "is_pro": False
+            "max_duration": tier_limits["max_duration"],
+            "tier": voice_tier,
+            "tier_name_uz": tier_limits["name_uz"],
+            "tier_name_ru": tier_limits["name_ru"],
+            "bonus": bonus_voice
         }
     else:
         return {
@@ -2680,62 +2730,67 @@ async def check_voice_limit(db, user_id: int, is_pro: bool = False, bonus_voice:
             "remaining": remaining,
             "used": usage["voice_count"],
             "limit": total_limit,
-            "bonus": bonus_voice,
-            "is_pro": False
+            "max_duration": tier_limits["max_duration"],
+            "tier": voice_tier,
+            "tier_name_uz": tier_limits["name_uz"],
+            "tier_name_ru": tier_limits["name_ru"],
+            "bonus": bonus_voice
         }
 
 
 def format_voice_limit_message(limit_info: Dict, lang: str = "uz") -> str:
     """
     Ovozli xabar limiti haqida xabar - limit tugaganda
+    Yangi tariflar: Voice+ va Voice Unlimited
     """
     from app.languages import format_number
+    
+    tier = limit_info.get("tier", "basic")
+    max_dur = limit_info.get("max_duration", 30)
     
     if lang == "uz":
         if not limit_info["allowed"]:
             return (
                 "🔒 *OVOZLI XABAR LIMITI TUGADI*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"📊 Ishlatilgan: *{limit_info['used']}/{limit_info['limit']}*\n\n"
+                f"📊 Ishlatilgan: *{limit_info['used']}/{limit_info['limit']}*\n"
+                f"⏱ Hozirgi tarif: *{limit_info.get('tier_name_uz', 'Asosiy')}* ({max_dur} sek)\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "💡 *DAVOM ETISH UCHUN:*\n\n"
-                "1️⃣ *PRO obuna* — cheksiz ovozli xabar\n"
-                f"   ├ 1 hafta: `14,990 so'm`\n"
-                f"   ├ 1 oy: `29,990 so'm`\n"
-                f"   └ 1 yil: `249,990 so'm`\n\n"
-                "2️⃣ *Voice Pack* — 100 ta qo'shimcha\n"
-                f"   └ Narxi: `{format_number(VOICE_PACK_PRICE)} so'm`\n\n"
+                "💡 *YANGILASH UCHUN:*\n\n"
+                "🎤 *Voice+* — 60 ta/oy, 60 sek\n"
+                f"   └ Narxi: `{format_number(VOICE_PLUS_PRICE)} so'm/oy`\n\n"
+                "♾️ *Voice Unlimited* — cheksiz, 60 sek\n"
+                f"   └ Narxi: `{format_number(VOICE_UNLIMITED_PRICE)} so'm/oy`\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "✍️ Yoki matnli xabar orqali davom eting!"
+                "✍️ *Matnli kiritish BEPUL va cheksiz!*"
             )
         else:
-            if limit_info.get("is_pro"):
-                return "🎤 PRO: *Cheksiz* ovozli xabar"
-            return f"🎤 Qolgan: *{limit_info['remaining']}/{limit_info['limit']}*"
+            if limit_info.get("limit") == -1:
+                return f"🎤 *{limit_info.get('tier_name_uz', 'Cheksiz')}*: ♾️ cheksiz (max {max_dur} sek)"
+            return f"🎤 Qolgan: *{limit_info['remaining']}/{limit_info['limit']}* (max {max_dur} sek)"
     else:
         if not limit_info["allowed"]:
             return (
                 "🔒 *ЛИМИТ ГОЛОСОВЫХ ИСЧЕРПАН*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"📊 Использовано: *{limit_info['used']}/{limit_info['limit']}*\n\n"
+                f"📊 Использовано: *{limit_info['used']}/{limit_info['limit']}*\n"
+                f"⏱ Текущий тариф: *{limit_info.get('tier_name_ru', 'Базовый')}* ({max_dur} сек)\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "💡 *ЧТОБЫ ПРОДОЛЖИТЬ:*\n\n"
-                "1️⃣ *PRO подписка* — безлимит\n"
-                f"   ├ 1 неделя: `14,990 сум`\n"
-                f"   ├ 1 месяц: `29,990 сум`\n"
-                f"   └ 1 год: `249,990 сум`\n\n"
-                "2️⃣ *Voice Pack* — 100 дополнительных\n"
-                f"   └ Цена: `{format_number(VOICE_PACK_PRICE)} сум`\n\n"
+                "💡 *ДЛЯ ОБНОВЛЕНИЯ:*\n\n"
+                "🎤 *Voice+* — 60 шт/мес, 60 сек\n"
+                f"   └ Цена: `{format_number(VOICE_PLUS_PRICE)} сум/мес`\n\n"
+                "♾️ *Voice Unlimited* — безлимит, 60 сек\n"
+                f"   └ Цена: `{format_number(VOICE_UNLIMITED_PRICE)} сум/мес`\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                "✍️ Или продолжайте текстом!"
+                "✍️ *Текстовый ввод БЕСПЛАТНО и без лимита!*"
             )
         else:
-            if limit_info.get("is_pro"):
-                return "🎤 PRO: *Безлимит* голосовых"
-            return f"🎤 Осталось: *{limit_info['remaining']}/{limit_info['limit']}*"
+            if limit_info.get("limit") == -1:
+                return f"🎤 *{limit_info.get('tier_name_ru', 'Безлимит')}*: ♾️ безлимит (max {max_dur} сек)"
+            return f"🎤 Осталось: *{limit_info['remaining']}/{limit_info['limit']}* (max {max_dur} сек)"
 
 
-def format_voice_duration_error(duration: int, lang: str = "uz") -> str:
+def format_voice_duration_error(duration: int, max_duration: int = 30, lang: str = "uz") -> str:
     """
     Ovozli xabar juda uzun bo'lganda xato xabari
     """
@@ -2744,16 +2799,22 @@ def format_voice_duration_error(duration: int, lang: str = "uz") -> str:
             "⚠️ *OVOZ JUDA UZUN*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"Ovozli xabar uzunligi: *{duration}* sekund\n"
-            f"Maksimal ruxsat: *{MAX_VOICE_DURATION}* sekund\n\n"
-            "💡 Qisqaroq ovozli xabar yuboring yoki matn yozing."
+            f"Sizning limitingiz: *{max_duration}* sekund\n\n"
+            "💡 *Uzunroq ovoz uchun:*\n"
+            f"├ Voice+ — 60 sekund (`{format_number(VOICE_PLUS_PRICE)} so'm/oy`)\n"
+            f"└ Voice Unlimited — 60 sekund (`{format_number(VOICE_UNLIMITED_PRICE)} so'm/oy`)\n\n"
+            "✍️ Yoki matnli xabar yuboring (bepul!)"
         )
     else:
         return (
             "⚠️ *СЛИШКОМ ДЛИННОЕ СООБЩЕНИЕ*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"Длительность: *{duration}* секунд\n"
-            f"Максимум: *{MAX_VOICE_DURATION}* секунд\n\n"
-            "💡 Отправьте короче или напишите текстом."
+            f"Ваш лимит: *{max_duration}* секунд\n\n"
+            "💡 *Для более длинных:*\n"
+            f"├ Voice+ — 60 сек (`{format_number(VOICE_PLUS_PRICE)} сум/мес`)\n"
+            f"└ Voice Unlimited — 60 сек (`{format_number(VOICE_UNLIMITED_PRICE)} сум/мес`)\n\n"
+            "✍️ Или напишите текстом (бесплатно!)"
         )
 
 

@@ -1160,3 +1160,192 @@ async def add_bonus_voice(telegram_id: int, count: int = 100) -> bool:
         logger.error(f"[VOICE_PACK] Error adding bonus voice: {e}")
         return False
 
+
+# ==================== VOICE TIER PURCHASE (Voice+, Voice Unlimited) ====================
+
+async def buy_voice_plus_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Voice+ tier purchase request"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    from app.ai_assistant import VOICE_PLUS_PRICE, VOICE_TIERS
+    
+    # Show Voice+ purchase info
+    if lang == "uz":
+        msg = (
+            "🎤 *VOICE+ OBUNA*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📦 *Nima kiradi:*\n"
+            "├ 📊 Oyiga *60 ta* ovozli xabar\n"
+            "├ ⏱ Har biri *60 soniyagacha*\n"
+            "└ 📝 Matnli kiritish - BEPUL va cheksiz\n\n"
+            "✅ *Afzalliklari:*\n"
+            "├ Basic dan 2 baravar ko'p\n"
+            "├ Uzunroq ovozli xabarlar\n"
+            "└ Oylik obuna\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Narxi:* `{format_number(VOICE_PLUS_PRICE)} so'm/oy`\n\n"
+            "💳 *To'lov: Telegram Payment*"
+        )
+    else:
+        msg = (
+            "🎤 *VOICE+ ПОДПИСКА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📦 *Что включено:*\n"
+            "├ 📊 *60* голосовых в месяц\n"
+            "├ ⏱ До *60 секунд* каждое\n"
+            "└ 📝 Текстовый ввод - БЕСПЛАТНО\n\n"
+            "✅ *Преимущества:*\n"
+            "├ В 2 раза больше Basic\n"
+            "├ Более длинные голосовые\n"
+            "└ Ежемесячная подписка\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Цена:* `{format_number(VOICE_PLUS_PRICE)} сум/мес`\n\n"
+            "💳 *Оплата: Telegram Payment*"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            f"💳 To'lash {format_number(VOICE_PLUS_PRICE)} so'm" if lang == "uz" else f"💳 Оплатить {format_number(VOICE_PLUS_PRICE)} сум",
+            callback_data="tg_pay_voice_plus"
+        )],
+        [InlineKeyboardButton(
+            f"🎤 Voice Unlimited - {format_number(29990)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(29990)} сум",
+            callback_data="buy_voice_unlimited"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="cancel_voice_tier"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def buy_voice_unlimited_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Voice Unlimited tier purchase request"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    from app.ai_assistant import VOICE_UNLIMITED_PRICE, VOICE_TIERS
+    
+    # Show Voice Unlimited purchase info
+    if lang == "uz":
+        msg = (
+            "🎤 *VOICE UNLIMITED*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📦 *Nima kiradi:*\n"
+            "├ 📊 *CHEKSIZ* ovozli xabar\n"
+            "├ ⏱ Har biri *60 soniyagacha*\n"
+            "└ 📝 Matnli kiritish - BEPUL va cheksiz\n\n"
+            "✅ *Afzalliklari:*\n"
+            "├ Hech qanday limit yo'q\n"
+            "├ Uzun ovozli xabarlar\n"
+            "├ Premium foydalanuvchi\n"
+            "└ Oylik obuna\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Narxi:* `{format_number(VOICE_UNLIMITED_PRICE)} so'm/oy`\n\n"
+            "💳 *To'lov: Telegram Payment*"
+        )
+    else:
+        msg = (
+            "🎤 *VOICE UNLIMITED*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📦 *Что включено:*\n"
+            "├ 📊 *БЕЗЛИМИТ* голосовых\n"
+            "├ ⏱ До *60 секунд* каждое\n"
+            "└ 📝 Текстовый ввод - БЕСПЛАТНО\n\n"
+            "✅ *Преимущества:*\n"
+            "├ Никаких лимитов\n"
+            "├ Длинные голосовые\n"
+            "├ Премиум пользователь\n"
+            "└ Ежемесячная подписка\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Цена:* `{format_number(VOICE_UNLIMITED_PRICE)} сум/мес`\n\n"
+            "💳 *Оплата: Telegram Payment*"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            f"💳 To'lash {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"💳 Оплатить {format_number(VOICE_UNLIMITED_PRICE)} сум",
+            callback_data="tg_pay_voice_unlimited"
+        )],
+        [InlineKeyboardButton(
+            f"🎤 Voice+ - {format_number(14990)} so'm" if lang == "uz" else f"🎤 Voice+ - {format_number(14990)} сум",
+            callback_data="buy_voice_plus"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="cancel_voice_tier"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def cancel_voice_tier_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel voice tier purchase"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    await query.edit_message_text(
+        "✅ Bekor qilindi" if lang == "uz" else "✅ Отменено"
+    )
+
+
+async def activate_voice_tier(telegram_id: int, tier: str = "plus") -> bool:
+    """Activate voice tier for user (1 month duration)"""
+    db = await get_database()
+    from datetime import datetime, timedelta
+    
+    expires = datetime.now() + timedelta(days=30)
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET voice_tier = $1, voice_tier_expires = $2
+                    WHERE telegram_id = $3
+                """, tier, expires, telegram_id)
+        else:
+            await db._connection.execute("""
+                UPDATE users 
+                SET voice_tier = ?, voice_tier_expires = ?
+                WHERE telegram_id = ?
+            """, (tier, expires.isoformat(), telegram_id))
+            await db._connection.commit()
+        
+        logger.info(f"[VOICE_TIER] Activated {tier} for user {telegram_id} until {expires}")
+        return True
+    except Exception as e:
+        logger.error(f"[VOICE_TIER] Error activating tier: {e}")
+        return False

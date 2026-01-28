@@ -154,6 +154,119 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"Pre-checkout approved for user {query.from_user.id}")
 
 
+async def handle_voice_tier_payment(update: Update, context: ContextTypes.DEFAULT_TYPE, payment, tier: str) -> None:
+    """Handle successful Voice Tier (Voice+ or Unlimited) payment"""
+    message = update.message
+    telegram_id = update.effective_user.id
+    
+    from app.ai_assistant import VOICE_PLUS_PRICE, VOICE_UNLIMITED_PRICE, VOICE_TIERS
+    from app.subscription_handlers import activate_voice_tier
+    from app.languages import format_number
+    
+    logger.info(f"Voice {tier} payment received from user {telegram_id}")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        logger.error(f"User not found for Voice Tier: {telegram_id}")
+        await message.reply_text("❌ Foydalanuvchi topilmadi. /start bosing.")
+        return
+    
+    # Activate voice tier
+    success = await activate_voice_tier(telegram_id, tier)
+    
+    if not success:
+        logger.error(f"Failed to activate Voice {tier} for user {telegram_id}")
+        await message.reply_text("❌ Xatolik yuz berdi. Admin: @halos_support")
+        return
+    
+    # Get tier info
+    tier_info = VOICE_TIERS[tier]
+    price = VOICE_PLUS_PRICE if tier == "plus" else VOICE_UNLIMITED_PRICE
+    
+    # Record payment
+    now = datetime.now()
+    try:
+        await db.execute_update(
+            """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
+               VALUES ($1, $2, $3, 'telegram_click', $4, 'completed', $5)""" if db.is_postgres else
+            """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
+               VALUES (?, ?, ?, 'telegram_click', ?, 'completed', ?)""",
+            user['id'], f'voice_{tier}', price, payment.telegram_payment_charge_id, now
+        )
+    except Exception as e:
+        logger.error(f"Failed to record Voice Tier payment: {e}")
+    
+    # Calculate expiration date
+    from datetime import timedelta
+    expires = now + timedelta(days=30)
+    
+    lang = user.get("language", "uz")
+    
+    if lang == "uz":
+        if tier == "plus":
+            success_msg = (
+                "🎉 *VOICE+ MUVAFFAQIYATLI AKTIVLASHTIRILDI!*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎤 *Voice+* obuna faol!\n\n"
+                f"📊 Oylik limit: *{tier_info['monthly_limit']} ta*\n"
+                f"⏱ Max uzunlik: *{tier_info['max_duration']} soniya*\n"
+                f"💰 To'landi: *{format_number(price)} so'm*\n"
+                f"📅 Amal qiladi: *{expires.strftime('%d.%m.%Y')}* gacha\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "✨ Endi ovozli xabar yuborishingiz mumkin!\n\n"
+                "💡 _Matnli kiritish hamma uchun BEPUL va cheksiz!_"
+            )
+        else:  # unlimited
+            success_msg = (
+                "🎉 *VOICE UNLIMITED AKTIVLASHTIRILDI!*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎤 *Voice Unlimited* obuna faol!\n\n"
+                f"📊 Limit: *CHEKSIZ* ♾️\n"
+                f"⏱ Max uzunlik: *{tier_info['max_duration']} soniya*\n"
+                f"💰 To'landi: *{format_number(price)} so'm*\n"
+                f"📅 Amal qiladi: *{expires.strftime('%d.%m.%Y')}* gacha\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "✨ Endi cheksiz ovozli xabar yuborishingiz mumkin!\n\n"
+                "💡 _Matnli kiritish ham BEPUL va cheksiz!_"
+            )
+    else:
+        if tier == "plus":
+            success_msg = (
+                "🎉 *VOICE+ УСПЕШНО АКТИВИРОВАН!*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎤 *Voice+* подписка активна!\n\n"
+                f"📊 Лимит: *{tier_info['monthly_limit']}* в месяц\n"
+                f"⏱ Макс. длина: *{tier_info['max_duration']} сек*\n"
+                f"💰 Оплачено: *{format_number(price)} сум*\n"
+                f"📅 Действует до: *{expires.strftime('%d.%m.%Y')}*\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "✨ Теперь можно отправлять голосовые!\n\n"
+                "💡 _Текстовый ввод БЕСПЛАТНО для всех!_"
+            )
+        else:  # unlimited
+            success_msg = (
+                "🎉 *VOICE UNLIMITED АКТИВИРОВАН!*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎤 *Voice Unlimited* подписка активна!\n\n"
+                f"📊 Лимит: *БЕЗЛИМИТ* ♾️\n"
+                f"⏱ Макс. длина: *{tier_info['max_duration']} сек*\n"
+                f"💰 Оплачено: *{format_number(price)} сум*\n"
+                f"📅 Действует до: *{expires.strftime('%d.%m.%Y')}*\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "✨ Теперь безлимит голосовых!\n\n"
+                "💡 _Текстовый ввод тоже БЕСПЛАТНО!_"
+            )
+    
+    await message.reply_text(
+        success_msg,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    logger.info(f"Voice {tier} activated for user {telegram_id} until {expires}")
+
+
 async def handle_voice_pack_payment(update: Update, context: ContextTypes.DEFAULT_TYPE, payment) -> None:
     """Handle successful Voice Pack payment"""
     message = update.message
@@ -257,6 +370,12 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         # Check if it's Voice Pack payment: vp_{user_id}_{count}_{time}
         if payload.startswith("vp_"):
             await handle_voice_pack_payment(update, context, payment)
+            return
+        
+        # Check if it's Voice Tier payment: vt_{tier}_{user_id}_{time}
+        if payload.startswith("vt_"):
+            tier = parts[1]  # "plus" or "unlimited"
+            await handle_voice_tier_payment(update, context, payment, tier)
             return
         
         # PRO subscription payment: h_{user_id}_{plan_short}_{time}
@@ -437,6 +556,16 @@ async def telegram_pay_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await send_voice_pack_invoice(update, context)
         return
     
+    # Check if it's Voice+ tier
+    if plan_id == "voice_plus":
+        await send_voice_tier_invoice(update, context, "plus")
+        return
+    
+    # Check if it's Voice Unlimited tier
+    if plan_id == "voice_unlimited":
+        await send_voice_tier_invoice(update, context, "unlimited")
+        return
+    
     # Delete the message with buttons
     try:
         await query.message.delete()
@@ -502,6 +631,88 @@ async def send_voice_pack_invoice(update: Update, context: ContextTypes.DEFAULT_
         
     except Exception as e:
         logger.error(f"Failed to send Voice Pack invoice: {e}")
+        
+        error_msg = (
+            "❌ To'lov tizimida xatolik yuz berdi.\n"
+            "Iltimos, keyinroq urinib ko'ring."
+        ) if lang == "uz" else (
+            "❌ Ошибка платежной системы.\n"
+            "Пожалуйста, попробуйте позже."
+        )
+        
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=error_msg)
+
+
+async def send_voice_tier_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, tier: str) -> None:
+    """Send Voice Tier (Voice+ or Unlimited) payment invoice"""
+    query = update.callback_query
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import VOICE_PLUS_PRICE, VOICE_UNLIMITED_PRICE, VOICE_TIERS
+    
+    # Get tier info
+    if tier == "plus":
+        price = VOICE_PLUS_PRICE
+        tier_info = VOICE_TIERS["plus"]
+        if lang == "uz":
+            title = "Voice+ Obuna"
+            description = f"🎤 Oyiga {tier_info['monthly_limit']} ta ovozli xabar, har biri {tier_info['max_duration']} soniyagacha"
+            price_label = "Voice+ (1 oy)"
+        else:
+            title = "Voice+ Подписка"
+            description = f"🎤 {tier_info['monthly_limit']} голосовых в месяц, до {tier_info['max_duration']} секунд каждое"
+            price_label = "Voice+ (1 мес)"
+    else:  # unlimited
+        price = VOICE_UNLIMITED_PRICE
+        tier_info = VOICE_TIERS["unlimited"]
+        if lang == "uz":
+            title = "Voice Unlimited"
+            description = f"🎤 Cheksiz ovozli xabar, har biri {tier_info['max_duration']} soniyagacha"
+            price_label = "Voice Unlimited (1 oy)"
+        else:
+            title = "Voice Unlimited"
+            description = f"🎤 Безлимит голосовых, до {tier_info['max_duration']} секунд каждое"
+            price_label = "Voice Unlimited (1 мес)"
+    
+    # Telegram Payments uses tiyin (100 tiyin = 1 UZS)
+    amount_tiyin = int(price * 100)
+    
+    # Create payload: vt_{tier}_{telegram_id}_{timestamp}
+    payload = f"vt_{tier}_{telegram_id}_{datetime.now().strftime('%m%d%H%M')}"
+    
+    prices = [LabeledPrice(label=price_label, amount=amount_tiyin)]
+    
+    try:
+        # Delete the previous message
+        try:
+            await query.message.delete()
+        except:
+            pass
+        
+        chat_id = update.effective_chat.id
+        
+        await context.bot.send_invoice(
+            chat_id=chat_id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=CLICK_PROVIDER_TOKEN,
+            currency="UZS",
+            prices=prices,
+            start_parameter=f"voicetier{tier}",
+            need_name=False,
+            need_phone_number=False,
+            need_email=False,
+            need_shipping_address=False,
+            is_flexible=False,
+        )
+        
+        logger.info(f"Voice {tier} invoice sent to user {telegram_id}, amount: {price} UZS")
+        
+    except Exception as e:
+        logger.error(f"Failed to send Voice {tier} invoice: {e}")
         
         error_msg = (
             "❌ To'lov tizimida xatolik yuz berdi.\n"

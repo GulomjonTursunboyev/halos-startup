@@ -106,6 +106,10 @@ from app.subscription_handlers import (
     handle_promo_code_input,
     buy_voice_pack_callback,
     cancel_voice_pack_callback,
+    # Voice Tier callbacks
+    buy_voice_plus_callback,
+    buy_voice_unlimited_callback,
+    cancel_voice_tier_callback,
 )
 from app.telegram_payments import (
     pre_checkout_handler,
@@ -405,6 +409,17 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(cancel_voice_pack_callback, pattern="^cancel_voice_pack$")
+    )
+    
+    # Voice Tier handlers (Voice+, Voice Unlimited)
+    application.add_handler(
+        CallbackQueryHandler(buy_voice_plus_callback, pattern="^buy_voice_plus$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(buy_voice_unlimited_callback, pattern="^buy_voice_unlimited$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(cancel_voice_tier_callback, pattern="^cancel_voice_tier$")
     )
     
     # PRO Features handlers
