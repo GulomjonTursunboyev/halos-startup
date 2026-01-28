@@ -63,6 +63,9 @@ from app.handlers import (
     ai_correct_callback,
     ai_correct_multi_callback,
     ai_swap_type_callback,
+    ai_reanalyze_callback,      # Gemini bilan qayta tahlil
+    ai_change_category_callback,  # Kategoriya tanlash
+    ai_set_category_callback,   # Kategoriyani o'rnatish
     ai_delete_all_callback,
     ai_delete_callback,
     ai_rewrite_callback,
@@ -295,6 +298,17 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_")
+    )
+    # Gemini bilan qayta tahlil
+    app.add_handler(
+        CallbackQueryHandler(ai_reanalyze_callback, pattern="^ai_reanalyze_")
+    )
+    # Kategoriya o'zgartirish
+    app.add_handler(
+        CallbackQueryHandler(ai_change_category_callback, pattern="^ai_change_category_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_set_category_callback, pattern="^ai_set_category_")
     )
     app.add_handler(
         CallbackQueryHandler(ai_delete_callback, pattern="^ai_delete_")

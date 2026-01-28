@@ -5685,15 +5685,35 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # Save transaction
             transaction_id = await save_transaction(db, user["id"], transaction)
             
+            # O'RGANISH UCHUN: Context da saqlash (text handler uchun ham)
+            context.user_data["last_transaction"] = {
+                "original_text": text,
+                "transaction_id": transaction_id,
+                "type": transaction["type"],
+                "category": transaction["category"],
+                "amount": transaction["amount"],
+                "description": transaction.get("description", ""),
+                "ai_source": transaction.get("ai_source", "local"),
+                "needs_learning": transaction.get("ai_source") == "gemini"
+            }
+            
             # Format response with budget info
             msg = format_expense_saved_with_budget(transaction, budget_status, lang)
+            
+            # AI manbasini ko'rsatish
+            ai_source = transaction.get("ai_source", "local")
+            confidence = transaction.get("confidence", 0)
+            if ai_source == "gemini":
+                msg += f"\n\n🤖 _Gemini AI tahlili_" if lang == "uz" else f"\n\n🤖 _Анализ Gemini AI_"
+            elif ai_source == "learned":
+                msg += f"\n\n🧠 _O'rganilgan pattern ({confidence}%)_" if lang == "uz" else f"\n\n🧠 _Изученный паттерн ({confidence}%)_"
             
             # Keyboard with correction option
             keyboard = [
                 [
                     InlineKeyboardButton(
                         "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                        callback_data="ai_confirm_ok"
+                        callback_data="ai_confirm_learn"  # O'rganish bilan
                     ),
                     InlineKeyboardButton(
                         "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
@@ -5905,7 +5925,7 @@ async def ai_delete_all_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Start transaction correction process"""
+    """Start transaction correction process - with Gemini re-analysis option"""
     query = update.callback_query
     await query.answer()
     
@@ -5936,8 +5956,9 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
     
-    # Store correction info
+    # Store correction info and original text for re-learning
     context.user_data["ai_correcting"] = transaction_id
+    context.user_data["ai_correction_original"] = transaction.get("description", "")
     
     # Determine opposite type for swap button
     current_type = transaction['type']
@@ -5954,7 +5975,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"├ Kategoriya: *{transaction['category']}*\n"
             f"├ Summa: *{transaction['amount']:,}* so'm\n"
             f"└ Tavsif: _{transaction['description']}_\n\n"
-            "Quyidagilardan birini tanlang:"
+            "🤖 _Noto'g'ri tahlil qildim. Qanday tuzatay?_"
         )
     else:
         msg = (
@@ -5965,17 +5986,22 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"├ Категория: *{transaction['category']}*\n"
             f"├ Сумма: *{transaction['amount']:,}* сум\n"
             f"└ Описание: _{transaction['description']}_\n\n"
-            "Выберите действие:"
+            "🤖 _Неверный анализ. Как исправить?_"
         )
     
     keyboard = [
+        # Gemini bilan qayta tahlil
+        [InlineKeyboardButton(
+            "🤖 Gemini bilan qayta tahlil" if lang == "uz" else "🤖 Повторный анализ Gemini",
+            callback_data=f"ai_reanalyze_{transaction_id}"
+        )],
         [InlineKeyboardButton(
             f"🔄 {new_type_label}ga o'zgartirish" if lang == "uz" else f"🔄 Сделать {new_type_label_ru.lower()}ом",
             callback_data=f"ai_swap_type_{transaction_id}_{new_type}"
         )],
         [InlineKeyboardButton(
-            "🔄 Qayta yozish" if lang == "uz" else "🔄 Перезаписать",
-            callback_data=f"ai_rewrite_{transaction_id}"
+            "📝 Kategoriyani o'zgartirish" if lang == "uz" else "📝 Изменить категорию",
+            callback_data=f"ai_change_category_{transaction_id}"
         )],
         [InlineKeyboardButton(
             "✏️ Summani o'zgartirish" if lang == "uz" else "✏️ Изменить сумму",
@@ -6114,6 +6140,295 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
             f"├ Категория: *{new_category_name}*\n"
             f"└ Сумма: *{transaction['amount']:,}* сум\n\n"
             "🧠 _AI запомнил эту ошибку и не повторит её!_"
+        )
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Gemini bilan qayta tahlil qilish va AI'ni o'rgatish"""
+    query = update.callback_query
+    await query.answer("🤖 Gemini tahlil qilmoqda..." if context.user_data.get("lang") == "uz" else "🤖 Gemini анализирует...")
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID
+    callback_data = query.data  # ai_reanalyze_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        await query.edit_message_text("Xatolik" if lang == "uz" else "Ошибка")
+        return
+    
+    from app.ai_assistant import (
+        get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES,
+        confirm_and_learn
+    )
+    from app.gemini_ai import analyze_with_gemini, is_gemini_available
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, transaction_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        return
+    
+    # Original description ni olish
+    original_text = transaction.get("description", "") or context.user_data.get("ai_correction_original", "")
+    
+    if not original_text or not is_gemini_available():
+        await query.edit_message_text(
+            "❌ Gemini mavjud emas yoki matn topilmadi" if lang == "uz" else "❌ Gemini недоступен или текст не найден"
+        )
+        return
+    
+    # Gemini bilan qayta tahlil
+    try:
+        gemini_result = await analyze_with_gemini(original_text, lang)
+        
+        if not gemini_result:
+            await query.edit_message_text(
+                "❌ Gemini javob bermadi. Boshqa usulni tanlang." if lang == "uz" else "❌ Gemini не ответил. Выберите другой способ."
+            )
+            return
+        
+        new_type = gemini_result.get("type", "expense")
+        new_category = gemini_result.get("category", "boshqa")
+        new_amount = gemini_result.get("amount") or transaction["amount"]
+        new_description = gemini_result.get("description", original_text)
+        
+        # Kategoriya nomini olish
+        if new_type == "income":
+            new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
+        else:
+            new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
+        
+        # Database'ni yangilash
+        try:
+            if db._use_postgres:
+                async with db._pool.acquire() as conn:
+                    await conn.execute("""
+                        UPDATE transactions 
+                        SET type = $1, category = $2, category_key = $3, amount = $4, description = $5
+                        WHERE id = $6 AND user_id = $7
+                    """, new_type, new_category_name, new_category, new_amount, new_description, transaction_id, user["id"])
+            else:
+                await db._connection.execute("""
+                    UPDATE transactions 
+                    SET type = ?, category = ?, category_key = ?, amount = ?, description = ?
+                    WHERE id = ? AND user_id = ?
+                """, (new_type, new_category_name, new_category, new_amount, new_description, transaction_id, user["id"]))
+                await db._connection.commit()
+        except Exception as e:
+            print(f"[AI-REANALYZE] DB error: {e}")
+            await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+            return
+        
+        # AI'ga o'rgatish - Gemini natijasini to'g'ri deb belgilash
+        await confirm_and_learn(original_text, {
+            "type": new_type,
+            "category": new_category,
+            "amount": new_amount,
+            "description": new_description
+        })
+        
+        # Natijani ko'rsatish va tasdiqlash so'rash
+        if lang == "uz":
+            msg = (
+                "🤖 *GEMINI QAYTA TAHLILI*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📝 Yangi natija:\n"
+                f"├ Turi: *{'📥 Daromad' if new_type == 'income' else '📤 Xarajat'}*\n"
+                f"├ Kategoriya: *{new_category_name}*\n"
+                f"├ Summa: *{new_amount:,}* so'm\n"
+                f"└ Tavsif: _{new_description}_\n\n"
+                "✅ _Yangilandi va AI o'rgandi!_"
+            )
+        else:
+            msg = (
+                "🤖 *ПОВТОРНЫЙ АНАЛИЗ GEMINI*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📝 Новый результат:\n"
+                f"├ Тип: *{'📥 Доход' if new_type == 'income' else '📤 Расход'}*\n"
+                f"├ Категория: *{new_category_name}*\n"
+                f"├ Сумма: *{new_amount:,}* сум\n"
+                f"└ Описание: _{new_description}_\n\n"
+                "✅ _Обновлено и AI обучился!_"
+            )
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ To'g'ri" if lang == "uz" else "✅ Верно", callback_data="ai_confirm_ok"),
+                InlineKeyboardButton("❌ Yana noto'g'ri" if lang == "uz" else "❌ Всё ещё неверно", callback_data=f"ai_correct_{transaction_id}")
+            ]
+        ]
+        
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        
+    except Exception as e:
+        print(f"[AI-REANALYZE] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        await query.edit_message_text(
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
+        )
+
+
+async def ai_change_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Kategoriyani o'zgartirish - kategoriyalar ro'yxatini ko'rsatish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID
+    callback_data = query.data  # ai_change_category_123
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        return
+    
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, transaction_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        return
+    
+    # Turi bo'yicha kategoriyalarni ko'rsatish
+    tx_type = transaction["type"]
+    
+    if tx_type == "income":
+        categories = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"])
+    else:
+        categories = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
+    
+    if lang == "uz":
+        msg = (
+            "📂 *KATEGORIYA TANLANG*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Joriy: *{transaction['category']}*\n\n"
+            "Yangi kategoriya:"
+        )
+    else:
+        msg = (
+            "📂 *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Текущая: *{transaction['category']}*\n\n"
+            "Новая категория:"
+        )
+    
+    keyboard = []
+    for cat_key, cat_name in categories.items():
+        keyboard.append([InlineKeyboardButton(
+            cat_name,
+            callback_data=f"ai_set_category_{transaction_id}_{cat_key}"
+        )])
+    
+    keyboard.append([InlineKeyboardButton(
+        "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+        callback_data=f"ai_correct_{transaction_id}"
+    )])
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Tanlangan kategoriyani o'rnatish va AI'ga o'rgatish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract data: ai_set_category_123_oziq_ovqat
+    callback_data = query.data
+    parts = callback_data.split("_")
+    try:
+        transaction_id = int(parts[3])
+        new_category = "_".join(parts[4:])  # kategoriya nomi bo'sh joy bilan bo'lishi mumkin
+    except:
+        return
+    
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, confirm_and_learn
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, transaction_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        return
+    
+    tx_type = transaction["type"]
+    
+    # Kategoriya nomini olish
+    if tx_type == "income":
+        new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
+    else:
+        new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
+    
+    # Database'ni yangilash
+    try:
+        if db._use_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE transactions 
+                    SET category = $1, category_key = $2
+                    WHERE id = $3 AND user_id = $4
+                """, new_category_name, new_category, transaction_id, user["id"])
+        else:
+            await db._connection.execute("""
+                UPDATE transactions 
+                SET category = ?, category_key = ?
+                WHERE id = ? AND user_id = ?
+            """, (new_category_name, new_category, transaction_id, user["id"]))
+            await db._connection.commit()
+    except Exception as e:
+        print(f"[AI-SET-CATEGORY] DB error: {e}")
+        await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+        return
+    
+    # AI'ga o'rgatish
+    original_text = transaction.get("description", "") or context.user_data.get("ai_correction_original", "")
+    if original_text:
+        await confirm_and_learn(original_text, {
+            "type": tx_type,
+            "category": new_category,
+            "amount": transaction["amount"],
+            "description": transaction.get("description", "")
+        })
+    
+    if lang == "uz":
+        msg = (
+            "✅ *KATEGORIYA O'ZGARTIRILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📂 Yangi kategoriya: *{new_category_name}*\n"
+            f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
+            "🧠 _AI bu o'zgarishni o'rgandi!_"
+        )
+    else:
+        msg = (
+            "✅ *КАТЕГОРИЯ ИЗМЕНЕНА*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📂 Новая категория: *{new_category_name}*\n"
+            f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
+            "🧠 _AI запомнил это изменение!_"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
