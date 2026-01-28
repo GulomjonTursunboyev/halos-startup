@@ -5255,6 +5255,8 @@ async def ai_assistant_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle voice messages for AI assistant - works automatically for PRO users
     MULTI-TRANSACTION SUPPORT: Bir ovozli xabarda bir nechta tranzaksiyalarni aniqlaydi
+    
+    Faqat PRO (plus/unlimited) foydalanuvchilar uchun!
     """
     voice = update.message.voice
     if not voice:
@@ -5286,7 +5288,12 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.warning(f"[VOICE] User {telegram_id} not found in DB")
         return
     
-    # Get user's voice tier (basic, plus, unlimited)
+    # ==================== ADMIN TEKSHIRUVI ====================
+    from app.config import ADMIN_IDS
+    is_admin = telegram_id in ADMIN_IDS
+    
+    # ==================== 1. OBUNA TEKSHIRUVI (BIRINCHI!) ====================
+    # Faqat PRO (plus/unlimited) foydalanuvchilar ovozli xabar yuborishi mumkin
     voice_tier = user.get("voice_tier", "basic") or "basic"
     voice_tier_expires = user.get("voice_tier_expires")
     
@@ -5303,6 +5310,55 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             voice_tier = "basic"
             logger.info(f"[VOICE] User {telegram_id} voice tier expired, reverted to basic")
     
+    # ==================== BASIC FOYDALANUVCHILAR UCHUN PRO TAKLIF ====================
+    # Admin bo'lmasa va basic tier bo'lsa - PRO taklif qilish
+    if not is_admin and voice_tier == "basic":
+        if lang == "uz":
+            msg = (
+                "🎤 *Ovozli kiritish - PRO funksiya*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Ovozli xabarlar orqali xarajatlarni kiritish "
+                "faqat PRO foydalanuvchilar uchun mavjud.\n\n"
+                "✨ *PRO afzalliklari:*\n"
+                "├ 🎤 Ovozli kiritish\n"
+                "├ ⏱ Uzunroq ovozli xabarlar\n"
+                "├ 📊 Kengaytirilgan hisobotlar\n"
+                "└ 🚀 Ustuvor qo'llab-quvvatlash\n\n"
+                "💡 _Matnli kiritish BEPUL va cheksiz!_"
+            )
+        else:
+            msg = (
+                "🎤 *Голосовой ввод - PRO функция*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Ввод расходов голосом доступен "
+                "только для PRO пользователей.\n\n"
+                "✨ *Преимущества PRO:*\n"
+                "├ 🎤 Голосовой ввод\n"
+                "├ ⏱ Более длинные сообщения\n"
+                "├ 📊 Расширенные отчёты\n"
+                "└ 🚀 Приоритетная поддержка\n\n"
+                "💡 _Текстовый ввод БЕСПЛАТНО!_"
+            )
+        
+        keyboard = [
+            [InlineKeyboardButton(
+                f"🎤 Voice+ (60 ta/oy) - {format_number(VOICE_PLUS_PRICE)} so'm" if lang == "uz" else f"🎤 Voice+ (60/мес) - {format_number(VOICE_PLUS_PRICE)} сум",
+                callback_data="buy_voice_plus"
+            )],
+            [InlineKeyboardButton(
+                f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
+                callback_data="buy_voice_unlimited"
+            )]
+        ]
+        
+        await update.message.reply_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== 2. OVOZ UZUNLIGI TEKSHIRUVI ====================
     # Get tier limits
     tier_limits = get_voice_tier_limits(voice_tier)
     max_duration = tier_limits["max_duration"]
@@ -5312,11 +5368,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     logger.info(f"[VOICE] User {telegram_id} - Tier: {voice_tier}, Max Duration: {max_duration}s, Bonus: {bonus_voice}")
     
-    # ==================== ADMIN UCHUN CHEKSIZ ====================
-    from app.config import ADMIN_IDS
-    is_admin = telegram_id in ADMIN_IDS
-    
-    # Check voice duration limit (based on tier) - KOTIB.AI GA YUBORISHDAN OLDIN!
+    # Check voice duration limit (based on tier)
     voice_duration = voice.duration or 0
     
     # Admin uchun limitlarni tekshirmaslik
@@ -5338,19 +5390,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # Limit tugagan - tier ga qarab upgrade opsiyalarini ko'rsatish
         keyboard = []
         
-        if voice_tier == "basic":
-            # Basic userga Voice+ va Voice Unlimited taklif qilish
-            keyboard = [
-                [InlineKeyboardButton(
-                    f"🎤 Voice+ (60 ta/oy) - {format_number(VOICE_PLUS_PRICE)} so'm" if lang == "uz" else f"🎤 Voice+ (60/мес) - {format_number(VOICE_PLUS_PRICE)} сум",
-                    callback_data="buy_voice_plus"
-                )],
-                [InlineKeyboardButton(
-                    f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
-                    callback_data="buy_voice_unlimited"
-                )]
-            ]
-        elif voice_tier == "plus":
+        # Basic userlar bu yerga kelmaydi (yuqorida to'xtatiladi)
+        # Faqat plus tier uchun upgrade taklif
+        if voice_tier == "plus":
             # Voice+ userga Voice Unlimited taklif qilish
             keyboard = [
                 [InlineKeyboardButton(
@@ -5547,8 +5589,8 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         "transaction_ids": transaction_ids
                     }
                     
-                    # Format response
-                    msg = format_multiple_transactions_message(transactions, budget_status, lang)
+                    # Format response (now returns tuple with needs_clarification_list)
+                    msg, needs_clarification_list = format_multiple_transactions_message(transactions, budget_status, lang)
                     
                     # Get updated voice limit info (Admin uchun ko'rsatmaslik)
                     if not is_admin:
@@ -5558,22 +5600,32 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     
                     # Keyboard
                     ids_str = ",".join([str(tid) for tid in transaction_ids])
-                    keyboard = [
-                        [
-                            InlineKeyboardButton(
-                                "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
-                                callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
-                            ),
-                            InlineKeyboardButton(
-                                "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
-                                callback_data=f"ai_correct_multi_{ids_str}"
-                            )
-                        ],
-                        [InlineKeyboardButton(
-                            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                            callback_data="ai_report"
-                        )]
-                    ]
+                    keyboard = []
+                    
+                    # Aniqlashtirish tugmasi - agar kerak bo'lsa
+                    if needs_clarification_list:
+                        # Birinchi aniqlashtirish kerak bo'lgan tranzaksiya uchun
+                        first_idx, first_tx, clarification_type = needs_clarification_list[0]
+                        clarify_tx_id = transaction_ids[first_idx - 1] if first_idx <= len(transaction_ids) else transaction_ids[0]
+                        keyboard.append([InlineKeyboardButton(
+                            f"🔍 Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"🔍 Уточнить ({len(needs_clarification_list)})",
+                            callback_data=f"ai_clarify_multi_{ids_str}"
+                        )])
+                    
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
+                            callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
+                        ),
+                        InlineKeyboardButton(
+                            "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
+                            callback_data=f"ai_correct_multi_{ids_str}"
+                        )
+                    ])
+                    keyboard.append([InlineKeyboardButton(
+                        "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                        callback_data="ai_report"
+                    )])
                     
                     await processing_msg.edit_text(
                         msg,
@@ -6154,6 +6206,80 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
     )
 
 
+async def ai_clarify_multi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ko'p tranzaksiyalar uchun aniqlashtirish - qaysi birini aniqlashtirish kerakligini ko'rsatish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction IDs from callback data: ai_clarify_multi_1,2,3
+    callback_data = query.data
+    try:
+        ids_str = callback_data.replace("ai_clarify_multi_", "")
+        transaction_ids = [int(x) for x in ids_str.split(",")]
+    except:
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Aniqlashtirish kerak bo'lgan tranzaksiyalarni topish
+    needs_clarification = []
+    for tid in transaction_ids:
+        tx = await get_transaction_by_id(db, tid)
+        if tx and tx["user_id"] == user["id"]:
+            # Kategoriya "boshqa" yoki noaniq bo'lsa
+            if tx.get("category_key") == "boshqa" or tx.get("category") in ["Boshqa", "Другое", "boshqa"]:
+                needs_clarification.append(tx)
+    
+    if not needs_clarification:
+        await query.edit_message_text(
+            "✅ Barcha tranzaksiyalar aniq" if lang == "uz" else "✅ Все транзакции точны"
+        )
+        return
+    
+    # Ro'yxatni ko'rsatish
+    if lang == "uz":
+        msg = (
+            "🔍 *QAYSI YOZUVNI ANIQLASHTIRISH KERAK?*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+    else:
+        msg = (
+            "🔍 *КАКУЮ ЗАПИСЬ УТОЧНИТЬ?*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+    
+    keyboard = []
+    for i, tx in enumerate(needs_clarification, 1):
+        tx_type = "📥" if tx['type'] == 'income' else "📤"
+        msg += f"{i}. {tx_type} *{tx['amount']:,}* - {tx.get('description', '')[:30]}\n"
+        
+        keyboard.append([InlineKeyboardButton(
+            f"🔍 #{i} - {tx['amount']:,}",
+            callback_data=f"ai_clarify_category_{tx['id']}"
+        )])
+    
+    keyboard.append([InlineKeyboardButton(
+        "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+        callback_data="ai_cancel_correct"
+    )])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
 async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Kategoriyani aniqlashtirish uchun kategoriya ro'yxatini ko'rsatish"""
     query = update.callback_query
@@ -6417,6 +6543,12 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     new_type_label = "Xarajat" if new_type == "expense" else "Daromad"
     new_type_label_ru = "Расход" if new_type == "expense" else "Доход"
     
+    # Description uchun xavfsiz escape (Markdown maxsus belgilardan)
+    description = transaction.get('description', '') or ''
+    # Markdown maxsus belgilarni escape qilish
+    for char in ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']:
+        description = description.replace(char, '\\' + char)
+    
     if lang == "uz":
         msg = (
             "✏️ *TUZATISH*\n"
@@ -6425,7 +6557,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"├ Turi: *{'Daromad' if transaction['type'] == 'income' else 'Xarajat'}*\n"
             f"├ Kategoriya: *{transaction['category']}*\n"
             f"├ Summa: *{transaction['amount']:,}* so'm\n"
-            f"└ Tavsif: _{transaction['description']}_\n\n"
+            f"└ Tavsif: _{description}_\n\n"
             "🤖 _Noto'g'ri tahlil qildim. Qanday tuzatay?_"
         )
     else:
@@ -6436,7 +6568,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"├ Тип: *{'Доход' if transaction['type'] == 'income' else 'Расход'}*\n"
             f"├ Категория: *{transaction['category']}*\n"
             f"├ Сумма: *{transaction['amount']:,}* сум\n"
-            f"└ Описание: _{transaction['description']}_\n\n"
+            f"└ Описание: _{description}_\n\n"
             "🤖 _Неверный анализ. Как исправить?_"
         )
     

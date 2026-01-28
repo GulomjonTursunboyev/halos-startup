@@ -1955,10 +1955,13 @@ async def save_multiple_transactions(db, user_id: int, transactions: List[Dict])
     return transaction_ids
 
 
-def format_multiple_transactions_message(transactions: List[Dict], budget_status: Dict, lang: str = "uz") -> str:
+def format_multiple_transactions_message(transactions: List[Dict], budget_status: Dict, lang: str = "uz") -> tuple:
     """
     Bir nechta tranzaksiyalar uchun xabar formatlash - YAXSHILANGAN v2.0
     Aniqlashtirish kerak bo'lgan tranzaksiyalarni ko'rsatadi
+    
+    Returns:
+        tuple: (msg: str, needs_clarification_list: List[Tuple])
     """
     # Aniqlashtirish turlari uchun matnlar
     clarification_texts = {
@@ -2105,7 +2108,7 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
             msg += f"\n\n⚠️ *Требуется уточнение:* {len(needs_clarification_list)}\n"
             msg += "_Используйте кнопки для исправления_"
     
-    return msg
+    return msg, needs_clarification_list
 
 
 # Legacy function for backwards compatibility
@@ -4201,8 +4204,7 @@ def format_period_report(report_data: Dict, lang: str = "uz") -> str:
                 msg += "📉 *Top xarajatlar:*\n"
                 sorted_exp = sorted(expenses_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
                 for cat, amt in sorted_exp:
-                    cat_emoji = CATEGORY_EMOJIS.get(cat, "📌")
-                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} so'm\n"
+                    msg += f"├ 📌 {cat}: {format_number(amt)} so'm\n"
                 msg += "\n"
             
             # Top daromadlar
@@ -4210,8 +4212,7 @@ def format_period_report(report_data: Dict, lang: str = "uz") -> str:
                 msg += "📈 *Top daromadlar:*\n"
                 sorted_inc = sorted(incomes_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
                 for cat, amt in sorted_inc:
-                    cat_emoji = CATEGORY_EMOJIS.get(cat, "💵")
-                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} so'm\n"
+                    msg += f"├ 💵 {cat}: {format_number(amt)} so'm\n"
         
         msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
         msg += "💡 _Matnli kiritish BEPUL va cheksiz!_"
@@ -4244,8 +4245,7 @@ def format_period_report(report_data: Dict, lang: str = "uz") -> str:
                 msg += "📉 *Топ расходы:*\n"
                 sorted_exp = sorted(expenses_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
                 for cat, amt in sorted_exp:
-                    cat_emoji = CATEGORY_EMOJIS.get(cat, "📌")
-                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} сум\n"
+                    msg += f"├ 📌 {cat}: {format_number(amt)} сум\n"
                 msg += "\n"
             
             # Top доходы
@@ -4253,8 +4253,7 @@ def format_period_report(report_data: Dict, lang: str = "uz") -> str:
                 msg += "📈 *Топ доходы:*\n"
                 sorted_inc = sorted(incomes_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
                 for cat, amt in sorted_inc:
-                    cat_emoji = CATEGORY_EMOJIS.get(cat, "💵")
-                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} сум\n"
+                    msg += f"├ 💵 {cat}: {format_number(amt)} сум\n"
         
         msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
         msg += "💡 _Текстовый ввод БЕСПЛАТНО!_"

@@ -80,6 +80,7 @@ from app.handlers import (
     ai_new_category_callback,   # Yangi kategoriya yaratish
     ai_set_category_callback,   # Kategoriyani o'rnatish
     ai_clarify_category_callback,  # Kategoriyani aniqlashtirish (ixtiyoriy)
+    ai_clarify_multi_callback,  # Ko'p tranzaksiya aniqlashtirish
     ai_delete_all_callback,
     ai_delete_callback,
     ai_rewrite_callback,
@@ -585,6 +586,10 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(ai_new_category_callback, pattern="^ai_new_category_")
+    )
+    # Ko'p tranzaksiya aniqlashtirish
+    application.add_handler(
+        CallbackQueryHandler(ai_clarify_multi_callback, pattern="^ai_clarify_multi_")
     )
     # Kategoriyani aniqlashtirish (ixtiyoriy)
     application.add_handler(
