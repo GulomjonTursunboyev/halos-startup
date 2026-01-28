@@ -4259,48 +4259,83 @@ async def send_scheduled_report(context, telegram_id: int, period: str = "daily"
         return False
 
 
+# ==================== BATCH REPORT SENDING ====================
+# Server yuklanishini kamaytirish uchun hisobotlar navbat bilan yuboriladi
+# Har bir userga yuborilgandan keyin kutish (delay) qo'shiladi
+
+REPORT_BATCH_SIZE = 10  # Bir batch da nechta user
+REPORT_DELAY_SECONDS = 3  # Har bir user orasida kutish (soniya)
+REPORT_BATCH_DELAY = 10  # Batch orasida kutish (soniya)
+
+
 async def send_daily_reports(context) -> int:
-    """Barcha foydalanuvchilarga kunlik hisobot yuborish (JobQueue callback)"""
+    """
+    Barcha foydalanuvchilarga kunlik hisobot yuborish (BATCH MODE)
+    Kunlik = faqat matn, tez yuboriladi
+    """
+    import asyncio
     from app.database import get_database
     
     db = await get_database()
     sent_count = 0
+    failed_count = 0
     
     try:
-        # Hisobot olish yoqilgan foydalanuvchilar (reports_enabled = true)
+        # Hisobot olish yoqilgan foydalanuvchilar
         if db.is_postgres:
             async with db._pool.acquire() as conn:
                 rows = await conn.fetch("""
                     SELECT telegram_id FROM users 
                     WHERE reports_daily = true AND telegram_id IS NOT NULL
+                    ORDER BY RANDOM()
                 """)
         else:
             cursor = await db._connection.execute("""
                 SELECT telegram_id FROM users 
                 WHERE reports_daily = 1 AND telegram_id IS NOT NULL
+                ORDER BY RANDOM()
             """)
             rows = await cursor.fetchall()
         
-        for row in rows:
-            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
-            success = await send_scheduled_report(context, telegram_id, "daily")
-            if success:
-                sent_count += 1
+        total_users = len(rows)
+        logger.info(f"[REPORT] Kunlik hisobot: {total_users} ta foydalanuvchi")
         
-        logger.info(f"[REPORT] Kunlik hisobotlar yuborildi: {sent_count} ta")
+        for i, row in enumerate(rows):
+            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
+            
+            try:
+                success = await send_scheduled_report(context, telegram_id, "daily")
+                if success:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+            except Exception as e:
+                logger.error(f"[REPORT] Daily error for {telegram_id}: {e}")
+                failed_count += 1
+            
+            # Delay: kunlik matn uchun 1 soniya yetarli
+            if i < total_users - 1:
+                await asyncio.sleep(1)
+        
+        logger.info(f"[REPORT] Kunlik hisobotlar: {sent_count} yuborildi, {failed_count} xatolik")
         
     except Exception as e:
-        logger.error(f"[REPORT] Kunlik hisobotlar yuborishda xatolik: {e}")
+        logger.error(f"[REPORT] Kunlik hisobotlar xatolik: {e}")
     
     return sent_count
 
 
 async def send_weekly_reports(context) -> int:
-    """Barcha foydalanuvchilarga haftalik hisobot yuborish (JobQueue callback)"""
+    """
+    Barcha foydalanuvchilarga haftalik hisobot yuborish (BATCH MODE)
+    Haftalik = rasm bilan, sekinroq yuboriladi
+    """
+    import asyncio
     from app.database import get_database
     
     db = await get_database()
     sent_count = 0
+    failed_count = 0
     
     try:
         if db.is_postgres:
@@ -4308,34 +4343,61 @@ async def send_weekly_reports(context) -> int:
                 rows = await conn.fetch("""
                     SELECT telegram_id FROM users 
                     WHERE reports_weekly = true AND telegram_id IS NOT NULL
+                    ORDER BY RANDOM()
                 """)
         else:
             cursor = await db._connection.execute("""
                 SELECT telegram_id FROM users 
                 WHERE reports_weekly = 1 AND telegram_id IS NOT NULL
+                ORDER BY RANDOM()
             """)
             rows = await cursor.fetchall()
         
-        for row in rows:
-            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
-            success = await send_scheduled_report(context, telegram_id, "weekly")
-            if success:
-                sent_count += 1
+        total_users = len(rows)
+        logger.info(f"[REPORT] Haftalik hisobot: {total_users} ta foydalanuvchi")
         
-        logger.info(f"[REPORT] Haftalik hisobotlar yuborildi: {sent_count} ta")
+        for i, row in enumerate(rows):
+            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
+            
+            try:
+                success = await send_scheduled_report(context, telegram_id, "weekly")
+                if success:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+            except Exception as e:
+                logger.error(f"[REPORT] Weekly error for {telegram_id}: {e}")
+                failed_count += 1
+            
+            # Delay: rasmli hisobot uchun 3 soniya
+            if i < total_users - 1:
+                await asyncio.sleep(REPORT_DELAY_SECONDS)
+            
+            # Har 10 ta userdan keyin qo'shimcha kutish
+            if (i + 1) % REPORT_BATCH_SIZE == 0:
+                logger.info(f"[REPORT] Haftalik batch {(i+1)//REPORT_BATCH_SIZE}: {sent_count} yuborildi")
+                await asyncio.sleep(REPORT_BATCH_DELAY)
+        
+        logger.info(f"[REPORT] Haftalik hisobotlar: {sent_count} yuborildi, {failed_count} xatolik")
         
     except Exception as e:
-        logger.error(f"[REPORT] Haftalik hisobotlar yuborishda xatolik: {e}")
+        logger.error(f"[REPORT] Haftalik hisobotlar xatolik: {e}")
     
     return sent_count
 
 
 async def send_monthly_reports(context) -> int:
-    """Barcha foydalanuvchilarga oylik hisobot yuborish (JobQueue callback)"""
+    """
+    Barcha foydalanuvchilarga oylik hisobot yuborish (BATCH MODE)
+    Oylik = to'liq rasm, eng sekin yuboriladi
+    22:00gacha yetib borishi kerak
+    """
+    import asyncio
     from app.database import get_database
     
     db = await get_database()
     sent_count = 0
+    failed_count = 0
     
     try:
         if db.is_postgres:
@@ -4343,23 +4405,57 @@ async def send_monthly_reports(context) -> int:
                 rows = await conn.fetch("""
                     SELECT telegram_id FROM users 
                     WHERE reports_monthly = true AND telegram_id IS NOT NULL
+                    ORDER BY RANDOM()
                 """)
         else:
             cursor = await db._connection.execute("""
                 SELECT telegram_id FROM users 
                 WHERE reports_monthly = 1 AND telegram_id IS NOT NULL
+                ORDER BY RANDOM()
             """)
             rows = await cursor.fetchall()
         
-        for row in rows:
-            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
-            success = await send_scheduled_report(context, telegram_id, "monthly")
-            if success:
-                sent_count += 1
+        total_users = len(rows)
+        logger.info(f"[REPORT] Oylik hisobot: {total_users} ta foydalanuvchi")
         
-        logger.info(f"[REPORT] Oylik hisobotlar yuborildi: {sent_count} ta")
+        # Oylik hisobot uchun delay ni hisoblash
+        # Masalan 100 user bo'lsa, 3 soat ichida yuborish kerak (19:00-22:00)
+        # 3 soat = 10800 soniya, 100 user = har 108 soniyada 1 ta
+        # Lekin minimum 5 soniya, maximum 60 soniya
+        if total_users > 0:
+            available_time = 3 * 60 * 60  # 3 soat (soniyada)
+            calculated_delay = available_time / total_users
+            monthly_delay = max(5, min(60, calculated_delay))  # 5-60 soniya orasida
+        else:
+            monthly_delay = 10
+        
+        logger.info(f"[REPORT] Oylik delay: {monthly_delay:.1f} soniya/user")
+        
+        for i, row in enumerate(rows):
+            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
+            
+            try:
+                success = await send_scheduled_report(context, telegram_id, "monthly")
+                if success:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+            except Exception as e:
+                logger.error(f"[REPORT] Monthly error for {telegram_id}: {e}")
+                failed_count += 1
+            
+            # Dinamik delay
+            if i < total_users - 1:
+                await asyncio.sleep(monthly_delay)
+            
+            # Progress log har 20 ta userda
+            if (i + 1) % 20 == 0:
+                progress = ((i + 1) / total_users) * 100
+                logger.info(f"[REPORT] Oylik progress: {progress:.1f}% ({sent_count} yuborildi)")
+        
+        logger.info(f"[REPORT] Oylik hisobotlar: {sent_count} yuborildi, {failed_count} xatolik")
         
     except Exception as e:
-        logger.error(f"[REPORT] Oylik hisobotlar yuborishda xatolik: {e}")
+        logger.error(f"[REPORT] Oylik hisobotlar xatolik: {e}")
     
     return sent_count
