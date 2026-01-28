@@ -87,11 +87,8 @@ from app.handlers import (
     ai_amount_input_handler,
     ai_cancel_correct_callback,
     # AI Clarification handlers
-    ai_show_clarify_callback,
     ai_clarify_callback,
     ai_clarify_custom_callback,
-    ai_clarification_input_handler,
-    CLARIFICATION_OPTIONS,
     # AI Debt handlers
     ai_debt_list_callback,
     ai_debt_mark_returned_callback,
@@ -614,15 +611,12 @@ def main() -> None:
     application.add_handler(
         CallbackQueryHandler(ai_swap_type_callback, pattern="^ai_swap_type_")
     )
-    # Aniqlashtirish tugmalari - MUHIM: ai_show_clarify_ va ai_clarify_custom_ OLDIN!
+    # Aniqlashtirish tugmalari
     application.add_handler(
-        CallbackQueryHandler(ai_show_clarify_callback, pattern="^ai_show_clarify_")
+        CallbackQueryHandler(ai_clarify_callback, pattern="^ai_clarify_")
     )
     application.add_handler(
         CallbackQueryHandler(ai_clarify_custom_callback, pattern="^ai_clarify_custom_")
-    )
-    application.add_handler(
-        CallbackQueryHandler(ai_clarify_callback, pattern="^ai_clarify_")
     )
     
     # AI Debt handlers

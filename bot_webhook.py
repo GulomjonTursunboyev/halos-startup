@@ -37,6 +37,19 @@ from app.handlers import (
     menu_subscription_handler,
     menu_language_handler,
     menu_help_handler,
+    # Smart input handlers - transaction confirmation
+    menu_expense_input_handler,
+    text_expense_handler,
+    cancel_expense_mode_callback,
+    add_more_expense_callback,
+    show_expense_report_callback,
+    confirm_transaction_save_callback,
+    cancel_pending_transaction_callback,
+    swap_pending_type_callback,
+    edit_pending_transaction_callback,
+    edit_single_tx_callback,
+    set_category_callback,
+    back_to_pending_preview_callback,
     debt_plan_free_callback,
     debt_plan_pro_callback,
     menu_mode_callback,
@@ -221,6 +234,17 @@ def setup_handlers(app: Application) -> None:
         CallbackQueryHandler(menu_help_handler, pattern="^menu_help$")
     )
     
+    # Expense mode handlers
+    app.add_handler(
+        CallbackQueryHandler(cancel_expense_mode_callback, pattern="^cancel_expense_mode$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(add_more_expense_callback, pattern="^add_more_expense$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(show_expense_report_callback, pattern="^show_expense_report$")
+    )
+    
     # Debt plan callbacks
     app.add_handler(
         CallbackQueryHandler(debt_plan_free_callback, pattern="^debt_plan_free$")
@@ -232,6 +256,29 @@ def setup_handlers(app: Application) -> None:
     # Mode callback
     app.add_handler(
         CallbackQueryHandler(menu_mode_callback, pattern="^menu_mode$")
+    )
+    
+    # Smart input - transaction confirmation handlers
+    app.add_handler(
+        CallbackQueryHandler(confirm_transaction_save_callback, pattern="^confirm_transaction_save$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(cancel_pending_transaction_callback, pattern="^cancel_pending_transaction$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(swap_pending_type_callback, pattern="^swap_pending_type$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(edit_pending_transaction_callback, pattern="^edit_pending_transaction$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(edit_single_tx_callback, pattern="^edit_single_tx_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(set_category_callback, pattern="^set_category_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(back_to_pending_preview_callback, pattern="^back_to_pending_preview$")
     )
     
     # Income/debt handlers
@@ -343,15 +390,12 @@ def setup_handlers(app: Application) -> None:
     app.add_handler(
         CallbackQueryHandler(ai_swap_type_callback, pattern="^ai_swap_type_")
     )
-    # Aniqlashtirish tugmalari - MUHIM: ai_show_clarify_ va ai_clarify_custom_ OLDIN!
+    # Aniqlashtirish tugmalari
     app.add_handler(
-        CallbackQueryHandler(ai_show_clarify_callback, pattern="^ai_show_clarify_")
+        CallbackQueryHandler(ai_clarify_callback, pattern="^ai_clarify_")
     )
     app.add_handler(
         CallbackQueryHandler(ai_clarify_custom_callback, pattern="^ai_clarify_custom_")
-    )
-    app.add_handler(
-        CallbackQueryHandler(ai_clarify_callback, pattern="^ai_clarify_")
     )
     
     # AI Debt handlers
