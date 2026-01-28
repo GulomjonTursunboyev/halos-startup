@@ -345,6 +345,7 @@ class Database:
                     user_id INTEGER NOT NULL,
                     type TEXT NOT NULL,
                     category TEXT NOT NULL,
+                    category_key TEXT,
                     amount REAL DEFAULT 0,
                     description TEXT,
                     original_text TEXT,
@@ -352,6 +353,14 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            
+            # Add category_key column if it doesn't exist (migration)
+            try:
+                await conn.execute("""
+                    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS category_key TEXT
+                """)
+            except Exception:
+                pass  # Column already exists
             
             # Voice usage tracking (monthly limit)
             await conn.execute("""
@@ -559,6 +568,7 @@ class Database:
                 user_id INTEGER NOT NULL,
                 type TEXT NOT NULL,
                 category TEXT NOT NULL,
+                category_key TEXT,
                 amount REAL DEFAULT 0,
                 description TEXT,
                 original_text TEXT,

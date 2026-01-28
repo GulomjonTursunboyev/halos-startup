@@ -220,9 +220,10 @@ def _clean_kotib_text(text: str) -> str:
 
 
 async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
-    """Kotib.ai STT API"""
+    """Kotib.ai STT API - Optimized for speed"""
     try:
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=25, connect=5)  # Faster timeout
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             headers = {'Authorization': f'Bearer {KOTIB_API_KEY}'}
             
             data = aiohttp.FormData()
@@ -230,7 +231,7 @@ async def _transcribe_kotib(file_content: bytes) -> Optional[str]:
             data.add_field('language', 'uz')
             data.add_field('blocking', 'true')
             
-            async with session.post(KOTIB_STT_URL, data=data, headers=headers, timeout=60) as response:
+            async with session.post(KOTIB_STT_URL, data=data, headers=headers) as response:
                 response_text = await response.text()
                 logger.info(f"[STT][Kotib.ai] Status: {response.status}, Response: {response_text[:500]}")
                 
@@ -282,11 +283,12 @@ async def get_kotib_balance() -> Optional[Dict]:
         # Kotib.ai balance endpoint - GET /api/v1/get-balance
         balance_url = "https://developer.kotib.ai/api/v1/get-balance"
         
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=5, connect=2)  # Fast timeout
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             headers = {'Authorization': f'Bearer {KOTIB_API_KEY}'}
             
             try:
-                async with session.get(balance_url, headers=headers, timeout=10) as response:
+                async with session.get(balance_url, headers=headers) as response:
                     if response.status == 200:
                         result = await response.json()
                         logger.info(f"[Kotib.ai Balance] Response: {result}")
@@ -866,8 +868,9 @@ async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
     
     logger.info(f"[AI] Local tahlil: {local_result['category']} (confidence: {local_result['confidence']}%)")
     
-    # Agar ishonch yuqori bo'lsa - to'g'ridan-to'g'ri qaytarish
-    if local_result["confidence"] >= 70 and not local_result.get("needs_confirmation"):
+    # OPTIMIZATION: Agar ishonch 60%+ bo'lsa va kategoriya "boshqa" emas - to'g'ridan-to'g'ri qaytarish
+    # Bu Gemini chaqiruvlarini kamaytiradi va tezlikni oshiradi
+    if local_result["confidence"] >= 60 and local_result["category"] != "boshqa" and not local_result.get("needs_confirmation"):
         # Kategoriya nomini olish
         if local_result["type"] == "income":
             category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(local_result["category"], "📦 Boshqa")
@@ -1650,27 +1653,102 @@ async def determine_transaction_type_and_category_smart(context_before: str, con
 def detect_expense_category(context: str) -> str:
     """Xarajat kategoriyasini aniqlash"""
     # Oziq-ovqat
-    food_words = ['non', 'gosht', "go'sht", 'suv', 'choy', 'meva', 'sabzavot', 'osh', 'ovqat', 
-                  'yedim', 'ichdim', 'tushlik', 'kechki', 'nonushta', 'restoran', 'kafe']
+    food_words = ['non', 'nonga', 'gosht', "go'sht", "go'shtga", 'suv', 'suvga', 
+                  'choy', 'choyga', 'meva', 'mevaga', 'sabzavot', 'sabzavotga',
+                  'osh', 'oshga', 'ovqat', 'ovqatga', 'yedim', 'ichdim', 
+                  'tushlik', 'kechki', 'nonushta', 'restoran', 'kafe',
+                  'tovuq', 'tovuqqa', 'tovukka', 'baliq', 'baliqqa']
     if any(w in context for w in food_words):
         return "oziq_ovqat"
     
     # Transport
-    transport_words = ['taksi', 'avtobus', 'metro', 'benzin', 'yolkira', "yo'lkira", 'mashina']
+    transport_words = ['taksi', 'taksiga', 'avtobus', 'avtobusga', 'metro', 'metroga',
+                       'benzin', 'benzinga', 'yolkira', "yo'lkira", 'mashina', 'mashinaga',
+                       'kira', 'kiraga', 'transport', 'transportga']
     if any(w in context for w in transport_words):
         return "transport"
     
     # Kiyim
-    clothes_words = ['kiyim', "ko'ylak", 'shim', 'kurtka', 'krossovka', 'tufli']
+    clothes_words = ['kiyim', 'kiyimga', "ko'ylak", "ko'ylakka", 'shim', 'shimga',
+                     'kurtka', 'kurtkaga', 'krossovka', 'krossovkaga', 'tufli', 'tufliga']
     if any(w in context for w in clothes_words):
         return "kiyim"
     
     # Dori
-    medicine_words = ['dori', 'apteka', 'shifoxona', 'tabletka', 'vrach']
+    medicine_words = ['dori', 'doriga', 'apteka', 'aptekaga', 'shifoxona', 'shifoxonaga',
+                      'tabletka', 'tabletkaga', 'vrach', 'vrachga']
     if any(w in context for w in medicine_words):
         return "sog'liq"
     
     return "boshqa"
+
+
+def create_smart_description(context_after: str, category: str, tx_type: str, lang: str = "uz") -> str:
+    """
+    Aqlli tavsif yaratish - kategoriya asosida chiroyli nom
+    """
+    if not context_after or len(context_after.strip()) < 2:
+        # Kategoriya asosida default tavsif
+        default_descriptions = {
+            "uz": {
+                "oziq_ovqat": "Oziq-ovqat xarajati",
+                "transport": "Transport xarajati",
+                "kiyim": "Kiyim-kechak",
+                "sog'liq": "Tibbiy xarajat",
+                "kommunal": "Kommunal to'lov",
+                "uy_joy": "Uy-joy xarajati",
+                "ta'lim": "Ta'lim xarajati",
+                "ko'ngilochar": "Dam olish",
+                "aloqa": "Aloqa xarajati",
+                "kredit": "Kredit to'lovi",
+                "ish_haqi": "Ish haqi",
+                "biznes": "Biznes daromadi",
+                "boshqa": "Boshqa"
+            },
+            "ru": {
+                "oziq_ovqat": "Расходы на еду",
+                "transport": "Транспорт",
+                "kiyim": "Одежда",
+                "sog'liq": "Медицина",
+                "kommunal": "Коммунальные",
+                "uy_joy": "Жильё",
+                "ta'lim": "Образование",
+                "ko'ngilochar": "Развлечения",
+                "aloqa": "Связь",
+                "kredit": "Кредит",
+                "ish_haqi": "Зарплата",
+                "biznes": "Доход от бизнеса",
+                "boshqa": "Прочее"
+            }
+        }
+        return default_descriptions.get(lang, default_descriptions["uz"]).get(category, "Boshqa")
+    
+    # Kontekstni tozalash
+    clean = context_after.lower().strip()
+    
+    # Keraksiz so'zlarni olib tashlash
+    remove_words = ['va', 'ham', 'yana', 'keyin', "so'ng", 'uchun', 'ga', 'da', 'dan', 'ni']
+    for word in remove_words:
+        clean = re.sub(rf'\b{word}\b', '', clean)
+    
+    # "qildim", "oldim", "berdim" kabi fe'llarni olib tashlash
+    verbs = ['qildim', 'oldim', 'berdim', 'yedim', 'ichdim', 'bordim', 'keldim', 'sarfladim']
+    for verb in verbs:
+        clean = clean.replace(verb, '')
+    
+    # Ortiqcha bo'shliqlarni tozalash
+    clean = ' '.join(clean.split()).strip()
+    
+    if len(clean) < 2:
+        # Kategoriya asosida default
+        return create_smart_description("", category, tx_type, lang)
+    
+    # Birinchi harfni katta qilish va 50 belgidan keyin qirqish
+    clean = clean.capitalize()
+    if len(clean) > 50:
+        clean = clean[:47] + "..."
+    
+    return clean
 
 
 def determine_transaction_type_and_category(context_before: str, context_after: str, text_lower: str) -> Tuple[str, str, str]:
@@ -1693,9 +1771,15 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
     FOOD_KEYWORDS = [
         'ovqat', 'ovqatlandim', 'yedim', 'ichdim', 'tushlik', 'nonushta', 'kechki',
         'restoran', 'kafe', 'choyxona', 'oshxona', 'taom', 
-        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot',
-        'osh', 'palov', 'somsa', 'manti', 'chuchvara', 'lagmon', 'shashlik', 
-        'kabob', 'burger', 'pizza', 'lavash', 'hotdog'
+        'non', 'nonga', 'gosht', "go'sht", "go'shtga", 'suv', 'suvga', 'choy', 'choyga', 'kofe', 'kofega',
+        'meva', 'mevaga', 'sabzavot', 'sabzavotga',
+        'osh', 'oshga', 'palov', 'palovga', 'somsa', 'somsaga', 'manti', 'mantiga',
+        'chuchvara', 'chuchvaraga', 'lagmon', "lag'mon", 'shashlik', 'shashlikka',
+        'kabob', 'kabobga', 'burger', 'burgerga', 'pizza', 'pizzaga', 'lavash', 'lavashga',
+        'hotdog', 'tovuq', 'tovuqqa', 'tovukka', 'baliq', 'baliqqa',
+        # Qo'shimcha oziq-ovqat so'zlari
+        'gazak', 'shirinlik', 'tort', 'pechenye', 'shokolad', 'muzqaymoq',
+        'sok', 'cola', 'pepsi', 'pivo', 'aroq', 'vino'
     ]
     for kw in FOOD_KEYWORDS:
         if kw in local_context:
@@ -1704,9 +1788,11 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
     
     # ==================== 2. TRANSPORT TEKSHIRISH ====================
     TRANSPORT_KEYWORDS = [
-        'taksi', 'taksiga', 'taksida', 'yolkira', "yo'lkira", 'yol kira',
-        'avtobus', 'metro', 'marshrutka', 'poyezd', 'samolyot',
-        'uber', 'yandex', 'bolt', 'mycar', 'benzin', 'yoqilgi'
+        'taksi', 'taksiga', 'taksida', 'taksidan', 'yolkira', "yo'lkira", 'yol kira',
+        'avtobus', 'avtobusga', 'metro', 'metroga', 'marshrutka', 'marshrutkaga',
+        'poyezd', 'poyezdga', 'samolyot', 'samolyotga',
+        'uber', 'yandex', 'bolt', 'mycar', 'benzin', 'benzinga', 'yoqilgi', "yoqilg'i",
+        'transport', 'transportga', 'kira', 'kiraga'
     ]
     for kw in TRANSPORT_KEYWORDS:
         if kw in local_context:
@@ -1714,22 +1800,29 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
             return "expense", "transport", EXPENSE_CATEGORIES.get("uz", {}).get("transport", "🚗 Transport")
     
     # ==================== 3. KIYIM TEKSHIRISH ====================
-    CLOTHES_KEYWORDS = ['kiyim', "ko'ylak", 'koylak', 'shim', 'kurtka', 'palto', 
-                        'krossovka', 'tufli', 'botinka', 'oyoq kiyim']
+    CLOTHES_KEYWORDS = ['kiyim', 'kiyimga', "ko'ylak", "ko'ylakka", 'koylak', 'koylakka',
+                        'shim', 'shimga', 'kurtka', 'kurtkaga', 'palto', 'paltoga',
+                        'krossovka', 'krossovkaga', 'tufli', 'tufliga', 'botinka', 'botinkaga',
+                        'oyoq kiyim', 'futbolka', 'futbolkaga', 'shapka', 'shapkaga']
     for kw in CLOTHES_KEYWORDS:
         if kw in local_context:
             print(f"    [DETECT] 👕 Kiyim topildi: '{kw}'")
             return "expense", "kiyim", EXPENSE_CATEGORIES.get("uz", {}).get("kiyim", "👕 Kiyim-kechak")
     
     # ==================== 4. DORI/SOG'LIQ TEKSHIRISH ====================
-    HEALTH_KEYWORDS = ['dori', 'apteka', 'shifoxona', 'tabletka', 'vrach', 'doktor', 'kasalxona']
+    HEALTH_KEYWORDS = ['dori', 'doriga', 'apteka', 'aptekaga', 'aptekadan',
+                       'shifoxona', 'shifoxonaga', 'tabletka', 'tabletkaga',
+                       'vrach', 'vrachga', 'doktor', 'doktorga', 'kasalxona', 'kasalxonaga',
+                       'davolash', 'davolashga', 'ukol', 'ukolga', 'analiz', 'analizga']
     for kw in HEALTH_KEYWORDS:
         if kw in local_context:
             print(f"    [DETECT] 💊 Sog'liq topildi: '{kw}'")
             return "expense", "sog'liq", EXPENSE_CATEGORIES.get("uz", {}).get("sog'liq", "💊 Sog'liq")
     
     # ==================== 5. KOMMUNAL TEKSHIRISH ====================
-    KOMMUNAL_KEYWORDS = ['gaz', 'elektr', 'tok', 'suv tolov', 'kommunal', 'hududiy']
+    KOMMUNAL_KEYWORDS = ['gaz', 'gazga', 'elektr', 'elektrga', 'tok', 'tokka',
+                         'suv tolov', 'suvga tolov', 'kommunal', 'kommunalga',
+                         'hududiy', 'hududiyga', 'issiqlik', 'issiqlikka']
     for kw in KOMMUNAL_KEYWORDS:
         if kw in local_context:
             print(f"    [DETECT] 💡 Kommunal topildi: '{kw}'")
@@ -1748,12 +1841,19 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
     
     # ==================== 7. JISMONIY NARSA + OLDIM ====================
     PHYSICAL_ITEMS = {
-        'non', 'gosht', "go'sht", 'suv', 'choy', 'kofe', 'meva', 'sabzavot',
-        'guruch', 'un', 'sut', 'tuxum', 'tovuq', 'baliq', 
-        'telefon', 'noutbuk', 'kompyuter', 'mebel'
+        # Oziq-ovqat
+        'non', 'nonga', 'gosht', "go'sht", "go'shtga", 'suv', 'suvga',
+        'choy', 'choyga', 'kofe', 'kofega', 'meva', 'mevaga', 'sabzavot', 'sabzavotga',
+        'guruch', 'guruchga', 'un', 'unga', 'sut', 'sutga', 'tuxum', 'tuxumga',
+        'tovuq', 'tovuqqa', 'tovukka', 'baliq', 'baliqqa',
+        # Texnika
+        'telefon', 'telefonga', 'noutbuk', 'noutbukga', 'kompyuter', 'kompyuterga',
+        'mebel', 'mebelga', 'televizor', 'televizorga',
+        # Boshqa narsalar
+        'sumka', 'sumkaga', 'soat', 'soatga', 'kitob', 'kitobga'
     }
     
-    if 'oldim' in local_context or 'olgan' in local_context:
+    if 'oldim' in local_context or 'olgan' in local_context or 'olib' in local_context:
         for item in PHYSICAL_ITEMS:
             if item in local_context:
                 print(f"    [DETECT] 🛒 Jismoniy narsa: '{item}' + oldim")
@@ -1771,7 +1871,39 @@ def determine_transaction_type_and_category(context_before: str, context_after: 
             category = detect_expense_category(combined)
             return "expense", category, EXPENSE_CATEGORIES.get("uz", {}).get(category, "📦 Boshqa")
     
-    # ==================== 9. DEFAULT ====================
+    # ==================== 9. "GA" QO'SHIMCHASI BILAN KELGAN SO'ZLAR ====================
+    # "50 mingga non" -> "non" ni topish
+    # context_after ning birinchi so'zini tekshirish
+    words = local_context.split()
+    if words:
+        first_word = words[0].replace("ga", "").replace("da", "").replace("dan", "")
+        
+        # Oziq-ovqat
+        food_roots = ['non', 'gosht', "go'sht", 'suv', 'choy', 'ovqat', 'palov', 'osh', 
+                      'somsa', 'manti', 'burger', 'pizza', 'tovuq', 'baliq', 'meva']
+        if first_word in food_roots:
+            print(f"    [DETECT] 🍔 GA qo'shimchali oziq-ovqat: '{first_word}'")
+            return "expense", "oziq_ovqat", EXPENSE_CATEGORIES.get("uz", {}).get("oziq_ovqat", "🍔 Oziq-ovqat")
+        
+        # Transport
+        transport_roots = ['taksi', 'avtobus', 'metro', 'benzin', 'mashina', 'yol', 'transport', 'kira']
+        if first_word in transport_roots:
+            print(f"    [DETECT] 🚗 GA qo'shimchali transport: '{first_word}'")
+            return "expense", "transport", EXPENSE_CATEGORIES.get("uz", {}).get("transport", "🚗 Transport")
+        
+        # Dori
+        health_roots = ['dori', 'apteka', 'shifoxona', 'vrach', 'tabletka']
+        if first_word in health_roots:
+            print(f"    [DETECT] 💊 GA qo'shimchali sog'liq: '{first_word}'")
+            return "expense", "sog'liq", EXPENSE_CATEGORIES.get("uz", {}).get("sog'liq", "💊 Sog'liq")
+        
+        # Kiyim
+        clothes_roots = ['kiyim', "ko'ylak", 'shim', 'kurtka', 'krossovka', 'tufli']
+        if first_word in clothes_roots:
+            print(f"    [DETECT] 👕 GA qo'shimchali kiyim: '{first_word}'")
+            return "expense", "kiyim", EXPENSE_CATEGORIES.get("uz", {}).get("kiyim", "👕 Kiyim-kechak")
+    
+    # ==================== 10. DEFAULT ====================
     print(f"    [DETECT] ⚠️ Aniq kategoriya topilmadi, default: expense/boshqa")
     return "expense", "boshqa", EXPENSE_CATEGORIES.get("uz", {}).get("boshqa", "📦 Boshqa")
 
@@ -1904,18 +2036,8 @@ async def parse_multiple_transactions(text: str, lang: str = "uz", user_context:
             context_before, context_after, text_lower
         )
         
-        # Tavsif yaratish
-        description_parts = []
-        if context_after:
-            # Keraksiz so'zlarni olib tashlash
-            clean_after = context_after
-            for remove in ['va', 'ham', 'yana', 'keyin', 'so\'ng']:
-                clean_after = re.sub(rf'\b{remove}\b', '', clean_after)
-            clean_after = ' '.join(clean_after.split())
-            if clean_after:
-                description_parts.append(clean_after[:50])
-        
-        description = ' '.join(description_parts) if description_parts else item['text']
+        # Tavsif yaratish - YAXSHILANGAN
+        description = create_smart_description(context_after, category, tx_type, lang)
         
         # Kategoriya nomini til bo'yicha olish
         if tx_type == "income":
@@ -2462,18 +2584,44 @@ async def get_budget_status(db, user_id: int) -> Dict:
     
     budget_info = await get_monthly_budget(db, user_id)
     
-    if not budget_info["has_data"]:
-        return {
-            "budget": 0,
-            "spent": 0,
-            "remaining": 0,
-            "percentage_used": 0,
-            "status": "no_data",
-            "message": None
-        }
+    # Get actual transaction-based monthly data
+    month_summary = await get_transaction_summary(db, user_id, days=30)
+    monthly_income = month_summary.get("total_income", 0)
+    spent = month_summary.get("total_expense", 0)
     
-    living_budget = budget_info["living_budget"]
-    spent = await get_current_month_expenses(db, user_id)
+    # Agar profil ma'lumotlari bo'lmasa, tranzaksiyalardan hisoblash
+    if not budget_info["has_data"]:
+        # Tranzaksiyalardan byudjet hisoblash
+        # Agar daromad bo'lsa, shundan byudjet yasash
+        if monthly_income > 0:
+            living_budget = monthly_income  # Butun daromad - byudjet
+        else:
+            # Hech qanday ma'lumot yo'q
+            return {
+                "budget": 0,
+                "spent": spent,
+                "remaining": 0,
+                "percentage_used": 100 if spent > 0 else 0,
+                "status": "no_data" if spent == 0 else "over",
+                "message": None,
+                "day_of_month": datetime.now().day,
+                "days_in_month": 30,
+                "days_remaining": 30 - datetime.now().day + 1,
+                "day_percentage": (datetime.now().day / 30) * 100,
+                "spending_rate": 0,
+                "daily_budget": 0,
+                "remaining_daily_budget": 0,
+                "ideal_spent": 0,
+                "spending_difference": 0,
+                "severity": 5 if spent > 0 else 0,
+                "budget_info": budget_info
+            }
+    else:
+        living_budget = budget_info["living_budget"]
+        # Agar profildagi daromad kamroq bo'lsa, tranzaksiyalardagini ishlatish
+        if monthly_income > budget_info.get("total_income", 0):
+            living_budget = monthly_income * 0.70  # 70% yashash uchun
+    
     remaining = living_budget - spent
     
     # Oy haqida ma'lumot
@@ -2486,7 +2634,7 @@ async def get_budget_status(db, user_id: int) -> Dict:
     if living_budget > 0:
         percentage_used = (spent / living_budget) * 100
     else:
-        percentage_used = 0
+        percentage_used = 100 if spent > 0 else 0
     
     day_percentage = (day_of_month / days_in_month) * 100  # Oy qancha foiz o'tdi
     
@@ -2549,6 +2697,378 @@ async def get_budget_status(db, user_id: int) -> Dict:
         "severity": severity,
         "budget_info": budget_info
     }
+
+
+# ==================== HALOS USULI TRACKING ====================
+
+async def get_halos_method_status(db, user_id: int, lang: str = "uz") -> Dict:
+    """
+    🌟 HALOS USULI - Moliyaviy Ozodlik Tizimi
+    =========================================
+    
+    HALOS usuli - bu sizning bo'sh pulingizni 3 qismga taqsimlash:
+    
+    📊 TAQSIMOT:
+    ├── 🏠 70% - YASHASH (kunlik xarajatlar)
+    ├── ⚡ 20% - QARZ TO'LASH (qo'shimcha to'lov)
+    └── 💰 10% - JAMG'ARMA (boylik uchun)
+    
+    Bu funksiya foydalanuvchining HALOS usuliga qanchalik amal qilayotganini kuzatadi
+    va qarzdan chiqish sanasini hisoblaydi.
+    
+    Returns:
+        - halos_targets: Har bir kategoriya uchun maqsad summa
+        - halos_actual: Haqiqiy sarflangan/to'langan summalar
+        - halos_compliance: Har bir kategoriya uchun muvofiqlik foizi
+        - overall_score: Umumiy HALOS balli (0-100)
+        - debt_exit_date: Qarzdan chiqish sanasi
+        - months_saved: HALOS bilan tejalgan oylar
+        - stage: Joriy bosqich (beginner, learning, practicing, master)
+    """
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+    import math
+    
+    # 1. Profil ma'lumotlarini olish
+    user = await db.get_user_by_id(user_id)
+    if not user:
+        return {"error": "user_not_found"}
+    
+    profile = await db.get_financial_profile(user_id)
+    if not profile:
+        return {"error": "no_profile", "has_data": False}
+    
+    # 2. Moliyaviy ma'lumotlarni olish
+    income_self = profile.get("income_self", 0) or 0
+    income_partner = profile.get("income_partner", 0) or 0
+    total_income = income_self + income_partner
+    
+    rent = profile.get("rent", 0) or 0
+    kindergarten = profile.get("kindergarten", 0) or 0
+    utilities = profile.get("utilities", 0) or 0
+    loan_payment = profile.get("loan_payment", 0) or 0
+    total_debt = profile.get("total_debt", 0) or 0
+    
+    mandatory = rent + kindergarten + utilities + loan_payment
+    free_cash = total_income - mandatory
+    
+    if free_cash <= 0:
+        return {
+            "error": "no_free_cash",
+            "has_data": True,
+            "total_income": total_income,
+            "mandatory": mandatory,
+            "free_cash": 0,
+            "message_uz": "Bo'sh pul yo'q. Avval daromadni oshiring yoki xarajatlarni kamaytiring.",
+            "message_ru": "Нет свободных средств. Сначала увеличьте доход или сократите расходы."
+        }
+    
+    # 3. HALOS maqsadlarini hisoblash
+    halos_targets = {
+        "living": int(free_cash * 0.70),      # 🏠 70% - Yashash
+        "debt_extra": int(free_cash * 0.20),  # ⚡ 20% - Qo'shimcha qarz to'lash
+        "savings": int(free_cash * 0.10)      # 💰 10% - Jamg'arma
+    }
+    
+    # 4. Oylik tranzaksiyalarni olish
+    month_summary = await get_transaction_summary(db, user_id, days=30)
+    monthly_expense = month_summary.get("total_expense", 0)
+    expense_by_cat = month_summary.get("expense_by_category", {})
+    
+    # Kredit to'lovi kategoriyasidagi xarajatlar (qo'shimcha qarz to'lash)
+    extra_debt_paid = expense_by_cat.get("kredit", 0)
+    
+    # Jamg'arma kategoriyasidagi (yoki maxsus belgilangan) summalar
+    # Hozircha boshqa kategoriyani ishlatamiz
+    savings_made = expense_by_cat.get("jamg'arma", 0) + expense_by_cat.get("investitsiya", 0)
+    
+    # Yashash xarajatlari (kredit va jamg'arma tashqari)
+    living_expenses = monthly_expense - extra_debt_paid - savings_made
+    
+    # 5. HALOS muvofiqligini hisoblash
+    def calc_compliance(actual, target, is_expense=True):
+        """Muvofiqlik foizini hisoblash"""
+        if target == 0:
+            return 100 if actual == 0 else 0
+        
+        if is_expense:
+            # Yashash uchun - kam sarflash yaxshi
+            if actual <= target:
+                return 100
+            else:
+                over = actual - target
+                over_pct = (over / target) * 100
+                return max(0, 100 - over_pct)
+        else:
+            # Qarz va jamg'arma uchun - ko'proq yaxshi
+            ratio = (actual / target) * 100
+            return min(100, ratio)
+    
+    halos_actual = {
+        "living": int(living_expenses),
+        "debt_extra": int(extra_debt_paid),
+        "savings": int(savings_made)
+    }
+    
+    halos_compliance = {
+        "living": calc_compliance(living_expenses, halos_targets["living"], is_expense=True),
+        "debt_extra": calc_compliance(extra_debt_paid, halos_targets["debt_extra"], is_expense=False),
+        "savings": calc_compliance(savings_made, halos_targets["savings"], is_expense=False)
+    }
+    
+    # 6. Umumiy HALOS balli
+    # Og'irliklar: Yashash - 40%, Qarz - 40%, Jamg'arma - 20%
+    overall_score = int(
+        halos_compliance["living"] * 0.40 +
+        halos_compliance["debt_extra"] * 0.40 +
+        halos_compliance["savings"] * 0.20
+    )
+    
+    # 7. Qarzdan chiqish sanasini hisoblash
+    debt_info = {
+        "total_debt": total_debt,
+        "monthly_payment": loan_payment,
+        "extra_payment_target": halos_targets["debt_extra"],
+        "extra_payment_actual": extra_debt_paid
+    }
+    
+    if total_debt > 0 and loan_payment > 0:
+        # Oddiy yo'l (faqat minimal to'lov)
+        simple_months = math.ceil(total_debt / loan_payment)
+        simple_exit_date = datetime.now() + relativedelta(months=simple_months)
+        
+        # HALOS usuli bilan (minimal + qo'shimcha)
+        total_monthly = loan_payment + halos_targets["debt_extra"]
+        halos_months = math.ceil(total_debt / total_monthly) if total_monthly > 0 else simple_months
+        halos_exit_date = datetime.now() + relativedelta(months=halos_months)
+        
+        # Haqiqiy to'lovlar bilan
+        actual_monthly = loan_payment + extra_debt_paid
+        if actual_monthly > loan_payment:
+            actual_months = math.ceil(total_debt / actual_monthly)
+            actual_exit_date = datetime.now() + relativedelta(months=actual_months)
+        else:
+            actual_months = simple_months
+            actual_exit_date = simple_exit_date
+        
+        months_saved = simple_months - halos_months
+        actual_months_saved = simple_months - actual_months
+        
+        debt_info.update({
+            "simple_months": simple_months,
+            "simple_exit_date": simple_exit_date.strftime("%B %Y"),
+            "halos_months": halos_months,
+            "halos_exit_date": halos_exit_date.strftime("%B %Y"),
+            "actual_months": actual_months,
+            "actual_exit_date": actual_exit_date.strftime("%B %Y"),
+            "months_saved_potential": months_saved,
+            "months_saved_actual": actual_months_saved
+        })
+    else:
+        debt_info.update({
+            "simple_months": 0,
+            "simple_exit_date": None,
+            "halos_months": 0,
+            "halos_exit_date": None,
+            "actual_months": 0,
+            "actual_exit_date": None,
+            "months_saved_potential": 0,
+            "months_saved_actual": 0
+        })
+    
+    # 8. HALOS bosqichini aniqlash
+    if overall_score >= 90:
+        stage = "master"
+        stage_name = {"uz": "🏆 HALOS Ustasi", "ru": "🏆 Мастер HALOS"}
+        stage_desc = {
+            "uz": "Siz moliyaviy ozodlikka erishdingiz!",
+            "ru": "Вы достигли финансовой свободы!"
+        }
+    elif overall_score >= 70:
+        stage = "practicing"
+        stage_name = {"uz": "⭐ Amaliyotchi", "ru": "⭐ Практик"}
+        stage_desc = {
+            "uz": "Yaxshi! HALOS usuliga yaxshi amal qilyapsiz.",
+            "ru": "Отлично! Хорошо следуете методу HALOS."
+        }
+    elif overall_score >= 50:
+        stage = "learning"
+        stage_name = {"uz": "📚 O'rganuvchi", "ru": "📚 Ученик"}
+        stage_desc = {
+            "uz": "O'sish jarayonidasiz. Davom eting!",
+            "ru": "Вы в процессе роста. Продолжайте!"
+        }
+    else:
+        stage = "beginner"
+        stage_name = {"uz": "🌱 Boshlang'ich", "ru": "🌱 Начинающий"}
+        stage_desc = {
+            "uz": "HALOS usulini o'rganishni boshlang!",
+            "ru": "Начните изучать метод HALOS!"
+        }
+    
+    # 9. Kunlik maqsadlar
+    daily_targets = {
+        "living": int(halos_targets["living"] / 30),
+        "debt_extra": int(halos_targets["debt_extra"] / 30),
+        "savings": int(halos_targets["savings"] / 30)
+    }
+    
+    return {
+        "has_data": True,
+        "free_cash": free_cash,
+        "total_income": total_income,
+        "mandatory": mandatory,
+        
+        # HALOS maqsadlari
+        "halos_targets": halos_targets,
+        "halos_actual": halos_actual,
+        "halos_compliance": halos_compliance,
+        "daily_targets": daily_targets,
+        
+        # Umumiy ball va bosqich
+        "overall_score": overall_score,
+        "stage": stage,
+        "stage_name": stage_name,
+        "stage_desc": stage_desc,
+        
+        # Qarz ma'lumotlari
+        "debt_info": debt_info,
+        
+        # Xabarlar
+        "message_uz": f"HALOS balli: {overall_score}/100 - {stage_name['uz']}",
+        "message_ru": f"Балл HALOS: {overall_score}/100 - {stage_name['ru']}"
+    }
+
+
+def format_halos_status_message(halos_status: Dict, lang: str = "uz") -> str:
+    """
+    HALOS usuli holatini chiroyli formatda chiqarish
+    PRO foydalanuvchilar uchun
+    """
+    if halos_status.get("error"):
+        if lang == "uz":
+            if halos_status["error"] == "no_profile":
+                return "📊 HALOS usulini ko'rish uchun avval profilingizni to'ldiring."
+            elif halos_status["error"] == "no_free_cash":
+                return "⚠️ Bo'sh pul yo'q. HALOS usuli bo'sh pul mavjud bo'lganda ishlaydi."
+        else:
+            if halos_status["error"] == "no_profile":
+                return "📊 Заполните профиль, чтобы увидеть статус HALOS."
+            elif halos_status["error"] == "no_free_cash":
+                return "⚠️ Нет свободных средств. Метод HALOS работает при наличии свободных денег."
+        return ""
+    
+    free_cash = halos_status["free_cash"]
+    targets = halos_status["halos_targets"]
+    actual = halos_status["halos_actual"]
+    compliance = halos_status["halos_compliance"]
+    score = halos_status["overall_score"]
+    stage_name = halos_status["stage_name"][lang]
+    stage_desc = halos_status["stage_desc"][lang]
+    debt_info = halos_status["debt_info"]
+    daily = halos_status["daily_targets"]
+    
+    # Progress bar
+    def make_bar(pct):
+        filled = min(int(pct / 10), 10)
+        if pct >= 80:
+            return "🟢" * filled + "⚪" * (10 - filled)
+        elif pct >= 50:
+            return "🟡" * filled + "⚪" * (10 - filled)
+        else:
+            return "🔴" * filled + "⚪" * (10 - filled)
+    
+    if lang == "uz":
+        msg = (
+            f"🌟 *HALOS USULI*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 Umumiy ball: *{score}/100*\n"
+            f"🎯 Bosqich: {stage_name}\n"
+            f"_{stage_desc}_\n\n"
+            
+            f"💵 *Bo'sh pul:* {free_cash:,} so'm\n\n"
+            
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 *TAQSIMOT:*\n\n"
+            
+            f"🏠 *YASHASH*\n"
+            f"   Maqsad: {targets['living']:,} so'm/oy\n"
+            f"   Haqiqiy: {actual['living']:,} so'm\n"
+            f"   Kunlik: {daily['living']:,} so'm/kun\n"
+            f"   {make_bar(compliance['living'])}\n\n"
+            
+            f"⚡ *QARZ TO'LASH*\n"
+            f"   Maqsad: {targets['debt_extra']:,} so'm/oy\n"
+            f"   Haqiqiy: {actual['debt_extra']:,} so'm\n"
+            f"   {make_bar(compliance['debt_extra'])}\n\n"
+            
+            f"💰 *JAMG'ARMA*\n"
+            f"   Maqsad: {targets['savings']:,} so'm/oy\n"
+            f"   Haqiqiy: {actual['savings']:,} so'm\n"
+            f"   {make_bar(compliance['savings'])}\n"
+        )
+        
+        # Qarz ma'lumotlari
+        if debt_info["total_debt"] > 0:
+            msg += (
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"📅 *QARZDAN CHIQISH:*\n\n"
+                f"💳 Umumiy qarz: {debt_info['total_debt']:,} so'm\n\n"
+                f"🐢 Oddiy yo'l: {debt_info['simple_months']} oy\n"
+                f"   ({debt_info['simple_exit_date']})\n\n"
+                f"🚀 *HALOS bilan: {debt_info['halos_months']} oy*\n"
+                f"   *({debt_info['halos_exit_date']})*\n\n"
+                f"⏱️ Tejagan vaqt: *{debt_info['months_saved_potential']} oy!*"
+            )
+            
+            if debt_info['months_saved_actual'] > 0:
+                msg += f"\n🎉 Haqiqiy tejov: *{debt_info['months_saved_actual']} oy*"
+    else:
+        msg = (
+            f"🌟 *МЕТОД HALOS*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 Общий балл: *{score}/100*\n"
+            f"🎯 Этап: {stage_name}\n"
+            f"_{stage_desc}_\n\n"
+            
+            f"💵 *Свободные:* {free_cash:,} сум\n\n"
+            
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 *РАСПРЕДЕЛЕНИЕ:*\n\n"
+            
+            f"🏠 *ЖИЗНЬ*\n"
+            f"   Цель: {targets['living']:,} сум/мес\n"
+            f"   Факт: {actual['living']:,} сум\n"
+            f"   В день: {daily['living']:,} сум\n"
+            f"   {make_bar(compliance['living'])}\n\n"
+            
+            f"⚡ *ПОГАШЕНИЕ ДОЛГА*\n"
+            f"   Цель: {targets['debt_extra']:,} сум/мес\n"
+            f"   Факт: {actual['debt_extra']:,} сум\n"
+            f"   {make_bar(compliance['debt_extra'])}\n\n"
+            
+            f"💰 *НАКОПЛЕНИЯ*\n"
+            f"   Цель: {targets['savings']:,} сум/мес\n"
+            f"   Факт: {actual['savings']:,} сум\n"
+            f"   {make_bar(compliance['savings'])}\n"
+        )
+        
+        if debt_info["total_debt"] > 0:
+            msg += (
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"📅 *ВЫХОД ИЗ ДОЛГА:*\n\n"
+                f"💳 Общий долг: {debt_info['total_debt']:,} сум\n\n"
+                f"🐢 Обычный путь: {debt_info['simple_months']} мес\n"
+                f"   ({debt_info['simple_exit_date']})\n\n"
+                f"🚀 *С HALOS: {debt_info['halos_months']} мес*\n"
+                f"   *({debt_info['halos_exit_date']})*\n\n"
+                f"⏱️ Экономия времени: *{debt_info['months_saved_potential']} мес!*"
+            )
+            
+            if debt_info['months_saved_actual'] > 0:
+                msg += f"\n🎉 Фактическая экономия: *{debt_info['months_saved_actual']} мес*"
+    
+    return msg
 
 
 def format_budget_warning(budget_status: Dict, lang: str = "uz") -> Optional[str]:
@@ -2776,7 +3296,9 @@ def format_expense_saved_with_budget(transaction: Dict, budget_status: Dict, lan
     KUCHLI NAZORAT BILAN
     """
     type_emoji = "💰" if transaction["type"] == "income" else "💸"
-    status = budget_status["status"]
+    status = budget_status.get("status", "no_data")
+    budget = budget_status.get("budget", 0)
+    spent = budget_status.get("spent", 0)
     remaining = budget_status.get("remaining", 0)
     percentage = budget_status.get("percentage_used", 0)
     
@@ -2786,20 +3308,24 @@ def format_expense_saved_with_budget(transaction: Dict, budget_status: Dict, lan
     spending_rate = budget_status.get("spending_rate", 1)
     remaining_daily_budget = budget_status.get("remaining_daily_budget", 0)
     
-    # Progress bar yasash
-    filled = min(int(percentage / 10), 10)
-    empty = 10 - filled
-    
-    if status == "over":
+    # Progress bar yasash - YAXSHILANGAN
+    if percentage > 100:
+        # Oshib ketgan - hammasi qizil
         progress_bar = "🔴" * 10
-    elif status == "critical":
-        progress_bar = "🟢" * min(filled, 5) + "🟡" * min(max(filled - 5, 0), 3) + "🔴" * max(filled - 8, 0) + "⚪" * empty
-    elif status == "danger":
-        progress_bar = "🟢" * min(filled, 6) + "🟡" * min(max(filled - 6, 0), 2) + "🟠" * max(filled - 8, 0) + "⚪" * empty
-    elif status == "warning":
-        progress_bar = "🟢" * min(filled, 7) + "🟡" * max(filled - 7, 0) + "⚪" * empty
     else:
-        progress_bar = "🟢" * filled + "⚪" * empty
+        filled = min(int(percentage / 10), 10)
+        empty = 10 - filled
+        
+        if status == "over":
+            progress_bar = "🔴" * 10
+        elif status == "critical":
+            progress_bar = "🟢" * min(filled, 5) + "🟡" * min(max(filled - 5, 0), 3) + "🔴" * max(filled - 8, 0) + "⚪" * empty
+        elif status == "danger":
+            progress_bar = "🟢" * min(filled, 6) + "🟡" * min(max(filled - 6, 0), 2) + "🟠" * max(filled - 8, 0) + "⚪" * empty
+        elif status == "warning":
+            progress_bar = "🟢" * min(filled, 7) + "🟡" * max(filled - 7, 0) + "⚪" * empty
+        else:
+            progress_bar = "🟢" * filled + "⚪" * empty
     
     if lang == "uz":
         if transaction["type"] == "expense":
@@ -2811,11 +3337,18 @@ def format_expense_saved_with_budget(transaction: Dict, budget_status: Dict, lan
                 f"📋 *Tavsif:* {transaction['description']}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
                 f"📊 *OYLIK BYUDJET:*\n"
-                f"{progress_bar} {percentage:.0f}%\n\n"
+                f"{progress_bar} {min(percentage, 100):.0f}%\n\n"
             )
             
-            if status == "over":
-                msg += f"🚨 *XAVF! Byudjetdan oshib ketdingiz!*\n❌ Oshib ketgan: *{abs(remaining):,}* so'm"
+            if status == "over" or remaining < 0:
+                over_amount = abs(remaining) if remaining < 0 else spent - budget
+                msg += (
+                    f"🚨 *XAVF! Byudjetdan oshib ketdingiz!*\n"
+                    f"💰 Byudjet: *{budget:,.0f}* so'm\n"
+                    f"💸 Sarflangan: *{spent:,.0f}* so'm\n"
+                    f"❌ Oshib ketgan: *{over_amount:,.0f}* so'm\n\n"
+                    f"💡 Majburiy xarajatlarni qisqartiring!"
+                )
             elif status == "critical":
                 msg += (
                     f"🚨 *KRITIK HOLAT!*\n"
@@ -2860,11 +3393,18 @@ def format_expense_saved_with_budget(transaction: Dict, budget_status: Dict, lan
                 f"📋 *Описание:* {transaction['description']}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
                 f"📊 *МЕСЯЧНЫЙ БЮДЖЕТ:*\n"
-                f"{progress_bar} {percentage:.0f}%\n\n"
+                f"{progress_bar} {min(percentage, 100):.0f}%\n\n"
             )
             
-            if status == "over":
-                msg += f"🚨 *ОПАСНО! Бюджет превышен!*\n❌ Превышение: *{abs(remaining):,}* сум"
+            if status == "over" or remaining < 0:
+                over_amount = abs(remaining) if remaining < 0 else spent - budget
+                msg += (
+                    f"🚨 *ОПАСНО! Бюджет превышен!*\n"
+                    f"💰 Бюджет: *{budget:,.0f}* сум\n"
+                    f"💸 Потрачено: *{spent:,.0f}* сум\n"
+                    f"❌ Превышение: *{over_amount:,.0f}* сум\n\n"
+                    f"💡 Сократите обязательные расходы!"
+                )
             elif status == "critical":
                 msg += (
                     f"🚨 *КРИТИЧЕСКАЯ СИТУАЦИЯ!*\n"
@@ -3113,10 +3653,31 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
     """
     if db.is_postgres:
         async with db._pool.acquire() as conn:
-            row = await conn.fetchrow("""
-                SELECT id, user_id, type, category, category_key, amount, description, original_text, created_at
-                FROM transactions WHERE id = $1
-            """, transaction_id)
+            # Check if category_key column exists
+            try:
+                row = await conn.fetchrow("""
+                    SELECT id, user_id, type, category, category_key, amount, description, original_text, created_at
+                    FROM transactions WHERE id = $1
+                """, transaction_id)
+            except Exception:
+                # Fallback without category_key
+                row = await conn.fetchrow("""
+                    SELECT id, user_id, type, category, amount, description, original_text, created_at
+                    FROM transactions WHERE id = $1
+                """, transaction_id)
+                if row:
+                    return {
+                        "id": row["id"],
+                        "user_id": row["user_id"],
+                        "type": row["type"],
+                        "category": row["category"],
+                        "category_key": row["category"],  # Use category as fallback
+                        "amount": row["amount"],
+                        "description": row["description"],
+                        "original_text": row["original_text"],
+                        "created_at": row["created_at"]
+                    }
+                return None
             
             if row:
                 return {
@@ -3124,7 +3685,7 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
                     "user_id": row["user_id"],
                     "type": row["type"],
                     "category": row["category"],
-                    "category_key": row["category_key"],
+                    "category_key": row["category_key"] or row["category"],
                     "amount": row["amount"],
                     "description": row["description"],
                     "original_text": row["original_text"],
@@ -3143,7 +3704,7 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
                 "user_id": row[1],
                 "type": row[2],
                 "category": row[3],
-                "category_key": row[4],
+                "category_key": row[4] if row[4] else row[3],
                 "amount": row[5],
                 "description": row[6],
                 "original_text": row[7],

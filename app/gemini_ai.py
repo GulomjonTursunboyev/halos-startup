@@ -194,7 +194,8 @@ Faqat JSON qaytar:
 {{"type":"expense","category":"oziq_ovqat","amount":50000,"description":"non"}}"""
 
     try:
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=8, connect=3)  # Fast timeout
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             headers = {"Content-Type": "application/json"}
             data = {
                 "contents": [{"parts": [{"text": prompt}]}],
@@ -206,7 +207,7 @@ Faqat JSON qaytar:
             
             url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
             
-            async with session.post(url, headers=headers, json=data, timeout=15) as response:
+            async with session.post(url, headers=headers, json=data) as response:
                 if response.status == 200:
                     result = await response.json()
                     
@@ -355,7 +356,8 @@ MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
     logger.info(f"[Gemini Multi] analyze_multiple_transactions boshlandi: '{text[:100]}...'")
     
     try:
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=12, connect=3)  # Optimized timeout
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             headers = {"Content-Type": "application/json"}
             data = {
                 "contents": [{"parts": [{"text": prompt}]}],
@@ -369,7 +371,7 @@ MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
             url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
             logger.info(f"[Gemini Multi] API so'rov yuborilmoqda...")
             
-            async with session.post(url, headers=headers, json=data, timeout=20) as response:
+            async with session.post(url, headers=headers, json=data) as response:
                 logger.info(f"[Gemini Multi] API javob: status={response.status}")
                 
                 if response.status == 200:
@@ -454,7 +456,8 @@ Faqat kategoriya nomini qaytaring (masalan: oziq_ovqat yoki transport).
 Boshqa hech narsa yo'q, faqat bitta so'z!"""
 
     try:
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=4, connect=2)  # Fast timeout
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             data = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
@@ -465,7 +468,7 @@ Boshqa hech narsa yo'q, faqat bitta so'z!"""
             
             url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
             
-            async with session.post(url, json=data, timeout=5) as response:
+            async with session.post(url, json=data) as response:
                 if response.status == 200:
                     result = await response.json()
                     if "candidates" in result and result["candidates"]:

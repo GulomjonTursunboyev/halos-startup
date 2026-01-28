@@ -20,6 +20,31 @@ from app.subscription_handlers import is_user_pro
 logger = logging.getLogger(__name__)
 
 
+async def get_pro_trial_buttons(telegram_id: int, lang: str) -> List[List[InlineKeyboardButton]]:
+    """Generate PRO and Trial buttons based on user status"""
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    buttons = []
+    
+    # Check if trial is available
+    trial_available = user and not user.get("trial_used", 0)
+    
+    if trial_available:
+        # Show both trial (highlighted) and PRO buttons
+        buttons.append([InlineKeyboardButton(
+            "🎁 3 kun BEPUL sinash" if lang == "uz" else "🎁 3 дня БЕСПЛАТНО",
+            callback_data="activate_trial"
+        )])
+    
+    buttons.append([InlineKeyboardButton(
+        "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
+        callback_data="show_pricing"
+    )])
+    
+    return buttons
+
+
 # ==================== STATISTICS ====================
 
 async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -39,10 +64,7 @@ async def show_statistics(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         else:
             msg = "🔒 *Статистика для PRO пользователей*\n\nПерейдите на PRO и смотрите детальную статистику!"
         
-        keyboard = [[InlineKeyboardButton(
-            "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
-            callback_data="show_pricing"
-        )]]
+        keyboard = await get_pro_trial_buttons(telegram_id, lang)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if query:
@@ -194,10 +216,7 @@ async def show_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             msg = "🔒 *Напоминания для PRO пользователей*\n\nПерейдите на PRO и получайте напоминания!"
         
-        keyboard = [[InlineKeyboardButton(
-            "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
-            callback_data="show_pricing"
-        )]]
+        keyboard = await get_pro_trial_buttons(telegram_id, lang)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if query:
@@ -283,10 +302,7 @@ async def show_debt_monitoring(update: Update, context: ContextTypes.DEFAULT_TYP
         else:
             msg = "🔒 *Контроль долгов для PRO пользователей*\n\nПерейдите на PRO и контролируйте долги!"
         
-        keyboard = [[InlineKeyboardButton(
-            "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
-            callback_data="show_pricing"
-        )]]
+        keyboard = await get_pro_trial_buttons(telegram_id, lang)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if query:
@@ -409,7 +425,7 @@ async def show_debt_monitoring(update: Update, context: ContextTypes.DEFAULT_TYP
 # ==================== EXCEL EXPORT ====================
 
 async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Export user data to Excel file"""
+    """Export user data to beautifully formatted Excel file"""
     query = update.callback_query
     if query:
         await query.answer()
@@ -425,10 +441,7 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         else:
             msg = "🔒 *Excel экспорт для PRO пользователей*\n\nПерейдите на PRO и скачивайте отчёты!"
         
-        keyboard = [[InlineKeyboardButton(
-            "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
-            callback_data="show_pricing"
-        )]]
+        keyboard = await get_pro_trial_buttons(telegram_id, lang)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if query:
@@ -454,23 +467,38 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text(msg)
         return
     
-    # Generate Excel file
+    # Generate beautiful Excel file
     try:
-        import pandas as pd
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, NamedStyle
+        from openpyxl.utils import get_column_letter
+        from openpyxl.chart import PieChart, Reference, BarChart
+        from openpyxl.chart.label import DataLabelList
         from io import BytesIO
         import math
         
+        # Get transactions for the month
+        from app.ai_assistant import get_transaction_summary
+        month_summary = await get_transaction_summary(db, user["id"], days=30)
+        
         # Prepare data
-        income = profile.get("income_self", 0) + profile.get("income_partner", 0)
-        mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
-        loan_payment = profile.get("loan_payment", 0)
-        total_debt = profile.get("total_debt", 0)
-        free_cash = income - mandatory - loan_payment
+        income_self = profile.get("income_self", 0) or 0
+        income_partner = profile.get("income_partner", 0) or 0
+        total_income = income_self + income_partner
+        
+        rent = profile.get("rent", 0) or 0
+        kindergarten = profile.get("kindergarten", 0) or 0
+        utilities = profile.get("utilities", 0) or 0
+        loan_payment = profile.get("loan_payment", 0) or 0
+        total_debt = profile.get("total_debt", 0) or 0
+        
+        mandatory = rent + kindergarten + utilities + loan_payment
+        free_cash = total_income - mandatory
         
         if free_cash > 0:
-            savings = free_cash * 0.1
-            extra_debt = free_cash * 0.2
-            living = free_cash * 0.7
+            savings = free_cash * 0.10
+            extra_debt = free_cash * 0.20
+            living = free_cash * 0.70
         else:
             savings = living = extra_debt = 0
         
@@ -479,53 +507,425 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             simple_months = math.ceil(total_debt / loan_payment)
             total_payment = loan_payment + extra_debt
             pro_months = math.ceil(total_debt / total_payment) if total_payment > 0 else simple_months
+            months_saved = simple_months - pro_months
         else:
-            simple_months = pro_months = 0
+            simple_months = pro_months = months_saved = 0
         
-        # Create dataframe
-        if lang == "uz":
-            data = {
-                "Ko'rsatkich": [
-                    "Daromad (shaxsiy)", "Daromad (sherik)", "Umumiy daromad",
-                    "Ijara", "Bog'cha", "Kommunal", "Yuk to'lovi", "Majburiy xarajatlar",
-                    "Bo'sh pul", "Boylik uchun", "Kredit to'lovi", "Yashash",
-                    "Umumiy yuk", "Oddiy yo'l (oy)", "HALOS bilan (oy)"
-                ],
-                "Qiymat (so'm)": [
-                    profile.get("income_self", 0), profile.get("income_partner", 0), income,
-                    profile.get("rent", 0), profile.get("kindergarten", 0), profile.get("utilities", 0),
-                    loan_payment, mandatory + loan_payment,
-                    free_cash, savings, extra_debt, living,
-                    total_debt, simple_months, pro_months
-                ]
-            }
-        else:
-            data = {
-                "Показатель": [
-                    "Доход (личный)", "Доход (партнёр)", "Общий доход",
-                    "Аренда", "Детсад", "Коммуналка", "Платёж по бремени", "Обязательные расходы",
-                    "Свободные средства", "Для богатства", "Платёж по кредиту", "Жизнь",
-                    "Общее бремя", "Обычный путь (мес)", "С HALOS (мес)"
-                ],
-                "Значение (сум)": [
-                    profile.get("income_self", 0), profile.get("income_partner", 0), income,
-                    profile.get("rent", 0), profile.get("kindergarten", 0), profile.get("utilities", 0),
-                    loan_payment, mandatory + loan_payment,
-                    free_cash, savings, extra_debt, living,
-                    total_debt, simple_months, pro_months
-                ]
-            }
+        # Transaction summary
+        monthly_expense = month_summary.get("total_expense", 0)
+        monthly_income_tx = month_summary.get("total_income", 0)
+        expense_by_cat = month_summary.get("expense_by_category", {})
         
-        df = pd.DataFrame(data)
+        # Create workbook
+        wb = Workbook()
         
-        # Create Excel file in memory
+        # ==================== STYLES ====================
+        # Header style
+        header_font = Font(name='Arial', size=14, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='2E7D32', end_color='2E7D32', fill_type='solid')  # Green
+        header_align = Alignment(horizontal='center', vertical='center')
+        
+        # Title style
+        title_font = Font(name='Arial', size=18, bold=True, color='1B5E20')
+        title_align = Alignment(horizontal='center', vertical='center')
+        
+        # Section header
+        section_font = Font(name='Arial', size=12, bold=True, color='FFFFFF')
+        section_fill = PatternFill(start_color='1976D2', end_color='1976D2', fill_type='solid')  # Blue
+        
+        # Data styles
+        label_font = Font(name='Arial', size=11)
+        value_font = Font(name='Arial', size=11, bold=True)
+        money_font = Font(name='Arial', size=11, bold=True, color='2E7D32')
+        danger_font = Font(name='Arial', size=11, bold=True, color='D32F2F')
+        
+        # Border
+        thin_border = Border(
+            left=Side(style='thin', color='BDBDBD'),
+            right=Side(style='thin', color='BDBDBD'),
+            top=Side(style='thin', color='BDBDBD'),
+            bottom=Side(style='thin', color='BDBDBD')
+        )
+        
+        # Fills
+        income_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')  # Light green
+        expense_fill = PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid')  # Light red
+        highlight_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')  # Light orange
+        
+        # ==================== SHEET 1: SUMMARY ====================
+        ws1 = wb.active
+        ws1.title = "Xulosa" if lang == "uz" else "Сводка"
+        
+        # Set column widths
+        ws1.column_dimensions['A'].width = 35
+        ws1.column_dimensions['B'].width = 20
+        ws1.column_dimensions['C'].width = 15
+        
+        # Title
+        ws1.merge_cells('A1:C1')
+        ws1['A1'] = "📊 HALOS MOLIYAVIY HISOBOT" if lang == "uz" else "📊 HALOS ФИНАНСОВЫЙ ОТЧЁТ"
+        ws1['A1'].font = title_font
+        ws1['A1'].alignment = title_align
+        ws1.row_dimensions[1].height = 30
+        
+        # Date
+        ws1.merge_cells('A2:C2')
+        ws1['A2'] = f"📅 {datetime.now().strftime('%d.%m.%Y')}"
+        ws1['A2'].font = Font(name='Arial', size=10, italic=True)
+        ws1['A2'].alignment = Alignment(horizontal='center')
+        
+        row = 4
+        
+        # ===== DAROMADLAR =====
+        ws1.merge_cells(f'A{row}:C{row}')
+        ws1[f'A{row}'] = "💰 DAROMADLAR" if lang == "uz" else "💰 ДОХОДЫ"
+        ws1[f'A{row}'].font = section_font
+        ws1[f'A{row}'].fill = section_fill
+        ws1[f'A{row}'].alignment = header_align
+        ws1.row_dimensions[row].height = 25
+        row += 1
+        
+        income_data = [
+            ("Shaxsiy daromad" if lang == "uz" else "Личный доход", income_self),
+            ("Sherik daromadi" if lang == "uz" else "Доход партнёра", income_partner),
+            ("JAMI DAROMAD" if lang == "uz" else "ОБЩИЙ ДОХОД", total_income),
+        ]
+        
+        for label, value in income_data:
+            ws1[f'A{row}'] = label
+            ws1[f'A{row}'].font = label_font
+            ws1[f'A{row}'].border = thin_border
+            ws1[f'A{row}'].fill = income_fill
+            
+            ws1[f'B{row}'] = value
+            ws1[f'B{row}'].font = money_font if "JAMI" in label or "ОБЩИЙ" in label else value_font
+            ws1[f'B{row}'].number_format = '#,##0'
+            ws1[f'B{row}'].border = thin_border
+            ws1[f'B{row}'].fill = income_fill
+            ws1[f'B{row}'].alignment = Alignment(horizontal='right')
+            
+            ws1[f'C{row}'] = "so'm" if lang == "uz" else "сум"
+            ws1[f'C{row}'].border = thin_border
+            ws1[f'C{row}'].fill = income_fill
+            row += 1
+        
+        row += 1
+        
+        # ===== MAJBURIY XARAJATLAR =====
+        ws1.merge_cells(f'A{row}:C{row}')
+        ws1[f'A{row}'] = "🏠 MAJBURIY XARAJATLAR" if lang == "uz" else "🏠 ОБЯЗАТЕЛЬНЫЕ РАСХОДЫ"
+        ws1[f'A{row}'].font = section_font
+        ws1[f'A{row}'].fill = PatternFill(start_color='E65100', end_color='E65100', fill_type='solid')
+        ws1[f'A{row}'].alignment = header_align
+        ws1.row_dimensions[row].height = 25
+        row += 1
+        
+        expense_data = [
+            ("Ijara" if lang == "uz" else "Аренда", rent),
+            ("Bog'cha" if lang == "uz" else "Детсад", kindergarten),
+            ("Kommunal" if lang == "uz" else "Коммуналка", utilities),
+            ("Kredit to'lovi" if lang == "uz" else "Платёж по кредиту", loan_payment),
+            ("JAMI MAJBURIY" if lang == "uz" else "ИТОГО ОБЯЗАТ.", mandatory),
+        ]
+        
+        for label, value in expense_data:
+            ws1[f'A{row}'] = label
+            ws1[f'A{row}'].font = label_font
+            ws1[f'A{row}'].border = thin_border
+            ws1[f'A{row}'].fill = expense_fill
+            
+            ws1[f'B{row}'] = value
+            ws1[f'B{row}'].font = danger_font if "JAMI" in label or "ИТОГО" in label else value_font
+            ws1[f'B{row}'].number_format = '#,##0'
+            ws1[f'B{row}'].border = thin_border
+            ws1[f'B{row}'].fill = expense_fill
+            ws1[f'B{row}'].alignment = Alignment(horizontal='right')
+            
+            ws1[f'C{row}'] = "so'm" if lang == "uz" else "сум"
+            ws1[f'C{row}'].border = thin_border
+            ws1[f'C{row}'].fill = expense_fill
+            row += 1
+        
+        row += 1
+        
+        # ===== BO'SH PUL TAQSIMOTI =====
+        ws1.merge_cells(f'A{row}:C{row}')
+        ws1[f'A{row}'] = "🌟 HALOS USULI" if lang == "uz" else "🌟 МЕТОД HALOS"
+        ws1[f'A{row}'].font = section_font
+        ws1[f'A{row}'].fill = PatternFill(start_color='7B1FA2', end_color='7B1FA2', fill_type='solid')
+        ws1[f'A{row}'].alignment = header_align
+        ws1.row_dimensions[row].height = 25
+        row += 1
+        
+        budget_data = [
+            ("Bo'sh pul" if lang == "uz" else "Свободные средства", free_cash),
+            ("🏠 Yashash" if lang == "uz" else "🏠 Жизнь", living),
+            ("⚡ Qarz to'lash" if lang == "uz" else "⚡ Погашение", extra_debt),
+            ("💰 Jamg'arma" if lang == "uz" else "💰 Накопления", savings),
+        ]
+        
+        for label, value in budget_data:
+            ws1[f'A{row}'] = label
+            ws1[f'A{row}'].font = label_font
+            ws1[f'A{row}'].border = thin_border
+            ws1[f'A{row}'].fill = highlight_fill
+            
+            ws1[f'B{row}'] = value
+            ws1[f'B{row}'].font = money_font
+            ws1[f'B{row}'].number_format = '#,##0'
+            ws1[f'B{row}'].border = thin_border
+            ws1[f'B{row}'].fill = highlight_fill
+            ws1[f'B{row}'].alignment = Alignment(horizontal='right')
+            
+            ws1[f'C{row}'] = "so'm" if lang == "uz" else "сум"
+            ws1[f'C{row}'].border = thin_border
+            ws1[f'C{row}'].fill = highlight_fill
+            ws1[f'C{row}'].alignment = Alignment(horizontal='center')
+            row += 1
+        
+        row += 1
+        
+        # ===== QARZ MA'LUMOTLARI =====
+        if total_debt > 0:
+            ws1.merge_cells(f'A{row}:C{row}')
+            ws1[f'A{row}'] = "📅 QARZDAN CHIQISH" if lang == "uz" else "📅 ВЫХОД ИЗ ДОЛГА"
+            ws1[f'A{row}'].font = section_font
+            ws1[f'A{row}'].fill = PatternFill(start_color='C62828', end_color='C62828', fill_type='solid')
+            ws1[f'A{row}'].alignment = header_align
+            ws1.row_dimensions[row].height = 25
+            row += 1
+            
+            debt_data = [
+                ("Umumiy qarz" if lang == "uz" else "Общий долг", total_debt, "so'm" if lang == "uz" else "сум"),
+                ("Oddiy yo'l" if lang == "uz" else "Обычный путь", simple_months, "oy" if lang == "uz" else "мес"),
+                ("HALOS bilan" if lang == "uz" else "С HALOS", pro_months, "oy" if lang == "uz" else "мес"),
+                ("Tejagan vaqt" if lang == "uz" else "Сэкономлено", months_saved, "oy" if lang == "uz" else "мес"),
+            ]
+            
+            for label, value, unit in debt_data:
+                ws1[f'A{row}'] = label
+                ws1[f'A{row}'].font = label_font
+                ws1[f'A{row}'].border = thin_border
+                
+                ws1[f'B{row}'] = value
+                ws1[f'B{row}'].font = money_font if "HALOS" in label else value_font
+                ws1[f'B{row}'].number_format = '#,##0'
+                ws1[f'B{row}'].border = thin_border
+                ws1[f'B{row}'].alignment = Alignment(horizontal='right')
+                
+                ws1[f'C{row}'] = unit
+                ws1[f'C{row}'].border = thin_border
+                row += 1
+        
+        # ==================== SHEET 2: TRANSACTIONS ====================
+        ws2 = wb.create_sheet("Tranzaksiyalar" if lang == "uz" else "Транзакции")
+        
+        ws2.column_dimensions['A'].width = 25
+        ws2.column_dimensions['B'].width = 18
+        ws2.column_dimensions['C'].width = 15
+        
+        # Header
+        ws2.merge_cells('A1:C1')
+        ws2['A1'] = "📋 OYLIK TRANZAKSIYALAR" if lang == "uz" else "📋 ТРАНЗАКЦИИ ЗА МЕСЯЦ"
+        ws2['A1'].font = title_font
+        ws2['A1'].alignment = title_align
+        
+        row = 3
+        
+        # Summary
+        ws2[f'A{row}'] = "Jami daromad" if lang == "uz" else "Всего доход"
+        ws2[f'B{row}'] = monthly_income_tx
+        ws2[f'B{row}'].number_format = '#,##0'
+        ws2[f'B{row}'].font = money_font
+        row += 1
+        
+        ws2[f'A{row}'] = "Jami xarajat" if lang == "uz" else "Всего расход"
+        ws2[f'B{row}'] = monthly_expense
+        ws2[f'B{row}'].number_format = '#,##0'
+        ws2[f'B{row}'].font = danger_font
+        row += 1
+        
+        balance = monthly_income_tx - monthly_expense
+        ws2[f'A{row}'] = "Balans" if lang == "uz" else "Баланс"
+        ws2[f'B{row}'] = balance
+        ws2[f'B{row}'].number_format = '#,##0'
+        ws2[f'B{row}'].font = money_font if balance >= 0 else danger_font
+        row += 2
+        
+        # Expenses by category
+        if expense_by_cat:
+            ws2[f'A{row}'] = "XARAJATLAR KATEGORIYA BO'YICHA" if lang == "uz" else "РАСХОДЫ ПО КАТЕГОРИЯМ"
+            ws2[f'A{row}'].font = section_font
+            ws2[f'A{row}'].fill = section_fill
+            ws2.merge_cells(f'A{row}:C{row}')
+            row += 1
+            
+            # Category names mapping
+            from app.ai_assistant import EXPENSE_CATEGORIES
+            cat_names = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
+            
+            sorted_cats = sorted(expense_by_cat.items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_cats:
+                cat_name = cat_names.get(cat, cat)
+                pct = (amount / monthly_expense * 100) if monthly_expense > 0 else 0
+                
+                ws2[f'A{row}'] = cat_name
+                ws2[f'A{row}'].border = thin_border
+                
+                ws2[f'B{row}'] = amount
+                ws2[f'B{row}'].number_format = '#,##0'
+                ws2[f'B{row}'].border = thin_border
+                ws2[f'B{row}'].alignment = Alignment(horizontal='right')
+                
+                ws2[f'C{row}'] = f"{pct:.1f}%"
+                ws2[f'C{row}'].border = thin_border
+                ws2[f'C{row}'].alignment = Alignment(horizontal='center')
+                row += 1
+        
+        # ==================== SHEET 3: KUNLIK HISOBCHI ====================
+        # User's requested daily expense tracker format
+        ws3 = wb.create_sheet("Kunlik hisobchi" if lang == "uz" else "Дневник расходов")
+        
+        # Column widths
+        ws3.column_dimensions['A'].width = 6
+        ws3.column_dimensions['B'].width = 18
+        ws3.column_dimensions['C'].width = 18
+        ws3.column_dimensions['D'].width = 30
+        
+        # Yellow header style
+        header_yellow = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+        header_font_black = Font(name='Arial', size=11, bold=True)
+        
+        # Row 1: Headers
+        headers = [
+            ("№", 'A'),
+            ("Kirim" if lang == "uz" else "Приход", 'B'),
+            ("Chiqim" if lang == "uz" else "Расход", 'C'),
+            ("Izoh" if lang == "uz" else "Комментарий", 'D')
+        ]
+        
+        for header_text, col in headers:
+            ws3[f'{col}1'] = header_text
+            ws3[f'{col}1'].font = header_font_black
+            ws3[f'{col}1'].fill = header_yellow
+            ws3[f'{col}1'].border = thin_border
+            ws3[f'{col}1'].alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Get detailed transactions
+        from app.ai_assistant import get_user_transactions, INCOME_CATEGORIES, EXPENSE_CATEGORIES
+        transactions = await get_user_transactions(db, user["id"], days=30)
+        
+        # Row 2: Kun boshiga qoldiq (starting balance)
+        ws3.merge_cells('A2:C2')
+        ws3['A2'] = "Kun boshiga qoldiq" if lang == "uz" else "Остаток на начало"
+        ws3['A2'].font = header_font_black
+        ws3['A2'].border = thin_border
+        ws3['A2'].alignment = Alignment(horizontal='center')
+        
+        # Calculate starting balance (profile based or estimated)
+        starting_balance = free_cash  # Bo'sh pul = starting balance
+        ws3['D2'] = starting_balance
+        ws3['D2'].number_format = '#,##0.00'
+        ws3['D2'].font = money_font
+        ws3['D2'].fill = header_yellow
+        ws3['D2'].border = thin_border
+        ws3['D2'].alignment = Alignment(horizontal='right')
+        
+        # Data rows (35 rows like user's example)
+        row = 3
+        total_income_tracker = 0
+        total_expense_tracker = 0
+        
+        # Sort transactions by date
+        sorted_transactions = sorted(transactions, key=lambda x: x.get('created_at', ''), reverse=False)
+        
+        for i in range(1, 36):  # 35 rows
+            ws3[f'A{row}'] = i
+            ws3[f'A{row}'].border = thin_border
+            ws3[f'A{row}'].alignment = Alignment(horizontal='center')
+            
+            ws3[f'B{row}'].border = thin_border
+            ws3[f'B{row}'].number_format = '#,##0.00'
+            ws3[f'B{row}'].alignment = Alignment(horizontal='right')
+            
+            ws3[f'C{row}'].border = thin_border
+            ws3[f'C{row}'].number_format = '#,##0.00'
+            ws3[f'C{row}'].alignment = Alignment(horizontal='right')
+            
+            ws3[f'D{row}'].border = thin_border
+            
+            # Fill with transaction data if available
+            if i <= len(sorted_transactions):
+                tx = sorted_transactions[i-1]
+                tx_type = tx.get('type', '')
+                tx_amount = tx.get('amount', 0)
+                tx_category = tx.get('category', '')
+                tx_desc = tx.get('description', '')
+                
+                # Get category name
+                if tx_type == 'income':
+                    cat_names = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"])
+                    cat_display = cat_names.get(tx_category, tx_category)
+                    ws3[f'B{row}'] = tx_amount
+                    ws3[f'B{row}'].font = money_font
+                    total_income_tracker += tx_amount
+                else:
+                    cat_names = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
+                    cat_display = cat_names.get(tx_category, tx_category)
+                    ws3[f'C{row}'] = tx_amount
+                    ws3[f'C{row}'].font = danger_font
+                    total_expense_tracker += tx_amount
+                
+                # Description: category + user description
+                display_desc = f"{cat_display}"
+                if tx_desc:
+                    display_desc = tx_desc
+                ws3[f'D{row}'] = display_desc
+            
+            row += 1
+        
+        # JAMI (Total) row
+        ws3[f'A{row}'] = "JAMI" if lang == "uz" else "ИТОГО"
+        ws3[f'A{row}'].font = header_font_black
+        ws3[f'A{row}'].border = thin_border
+        
+        ws3[f'B{row}'] = total_income_tracker
+        ws3[f'B{row}'].number_format = '#,##0.00'
+        ws3[f'B{row}'].font = money_font
+        ws3[f'B{row}'].border = thin_border
+        ws3[f'B{row}'].alignment = Alignment(horizontal='right')
+        
+        ws3[f'C{row}'] = total_expense_tracker
+        ws3[f'C{row}'].number_format = '#,##0.00'
+        ws3[f'C{row}'].font = danger_font
+        ws3[f'C{row}'].border = thin_border
+        ws3[f'C{row}'].alignment = Alignment(horizontal='right')
+        
+        ws3[f'D{row}'].border = thin_border
+        row += 1
+        
+        # Kun oxiriga qoldiq (ending balance)
+        ws3.merge_cells(f'A{row}:C{row}')
+        ws3[f'A{row}'] = "Kun oxiriga qoldiq" if lang == "uz" else "Остаток на конец"
+        ws3[f'A{row}'].font = header_font_black
+        ws3[f'A{row}'].border = thin_border
+        ws3[f'A{row}'].alignment = Alignment(horizontal='center')
+        
+        ending_balance = starting_balance + total_income_tracker - total_expense_tracker
+        ws3[f'D{row}'] = ending_balance
+        ws3[f'D{row}'].number_format = '#,##0.00'
+        ws3[f'D{row}'].font = money_font if ending_balance >= 0 else danger_font
+        ws3[f'D{row}'].fill = header_yellow
+        ws3[f'D{row}'].border = thin_border
+        ws3[f'D{row}'].alignment = Alignment(horizontal='right')
+        
+        # Save to BytesIO
         output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='HALOS Report', index=False)
+        wb.save(output)
         output.seek(0)
         
         # Send file
-        filename = f"HALOS_Report_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        filename = f"HALOS_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
         
         if query:
             chat_id = query.message.chat_id
@@ -536,13 +936,14 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             chat_id=chat_id,
             document=output,
             filename=filename,
-            caption="📊 HALOS Report" if lang == "uz" else "📊 Отчёт HALOS"
+            caption="📊 *HALOS Moliyaviy Hisobot*\n\n✅ 3 ta sahifa:\n• Xulosa\n• Tranzaksiyalar\n• Kunlik hisobchi" if lang == "uz" else "📊 *HALOS Финансовый Отчёт*\n\n✅ 3 листа:\n• Сводка\n• Транзакции\n• Дневник расходов",
+            parse_mode="Markdown"
         )
         
         if lang == "uz":
-            msg = "✅ Excel hisobot yuborildi!"
+            msg = "✅ Excel hisobot yuborildi!\n\n📋 Hisobotda:\n• Daromadlar va xarajatlar\n• HALOS usuli taqsimoti\n• Qarzdan chiqish muddati\n• Oylik tranzaksiyalar\n• Kunlik hisobchi"
         else:
-            msg = "✅ Excel отчёт отправлен!"
+            msg = "✅ Excel отчёт отправлен!\n\n📋 В отчёте:\n• Доходы и расходы\n• Распределение по методу HALOS\n• Срок выхода из долга\n• Транзакции за месяц\n• Дневник расходов"
         
         if query:
             await query.edit_message_text(msg)
@@ -551,6 +952,8 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             
     except Exception as e:
         logger.error(f"Excel export error: {e}")
+        import traceback
+        traceback.print_exc()
         if lang == "uz":
             msg = "❌ Eksportda xatolik yuz berdi. Keyinroq urinib ko'ring."
         else:
@@ -585,33 +988,67 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if lang == "uz":
         msg = (
             "💎 *HALOS PRO*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "PRO imkoniyatlaringiz:\n\n"
+            "✅ Siz PRO foydalanuvchisiz!\n\n"
             
-            "🤖 *AI yordamchi* — ovozli xarajat/daromad yozish\n"
-            "📊 *Statistika* — haftalik/oylik/yillik\n"
-            "🔔 *Eslatmalar* — to'lov eslatmalari\n"
-            "📋 *Yuk nazorati* — monitoring va maslahatlar\n"
-            "📥 *Excel hisobot* — yuklab olish\n"
+            "🎯 *Sizning imkoniyatlaringiz:*\n\n"
+            
+            "🎤 *Ovozli AI yordamchi*\n"
+            "   Ovoz yoki matn bilan xarajat yozing\n\n"
+            
+            "📊 *Batafsil statistika*\n"
+            "   Haftalik, oylik, yillik tahlil\n\n"
+            
+            "📅 *Halos sanangiz*\n"
+            "   Qarzlardan qachon xalos bo'lasiz\n\n"
+            
+            "🔔 *Aqlli eslatmalar*\n"
+            "   To'lov eslatmalari va maslahatlar\n\n"
+            
+            "📋 *Yuk nazorati*\n"
+            "   Moliyaviy yuk monitoringi\n\n"
+            
+            "📥 *Excel hisobot*\n"
+            "   Barcha ma'lumotlarni yuklab oling\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Quyidagi funksiyalardan birini tanlang:"
         )
     else:
         msg = (
             "💎 *HALOS PRO*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "Ваши PRO возможности:\n\n"
+            "✅ Вы PRO пользователь!\n\n"
             
-            "🤖 *AI помощник* — голосовая запись расходов/доходов\n"
-            "📊 *Статистика* — еженедельно/ежемесячно/ежегодно\n"
-            "🔔 *Напоминания* — напоминания об оплате\n"
-            "📋 *Контроль нагрузки* — мониторинг и советы\n"
-            "📥 *Excel отчёт* — скачать\n"
+            "🎯 *Ваши возможности:*\n\n"
+            
+            "🎤 *Голосовой AI помощник*\n"
+            "   Записывайте расходы голосом или текстом\n\n"
+            
+            "📊 *Детальная статистика*\n"
+            "   Еженедельный, ежемесячный, годовой анализ\n\n"
+            
+            "📅 *Дата Halos*\n"
+            "   Когда освободитесь от долгов\n\n"
+            
+            "🔔 *Умные напоминания*\n"
+            "   Напоминания о платежах и советы\n\n"
+            
+            "📋 *Контроль нагрузки*\n"
+            "   Мониторинг финансовой нагрузки\n\n"
+            
+            "📥 *Excel отчёт*\n"
+            "   Скачивайте все данные\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Выберите функцию:"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "🤖 AI yordamchi" if lang == "uz" else "🤖 AI помощник",
+            "🎤 Ovozli AI" if lang == "uz" else "🎤 Голосовой AI",
             callback_data="ai_assistant"
         )],
         [InlineKeyboardButton(
@@ -627,11 +1064,11 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             callback_data="pro_debt_monitor"
         )],
         [InlineKeyboardButton(
-            "� Hisobot sozlamalari" if lang == "uz" else "📊 Настройки отчётов",
+            "📊 Hisobot sozlamalari" if lang == "uz" else "📊 Настройки отчётов",
             callback_data="report_settings"
         )],
         [InlineKeyboardButton(
-            "�📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
+            "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
             callback_data="pro_export_excel"
         )],
         [InlineKeyboardButton(

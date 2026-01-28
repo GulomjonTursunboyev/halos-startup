@@ -20,7 +20,8 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    filters
+    filters,
+    ApplicationHandlerStop
 )
 
 from app.config import States, PDF_UPLOAD_DIR, TRANSACTION_UPLOAD_DIR, TRANSACTION_EXTENSIONS, ADMIN_IDS
@@ -2384,6 +2385,12 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     
     # Add upgrade button if not PRO
     if not is_pro:
+        # Check if trial available
+        trial_available = user and not user.get("trial_used", 0)
+        if trial_available:
+            keyboard.append([
+                InlineKeyboardButton("🎁 3 kun BEPUL sinash" if lang == "uz" else "🎁 3 дня БЕСПЛАТНО", callback_data="activate_trial")
+            ])
         keyboard.append([
             InlineKeyboardButton("💎 PRO olish" if lang == "uz" else "💎 Получить PRO", callback_data="show_pricing")
         ])
@@ -2530,14 +2537,15 @@ async def handle_profile_edit_input(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(
             get_message("edit_invalid_number", lang)
         )
-        return
+        # Stop propagation - don't let AI process invalid input
+        raise ApplicationHandlerStop()
     
     # Update in database
     db = await get_database()
     user = await db.get_user(telegram_id)
     
     if not user:
-        return
+        raise ApplicationHandlerStop()
     
     profile = await db.get_financial_profile(user["id"])
     
@@ -2565,6 +2573,9 @@ async def handle_profile_edit_input(update: Update, context: ContextTypes.DEFAUL
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
+    
+    # Stop propagation - don't let AI process this input
+    raise ApplicationHandlerStop()
 
 
 async def profile_mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2853,7 +2864,31 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Check PRO status
     is_pro = await is_user_pro(telegram_id)
     
-    # ==================== MA'LUMOTLARNI YIGISH ====================
+    # ==================== BUGUNGI KUNLIK HISOBOT (YANGI UX) ====================
+    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES, INCOME_CATEGORIES, get_debt_summary
+    from datetime import datetime
+    
+    # Bugungi tranzaksiyalar
+    try:
+        today_summary = await get_transaction_summary(db, user["id"], days=1)
+    except:
+        today_summary = {"total_income": 0, "total_expense": 0, "income_by_category": {}, "expense_by_category": {}}
+    
+    # Oylik summari
+    try:
+        month_summary = await get_transaction_summary(db, user["id"], days=30)
+    except:
+        month_summary = {"total_income": 0, "total_expense": 0, "income_by_category": {}, "expense_by_category": {}}
+    
+    today_income = today_summary.get("total_income", 0)
+    today_expense = today_summary.get("total_expense", 0)
+    today_balance = today_income - today_expense
+    
+    month_income = month_summary.get("total_income", 0)
+    month_expense = month_summary.get("total_expense", 0)
+    month_balance = month_income - month_expense
+    
+    # Profil ma'lumotlari
     income_self = profile.get("income_self", 0) or 0
     income_partner = profile.get("income_partner", 0) or 0
     total_income = income_self + income_partner
@@ -2867,285 +2902,245 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     mandatory_total = rent + kindergarten + utilities + loan_payment
     free_cash = total_income - mandatory_total
     
-    # ==================== QARZDAN CHIQISH HISOBLASH ====================
-    import math
-    from datetime import datetime
-    from dateutil.relativedelta import relativedelta
-    from app.engine import format_exit_date
-    
-    # Oddiy usul (faqat minimal to'lov)
-    if loan_payment > 0 and total_debt > 0:
-        simple_exit_months = math.ceil(total_debt / loan_payment)
-        simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
-        simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
-    else:
-        simple_exit_months = 0
-        simple_exit_formatted = "-"
-    
-    # PRO usul (aqlli taqsimlash)
-    if free_cash > 0 and total_debt > 0:
-        # 70% yashash, 20% qo'shimcha qarz, 10% boylik
-        extra_debt = free_cash * 0.2
-        savings_monthly = free_cash * 0.1
-        total_payment = loan_payment + extra_debt
-        pro_exit_months = math.ceil(total_debt / total_payment) if total_payment > 0 else 0
-        pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
-        pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
-        savings_at_exit = savings_monthly * pro_exit_months
-        months_saved = simple_exit_months - pro_exit_months
-        
-        # Aqlli taqsimlash
-        living_budget = free_cash * 0.7
-    else:
-        pro_exit_months = simple_exit_months
-        pro_exit_formatted = simple_exit_formatted
-        savings_at_exit = 0
-        months_saved = 0
-        extra_debt = 0
-        savings_monthly = 0
-        living_budget = 0
-    
-    # ==================== AI TRANZAKSIYALAR ====================
-    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES, INCOME_CATEGORIES, get_debt_summary
-    
-    try:
-        ai_summary = await get_transaction_summary(db, user["id"], days=30)
-    except:
-        ai_summary = {"total_income": 0, "total_expense": 0, "income_by_category": {}, "expense_by_category": {}}
-    
-    ai_income = ai_summary.get("total_income", 0)
-    ai_expense = ai_summary.get("total_expense", 0)
-    
-    # ==================== SHAXSIY QARZLAR ====================
+    # Shaxsiy qarzlar
     try:
         debt_summary = await get_debt_summary(db, user["id"])
     except:
         debt_summary = {"total_lent": 0, "total_borrowed": 0, "net_balance": 0, "lent_count": 0, "borrowed_count": 0}
     
-    # ==================== HISOBOT FORMATLASH ====================
+    # ==================== ZAMONAVIY KUNLIK HISOBOT ====================
+    today_date = datetime.now().strftime("%d.%m.%Y")
+    
     if lang == "uz":
         msg = (
-            "📊 *MENING HISOBOTLARIM*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            
-            "💰 *DAROMADLAR:*\n"
-            f"├ Shaxsiy: *{income_self:,}* so'm\n"
+            f"📊 *BUGUNGI HISOBOT* • {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         )
-        if income_partner > 0:
-            msg += f"├ Sherik: *{income_partner:,}* so'm\n"
-        msg += f"└ Jami: *{total_income:,}* so'm\n\n"
+        
+        # Bugungi balans (katta va aniq)
+        if today_balance >= 0:
+            msg += f"💰 *Bugungi balans:* +{today_balance:,} so'm\n"
+        else:
+            msg += f"🔴 *Bugungi balans:* {today_balance:,} so'm\n"
         
         msg += (
-            "📌 *MAJBURIY TO'LOVLAR:*\n"
-            f"├ 🏠 Ijara: *{rent:,}* so'm\n"
-            f"├ 👶 Bog'cha: *{kindergarten:,}* so'm\n"
-            f"├ 💡 Kommunal: *{utilities:,}* so'm\n"
-            f"├ 💳 Kredit to'lovi: *{loan_payment:,}* so'm\n"
-            f"└ Jami majburiy: *{mandatory_total:,}* so'm\n\n"
+            f"   ├ 📥 Kirim: +{today_income:,}\n"
+            f"   └ 📤 Chiqim: -{today_expense:,}\n\n"
         )
         
-        if total_debt > 0:
-            msg += (
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "💳 *QARZ HOLATI:*\n"
-                f"├ Umumiy qarz: *{total_debt:,}* so'm\n"
-                f"└ Bo'sh pul: *{free_cash:,}* so'm\n\n"
-                
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🌿 *ODDIY USUL:*\n"
-                f"├ Muddat: *{simple_exit_months}* oy\n"
-                f"├ Sana: *{simple_exit_formatted}*\n"
-                f"└ Usul: Faqat minimal to'lov\n\n"
-            )
-            
-            if is_pro:
-                msg += (
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    "🌟 *HALOS PRO USULI:*\n"
-                    f"├ Muddat: *{pro_exit_months}* oy\n"
-                    f"├ Sana: *{pro_exit_formatted}*\n"
-                    f"├ ⏱ *{months_saved}* oy tezroq\n"
-                    f"├ 💎 Kapital: *{savings_at_exit:,.0f}* so'm\n"
-                    f"├ Oylik qo'shimcha: *{extra_debt:,.0f}* so'm\n"
-                    f"└ Oylik jamg'arma: *{savings_monthly:,.0f}* so'm\n\n"
-                    
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    "📋 *AQLLI TAQSIMLASH:*\n"
-                    f"├ 🏠 Yashash (70%): *{living_budget:,.0f}* so'm\n"
-                    f"├ ⚡ Qarz (20%): *{extra_debt:,.0f}* so'm\n"
-                    f"└ 🏦 Boylik (10%): *{savings_monthly:,.0f}* so'm\n\n"
-                )
-            else:
-                msg += (
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    "🔒 *HALOS PRO USULI:*\n"
-                    f"├ Muddat: *{pro_exit_months}* oy\n"
-                    f"├ ⏱ *{months_saved}* oy tezroq\n"
-                    f"├ 💎 Kapital: *{savings_at_exit:,.0f}* so'm\n"
-                    f"└ _PRO obuna bilan ochiladi_\n\n"
-                )
+        # Bugungi xarajatlar kategoriya bo'yicha
+        if today_summary.get("expense_by_category"):
+            msg += "💸 *Bugungi xarajatlar:*\n"
+            sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses[:5]:  # Top 5
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
+                percentage = (amount / today_expense * 100) if today_expense > 0 else 0
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                msg += f"   {cat_name}\n   {bar} {amount:,} ({percentage:.0f}%)\n"
+            msg += "\n"
         
-        # AI tracking data (if available)
-        if ai_income > 0 or ai_expense > 0:
-            msg += (
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🤖 *AI YORDAMCHI (30 kun):*\n"
-                f"├ 💰 Kirim: *{ai_income:,}* so'm\n"
-                f"├ 💸 Chiqim: *{ai_expense:,}* so'm\n"
-                f"└ 📈 Balans: *{ai_income - ai_expense:,}* so'm\n"
-            )
-            
-            # Show expense breakdown
-            if ai_summary.get("expense_by_category"):
-                msg += "\n💸 *Xarajatlar taqsimoti:*\n"
-                for cat, amount in ai_summary["expense_by_category"].items():
-                    cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
-                    msg += f"├ {cat_name}: *{amount:,}* so'm\n"
+        # Oylik xulosa (qisqacha)
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *OYLIK XULOSA* (30 kun)\n"
+        )
+        if month_balance >= 0:
+            msg += f"   💚 Balans: +{month_balance:,} so'm\n"
+        else:
+            msg += f"   🔴 Balans: {month_balance:,} so'm\n"
+        msg += (
+            f"   ├ Kirim: +{month_income:,}\n"
+            f"   └ Chiqim: -{month_expense:,}\n\n"
+        )
         
-        # Shaxsiy qarzlar bo'limi
+        # PRO uchun HALOS USULI
+        if is_pro and free_cash > 0:
+            living_70 = free_cash * 0.70
+            debt_20 = free_cash * 0.20
+            wealth_10 = free_cash * 0.10
+            
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🌟 *HALOS USULI*\n"
+                f"   Bo'sh pul: *{free_cash:,}* so'm\n\n"
+                f"   🏠 *Yashash*\n"
+                f"      {living_70:,.0f} so'm/oy\n"
+                f"      {living_70/30:,.0f} so'm/kun\n\n"
+                f"   ⚡ *Qarz to'lash*\n"
+                f"      {debt_20:,.0f} so'm/oy\n"
+            )
+            if total_debt > 0:
+                import math
+                from dateutil.relativedelta import relativedelta
+                months_to_pay = math.ceil(total_debt / (loan_payment + debt_20)) if (loan_payment + debt_20) > 0 else 0
+                exit_date = datetime.now() + relativedelta(months=months_to_pay)
+                msg += f"      📆 Qarzdan chiqish: {exit_date.strftime('%B %Y')}\n"
+            
+            msg += (
+                f"\n   💰 *Jamg'arma*\n"
+                f"      {wealth_10:,.0f} so'm/oy\n"
+                f"      Yilda: ~{wealth_10*12:,.0f} so'm\n"
+            )
+        elif not is_pro and free_cash > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🔒 *HALOS USULI*\n"
+                "   _PRO obuna bilan HALOS_\n"
+                "   _usulini oching_\n"
+            )
+        
+        # Shaxsiy qarzlar (qisqacha)
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
-            msg += (
-                "\n━━━━━━━━━━━━━━━━━━━━\n"
-                "🤝 *SHAXSIY QARZLAR:*\n"
-                f"├ 📤 Bergan: *{debt_summary['total_lent']:,}* so'm ({debt_summary['lent_count']} ta)\n"
-                f"├ 📥 Olgan: *{debt_summary['total_borrowed']:,}* so'm ({debt_summary['borrowed_count']} ta)\n"
-            )
             net = debt_summary['net_balance']
+            msg += "\n━━━━━━━━━━━━━━━━━━━━━━\n🤝 *QARZLAR*\n"
             if net > 0:
-                msg += f"└ 💚 Sof: *+{net:,}* so'm _(sizga qaytariladi)_\n"
+                msg += f"   💚 Sizga qaytariladi: +{net:,} so'm\n"
             elif net < 0:
-                msg += f"└ 🔴 Sof: *{net:,}* so'm _(siz qaytarasiz)_\n"
+                msg += f"   🔴 Siz qaytarasiz: {net:,} so'm\n"
             else:
-                msg += "└ ⚪ Sof: *0* so'm\n"
+                msg += "   ⚪ Qarz yo'q\n"
+    
     else:
         # Russian version
         msg = (
-            "📊 *МОИ ОТЧЁТЫ*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            
-            "💰 *ДОХОДЫ:*\n"
-            f"├ Личный: *{income_self:,}* сум\n"
+            f"📊 *ОТЧЁТ ЗА СЕГОДНЯ* • {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         )
-        if income_partner > 0:
-            msg += f"├ Партнёр: *{income_partner:,}* сум\n"
-        msg += f"└ Всего: *{total_income:,}* сум\n\n"
+        
+        if today_balance >= 0:
+            msg += f"💰 *Баланс за сегодня:* +{today_balance:,} сум\n"
+        else:
+            msg += f"🔴 *Баланс за сегодня:* {today_balance:,} сум\n"
         
         msg += (
-            "📌 *ОБЯЗАТЕЛЬНЫЕ ПЛАТЕЖИ:*\n"
-            f"├ 🏠 Аренда: *{rent:,}* сум\n"
-            f"├ 👶 Детсад: *{kindergarten:,}* сум\n"
-            f"├ 💡 Коммунальные: *{utilities:,}* сум\n"
-            f"├ 💳 Платёж по кредиту: *{loan_payment:,}* сум\n"
-            f"└ Всего обязательных: *{mandatory_total:,}* сум\n\n"
+            f"   ├ 📥 Приход: +{today_income:,}\n"
+            f"   └ 📤 Расход: -{today_expense:,}\n\n"
         )
         
-        if total_debt > 0:
-            msg += (
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "💳 *СОСТОЯНИЕ ДОЛГА:*\n"
-                f"├ Общий долг: *{total_debt:,}* сум\n"
-                f"└ Свободные: *{free_cash:,}* сум\n\n"
-                
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🌿 *ОБЫЧНЫЙ СПОСОБ:*\n"
-                f"├ Срок: *{simple_exit_months}* мес\n"
-                f"├ Дата: *{simple_exit_formatted}*\n"
-                f"└ Метод: Только минимальный платёж\n\n"
-            )
-            
-            if is_pro:
-                msg += (
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    "🌟 *СПОСОБ HALOS PRO:*\n"
-                    f"├ Срок: *{pro_exit_months}* мес\n"
-                    f"├ Дата: *{pro_exit_formatted}*\n"
-                    f"├ ⏱ На *{months_saved}* мес быстрее\n"
-                    f"├ 💎 Капитал: *{savings_at_exit:,.0f}* сум\n"
-                    f"├ Доп. платёж: *{extra_debt:,.0f}* сум\n"
-                    f"└ Ежемесячные накопления: *{savings_monthly:,.0f}* сум\n\n"
-                    
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    "📋 *УМНОЕ РАСПРЕДЕЛЕНИЕ:*\n"
-                    f"├ 🏠 Жизнь (70%): *{living_budget:,.0f}* сум\n"
-                    f"├ ⚡ Долг (20%): *{extra_debt:,.0f}* сум\n"
-                    f"└ 🏦 Богатство (10%): *{savings_monthly:,.0f}* сум\n\n"
-                )
-            else:
-                msg += (
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    "🔒 *СПОСОБ HALOS PRO:*\n"
-                    f"├ Срок: *{pro_exit_months}* мес\n"
-                    f"├ ⏱ На *{months_saved}* мес быстрее\n"
-                    f"├ 💎 Капитал: *{savings_at_exit:,.0f}* сум\n"
-                    f"└ _Доступно с PRO подпиской_\n\n"
-                )
+        if today_summary.get("expense_by_category"):
+            msg += "💸 *Расходы сегодня:*\n"
+            sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses[:5]:
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
+                percentage = (amount / today_expense * 100) if today_expense > 0 else 0
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                msg += f"   {cat_name}\n   {bar} {amount:,} ({percentage:.0f}%)\n"
+            msg += "\n"
         
-        # AI tracking data
-        if ai_income > 0 or ai_expense > 0:
-            msg += (
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "🤖 *AI ПОМОЩНИК (30 дней):*\n"
-                f"├ 💰 Приход: *{ai_income:,}* сум\n"
-                f"├ 💸 Расход: *{ai_expense:,}* сум\n"
-                f"└ 📈 Баланс: *{ai_income - ai_expense:,}* сум\n"
-            )
-            
-            if ai_summary.get("expense_by_category"):
-                msg += "\n💸 *Распределение расходов:*\n"
-                for cat, amount in ai_summary["expense_by_category"].items():
-                    cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
-                    msg += f"├ {cat_name}: *{amount:,}* сум\n"
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "📅 *ИТОГИ МЕСЯЦА* (30 дней)\n"
+        )
+        if month_balance >= 0:
+            msg += f"   💚 Баланс: +{month_balance:,} сум\n"
+        else:
+            msg += f"   🔴 Баланс: {month_balance:,} сум\n"
+        msg += (
+            f"   ├ Приход: +{month_income:,}\n"
+            f"   └ Расход: -{month_expense:,}\n\n"
+        )
         
-        # Shaxsiy qarzlar bo'limi (rus)
+        if is_pro and free_cash > 0:
+            living_70 = free_cash * 0.70
+            debt_20 = free_cash * 0.20
+            wealth_10 = free_cash * 0.10
+            
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🌟 *МЕТОД HALOS*\n"
+                f"   Свободные: *{free_cash:,}* сум\n\n"
+                f"   🏠 *Жизнь (70%)*\n"
+                f"      {living_70:,.0f} сум/мес\n"
+                f"      {living_70/30:,.0f} сум/день\n\n"
+                f"   ⚡ *Погашение долга (20%)*\n"
+                f"      {debt_20:,.0f} сум/мес\n"
+            )
+            if total_debt > 0:
+                import math
+                from dateutil.relativedelta import relativedelta
+                months_to_pay = math.ceil(total_debt / (loan_payment + debt_20)) if (loan_payment + debt_20) > 0 else 0
+                exit_date = datetime.now() + relativedelta(months=months_to_pay)
+                msg += f"      📆 Выход из долга: {exit_date.strftime('%B %Y')}\n"
+            
+            msg += (
+                f"\n   💰 *Накопления (10%)*\n"
+                f"      {wealth_10:,.0f} сум/мес\n"
+                f"      В год: ~{wealth_10*12:,.0f} сум\n"
+            )
+        elif not is_pro and free_cash > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🔒 *МЕТОД HALOS*\n"
+                "   _С PRO подпиской метод_\n"
+                "   _HALOS доступен_\n"
+            )
+        
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
-            msg += (
-                "\n━━━━━━━━━━━━━━━━━━━━\n"
-                "🤝 *ЛИЧНЫЕ ДОЛГИ:*\n"
-                f"├ 📤 Дал: *{debt_summary['total_lent']:,}* сум ({debt_summary['lent_count']})\n"
-                f"├ 📥 Взял: *{debt_summary['total_borrowed']:,}* сум ({debt_summary['borrowed_count']})\n"
-            )
             net = debt_summary['net_balance']
+            msg += "\n━━━━━━━━━━━━━━━━━━━━━━\n🤝 *ДОЛГИ*\n"
             if net > 0:
-                msg += f"└ 💚 Чистый: *+{net:,}* сум _(вернут вам)_\n"
+                msg += f"   💚 Вернут вам: +{net:,} сум\n"
             elif net < 0:
-                msg += f"└ 🔴 Чистый: *{net:,}* сум _(вернёте вы)_\n"
+                msg += f"   🔴 Вернёте вы: {net:,} сум\n"
             else:
-                msg += "└ ⚪ Чистый: *0* сум\n"
+                msg += "   ⚪ Долгов нет\n"
     
-    # ==================== TUGMALAR ====================
+    # ==================== TUGMALAR (YANGI UX) ====================
     if is_pro:
         keyboard = [
             [InlineKeyboardButton(
-                "📈 Batafsil statistika" if lang == "uz" else "📈 Подробная статистика",
-                callback_data="pro_statistics"
+                "🌟 HALOS holati" if lang == "uz" else "🌟 Статус HALOS",
+                callback_data="show_halos_status"
             )],
+            [InlineKeyboardButton(
+                "📈 Batafsil hisobot" if lang == "uz" else "📈 Подробный отчёт",
+                callback_data="detailed_report"
+            )],
+            [
+                InlineKeyboardButton(
+                    "📅 Haftalik" if lang == "uz" else "📅 Неделя",
+                    callback_data="report_weekly"
+                ),
+                InlineKeyboardButton(
+                    "📆 Oylik" if lang == "uz" else "📆 Месяц",
+                    callback_data="report_monthly"
+                )
+            ],
             [InlineKeyboardButton(
                 "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
                 callback_data="pro_export_excel"
             )],
-            [InlineKeyboardButton(
-                "✏️ Ma'lumotlarni o'zgartirish" if lang == "uz" else "✏️ Изменить данные",
-                callback_data="recalculate"
-            )],
-            [InlineKeyboardButton(
-                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
-                callback_data="ai_debt_list"
-            )]
+            [
+                InlineKeyboardButton(
+                    "📋 Qarzlar" if lang == "uz" else "📋 Долги",
+                    callback_data="ai_debt_list"
+                ),
+                InlineKeyboardButton(
+                    "✏️ Tahrirlash" if lang == "uz" else "✏️ Изменить",
+                    callback_data="recalculate"
+                )
+            ]
         ]
     else:
         keyboard = [
             [InlineKeyboardButton(
+                "📈 Batafsil hisobot" if lang == "uz" else "📈 Подробный отчёт",
+                callback_data="detailed_report"
+            )],
+            [InlineKeyboardButton(
                 "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
                 callback_data="show_pricing"
             )],
-            [InlineKeyboardButton(
-                "✏️ Ma'lumotlarni o'zgartirish" if lang == "uz" else "✏️ Изменить данные",
-                callback_data="recalculate"
-            )],
-            [InlineKeyboardButton(
-                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
-                callback_data="ai_debt_list"
-            )]
+            [
+                InlineKeyboardButton(
+                    "📋 Qarzlar" if lang == "uz" else "📋 Долги",
+                    callback_data="ai_debt_list"
+                ),
+                InlineKeyboardButton(
+                    "✏️ Tahrirlash" if lang == "uz" else "✏️ Изменить",
+                    callback_data="recalculate"
+                )
+            ]
         ]
     
     await update.message.reply_text(
@@ -4202,6 +4197,7 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         # Store pending transactions for confirmation
         context.user_data["pending_transactions"] = transactions
         context.user_data["pending_original_text"] = text
+        context.user_data["original_message_id"] = update.message.message_id
         
         # Format preview message
         if lang == "uz":
@@ -4329,46 +4325,95 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
         return
     
     # Save transactions
-    from app.ai_assistant import save_multiple_transactions, get_user_budget_status
+    from app.ai_assistant import save_multiple_transactions, get_budget_status
     
     tx_ids = await save_multiple_transactions(db, user["id"], transactions)
+    
+    # Try to delete the original user message (the one they typed/voice)
+    original_message_id = context.user_data.get("original_message_id")
+    if original_message_id:
+        try:
+            await context.bot.delete_message(
+                chat_id=telegram_id,
+                message_id=original_message_id
+            )
+        except Exception:
+            pass  # Message may already be deleted or too old
+        context.user_data.pop("original_message_id", None)
     
     # Clear pending
     context.user_data.pop("pending_transactions", None)
     context.user_data.pop("pending_original_text", None)
     
     # Get budget status
-    budget_status = await get_user_budget_status(db, user["id"])
+    budget_status = await get_budget_status(db, user["id"])
     
-    # Success message
+    today_income = budget_status.get('today_income', 0)
+    today_expense = budget_status.get('today_expense', 0)
+    today_balance = today_income - today_expense
+    
+    # Build beautiful success message
     if lang == "uz":
         msg = "✅ *SAQLANDI!*\n"
-        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        for i, tx in enumerate(transactions, 1):
-            emoji = "📥" if tx["type"] == "income" else "📤"
-            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])} so'm*\n"
+        for tx in transactions:
+            emoji = "💰" if tx["type"] == "income" else "💸"
+            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* so'm\n"
         
-        msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
-        msg += f"📊 *Bugun:*\n"
-        msg += f"├ Daromad: {format_number(budget_status.get('today_income', 0))} so'm\n"
-        msg += f"├ Xarajat: {format_number(budget_status.get('today_expense', 0))} so'm\n"
-        msg += f"└ Balans: {format_number(budget_status.get('today_balance', 0))} so'm"
+        msg += "\n"
+        msg += "┌─────────────────────┐\n"
+        msg += "│    📊 *BUGUNGI HISOBOT*    │\n"
+        msg += "└─────────────────────┘\n\n"
+        
+        msg += f"💰 Daromad: *{format_number(today_income)}* so'm\n"
+        msg += f"💸 Xarajat: *{format_number(today_expense)}* so'm\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        
+        if today_balance >= 0:
+            msg += f"📈 Balans: *+{format_number(today_balance)}* so'm ✅"
+        else:
+            msg += f"📉 Balans: *{format_number(today_balance)}* so'm ⚠️"
+        
     else:
         msg = "✅ *СОХРАНЕНО!*\n"
-        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        for i, tx in enumerate(transactions, 1):
-            emoji = "📥" if tx["type"] == "income" else "📤"
-            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])} сум*\n"
+        for tx in transactions:
+            emoji = "💰" if tx["type"] == "income" else "💸"
+            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* сум\n"
         
-        msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
-        msg += f"📊 *Сегодня:*\n"
-        msg += f"├ Доход: {format_number(budget_status.get('today_income', 0))} сум\n"
-        msg += f"├ Расход: {format_number(budget_status.get('today_expense', 0))} сум\n"
-        msg += f"└ Баланс: {format_number(budget_status.get('today_balance', 0))} сум"
+        msg += "\n"
+        msg += "┌─────────────────────┐\n"
+        msg += "│    📊 *ОТЧЁТ ЗА ДЕНЬ*    │\n"
+        msg += "└─────────────────────┘\n\n"
+        
+        msg += f"💰 Доход: *{format_number(today_income)}* сум\n"
+        msg += f"💸 Расход: *{format_number(today_expense)}* сум\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        
+        if today_balance >= 0:
+            msg += f"📈 Баланс: *+{format_number(today_balance)}* сум ✅"
+        else:
+            msg += f"📉 Баланс: *{format_number(today_balance)}* сум ⚠️"
     
-    await query.edit_message_text(msg, parse_mode="Markdown")
+    # Add quick action buttons
+    keyboard = [[
+        InlineKeyboardButton(
+            "📊 Batafsil" if lang == "uz" else "📊 Подробнее",
+            callback_data="show_reports"
+        ),
+        InlineKeyboardButton(
+            "➕ Yana kiritish" if lang == "uz" else "➕ Ещё запись",
+            callback_data="add_transaction_menu"
+        )
+    ]]
+    
+    await query.edit_message_text(
+        msg, 
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def cancel_pending_transaction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4778,6 +4823,561 @@ async def add_more_expense_callback(update: Update, context: ContextTypes.DEFAUL
     )
 
 
+async def show_halos_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    🌟 HALOS USULI STATUS - PRO foydalanuvchilar uchun
+    
+    Bu callback HALOS usuliga qanchalik amal qilinayotganini ko'rsatadi:
+    - 70% yashash
+    - 20% qarz to'lash  
+    - 10% jamg'arma
+    
+    Shuningdek qarzdan chiqish sanasini va tejalgan oylarni ko'rsatadi.
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # PRO tekshirish
+    is_pro = await is_user_pro(telegram_id)
+    if not is_pro:
+        if lang == "uz":
+            msg = "🔒 *HALOS USULI* PRO obunachilarga ochiq.\n\n💎 PRO ga o'ting va HALOS usuli bilan qarzdan tezroq chiqing!"
+        else:
+            msg = "🔒 *МЕТОД HALOS* доступен PRO подписчикам.\n\n💎 Перейдите на PRO и выходите из долга быстрее с методом HALOS!"
+        
+        keyboard = [[InlineKeyboardButton(
+            "💎 PRO olish" if lang == "uz" else "💎 Получить PRO",
+            callback_data="show_pricing"
+        )]]
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # HALOS holatini olish
+    from app.ai_assistant import get_halos_method_status, format_halos_status_message
+    
+    halos_status = await get_halos_method_status(db, user["id"], lang)
+    msg = format_halos_status_message(halos_status, lang)
+    
+    # Tugmalar
+    keyboard = [
+        [InlineKeyboardButton(
+            "📊 Hisobotga qaytish" if lang == "uz" else "📊 Вернуться к отчёту",
+            callback_data="menu_plan"
+        )],
+        [InlineKeyboardButton(
+            "👤 Profilni tahrirlash" if lang == "uz" else "👤 Редактировать профиль",
+            callback_data="show_profile"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show detailed financial report with full breakdown"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    profile = await db.get_financial_profile(user["id"])
+    is_pro = await is_user_pro(telegram_id)
+    
+    from app.ai_assistant import get_transaction_summary, get_debt_summary, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    from datetime import datetime
+    import math
+    from dateutil.relativedelta import relativedelta
+    from app.engine import format_exit_date
+    
+    # Ma'lumotlarni yig'ish
+    month_summary = await get_transaction_summary(db, user["id"], days=30)
+    debt_summary = await get_debt_summary(db, user["id"])
+    
+    # Profil ma'lumotlari
+    income_self = profile.get("income_self", 0) or 0 if profile else 0
+    income_partner = profile.get("income_partner", 0) or 0 if profile else 0
+    total_income = income_self + income_partner
+    
+    rent = profile.get("rent", 0) or 0 if profile else 0
+    kindergarten = profile.get("kindergarten", 0) or 0 if profile else 0
+    utilities = profile.get("utilities", 0) or 0 if profile else 0
+    loan_payment = profile.get("loan_payment", 0) or 0 if profile else 0
+    total_debt = profile.get("total_debt", 0) or 0 if profile else 0
+    
+    mandatory_total = rent + kindergarten + utilities + loan_payment
+    free_cash = total_income - mandatory_total
+    
+    # Qarzdan chiqish hisoblash
+    if loan_payment > 0 and total_debt > 0:
+        simple_exit_months = math.ceil(total_debt / loan_payment)
+        simple_exit_date = datetime.now() + relativedelta(months=simple_exit_months)
+        simple_exit_formatted = format_exit_date(simple_exit_date.strftime("%Y-%m"), lang)
+    else:
+        simple_exit_months = 0
+        simple_exit_formatted = "-"
+    
+    # PRO usul
+    if free_cash > 0 and total_debt > 0:
+        extra_debt = free_cash * 0.2
+        savings_monthly = free_cash * 0.1
+        living_budget = free_cash * 0.7
+        total_payment = loan_payment + extra_debt
+        pro_exit_months = math.ceil(total_debt / total_payment) if total_payment > 0 else 0
+        pro_exit_date = datetime.now() + relativedelta(months=pro_exit_months)
+        pro_exit_formatted = format_exit_date(pro_exit_date.strftime("%Y-%m"), lang)
+        savings_at_exit = savings_monthly * pro_exit_months
+        months_saved = simple_exit_months - pro_exit_months
+    else:
+        extra_debt = 0
+        savings_monthly = 0
+        living_budget = 0
+        pro_exit_months = simple_exit_months
+        pro_exit_formatted = simple_exit_formatted
+        savings_at_exit = 0
+        months_saved = 0
+    
+    month_income = month_summary.get("total_income", 0)
+    month_expense = month_summary.get("total_expense", 0)
+    
+    if lang == "uz":
+        msg = (
+            "📈 *BATAFSIL HISOBOT*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "💰 *DAROMADLAR:*\n"
+            f"├ 👤 Shaxsiy: *{income_self:,}* so'm\n"
+        )
+        if income_partner > 0:
+            msg += f"├ 👫 Sherik: *{income_partner:,}* so'm\n"
+        msg += f"└ 📊 Jami oylik: *{total_income:,}* so'm\n\n"
+        
+        msg += (
+            "📌 *MAJBURIY TO'LOVLAR:*\n"
+            f"├ 🏠 Ijara/ipoteka: *{rent:,}* so'm\n"
+            f"├ 👶 Bog'cha/maktab: *{kindergarten:,}* so'm\n"
+            f"├ 💡 Kommunal: *{utilities:,}* so'm\n"
+            f"├ 💳 Kredit to'lovi: *{loan_payment:,}* so'm\n"
+            f"└ 📊 Jami majburiy: *{mandatory_total:,}* so'm\n\n"
+            
+            f"💵 *BO'SH PUL:* *{free_cash:,}* so'm\n\n"
+        )
+        
+        if total_debt > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💳 *QARZ HOLATI:*\n"
+                f"├ Umumiy qarz: *{total_debt:,}* so'm\n"
+                f"├ Oylik to'lov: *{loan_payment:,}* so'm\n\n"
+                
+                "🌿 *Oddiy usul:*\n"
+                f"├ Muddat: {simple_exit_months} oy\n"
+                f"└ Sana: {simple_exit_formatted}\n\n"
+            )
+            
+            if is_pro:
+                msg += (
+                    "🌟 *HALOS PRO usuli:*\n"
+                    f"├ Muddat: *{pro_exit_months}* oy\n"
+                    f"├ Sana: *{pro_exit_formatted}*\n"
+                    f"├ ⏱ {months_saved} oy tezroq!\n"
+                    f"├ 💎 Jamg'arma: {savings_at_exit:,.0f} so'm\n"
+                    f"└ Oylik qo'shimcha: {extra_debt:,.0f} so'm\n\n"
+                )
+        
+        # Oylik AI tranzaksiyalar
+        if month_income > 0 or month_expense > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🤖 *AI YORDAMCHI (30 kun):*\n"
+                f"├ 📥 Kirim: +{month_income:,} so'm\n"
+                f"├ 📤 Chiqim: -{month_expense:,} so'm\n"
+                f"└ 💰 Balans: {month_income - month_expense:,} so'm\n\n"
+            )
+            
+            # Xarajatlar bo'yicha
+            if month_summary.get("expense_by_category"):
+                msg += "💸 *Xarajatlar kategoriya bo'yicha:*\n"
+                sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+                for cat, amount in sorted_expenses:
+                    cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
+                    percentage = (amount / month_expense * 100) if month_expense > 0 else 0
+                    msg += f"├ {cat_name}: {amount:,} ({percentage:.0f}%)\n"
+                msg += "\n"
+            
+            # Daromadlar bo'yicha
+            if month_summary.get("income_by_category"):
+                msg += "💰 *Daromadlar kategoriya bo'yicha:*\n"
+                for cat, amount in month_summary["income_by_category"].items():
+                    cat_name = INCOME_CATEGORIES["uz"].get(cat, "💵 Boshqa")
+                    msg += f"├ {cat_name}: +{amount:,} so'm\n"
+                msg += "\n"
+        
+        # Shaxsiy qarzlar
+        if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🤝 *SHAXSIY QARZLAR:*\n"
+                f"├ 📤 Bergan: {debt_summary['total_lent']:,} so'm ({debt_summary['lent_count']} ta)\n"
+                f"├ 📥 Olgan: {debt_summary['total_borrowed']:,} so'm ({debt_summary['borrowed_count']} ta)\n"
+            )
+            net = debt_summary['net_balance']
+            if net > 0:
+                msg += f"└ 💚 Sof: +{net:,} so'm\n"
+            elif net < 0:
+                msg += f"└ 🔴 Sof: {net:,} so'm\n"
+            else:
+                msg += "└ ⚪ Sof: 0 so'm\n"
+    
+    else:
+        # Russian version
+        msg = (
+            "📈 *ПОДРОБНЫЙ ОТЧЁТ*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "💰 *ДОХОДЫ:*\n"
+            f"├ 👤 Личный: *{income_self:,}* сум\n"
+        )
+        if income_partner > 0:
+            msg += f"├ 👫 Партнёр: *{income_partner:,}* сум\n"
+        msg += f"└ 📊 Всего в месяц: *{total_income:,}* сум\n\n"
+        
+        msg += (
+            "📌 *ОБЯЗАТЕЛЬНЫЕ:*\n"
+            f"├ 🏠 Аренда/ипотека: *{rent:,}* сум\n"
+            f"├ 👶 Детсад/школа: *{kindergarten:,}* сум\n"
+            f"├ 💡 Коммунальные: *{utilities:,}* сум\n"
+            f"├ 💳 Платёж по кредиту: *{loan_payment:,}* сум\n"
+            f"└ 📊 Всего обязательных: *{mandatory_total:,}* сум\n\n"
+            
+            f"💵 *СВОБОДНЫЕ:* *{free_cash:,}* сум\n\n"
+        )
+        
+        if total_debt > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "💳 *СОСТОЯНИЕ ДОЛГА:*\n"
+                f"├ Общий долг: *{total_debt:,}* сум\n"
+                f"├ Ежемесячный платёж: *{loan_payment:,}* сум\n\n"
+                
+                "🌿 *Обычный способ:*\n"
+                f"├ Срок: {simple_exit_months} мес\n"
+                f"└ Дата: {simple_exit_formatted}\n\n"
+            )
+            
+            if is_pro:
+                msg += (
+                    "🌟 *Способ HALOS PRO:*\n"
+                    f"├ Срок: *{pro_exit_months}* мес\n"
+                    f"├ Дата: *{pro_exit_formatted}*\n"
+                    f"├ ⏱ На {months_saved} мес быстрее!\n"
+                    f"├ 💎 Накопления: {savings_at_exit:,.0f} сум\n"
+                    f"└ Доп. платёж: {extra_debt:,.0f} сум\n\n"
+                )
+        
+        if month_income > 0 or month_expense > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🤖 *AI ПОМОЩНИК (30 дней):*\n"
+                f"├ 📥 Приход: +{month_income:,} сум\n"
+                f"├ 📤 Расход: -{month_expense:,} сум\n"
+                f"└ 💰 Баланс: {month_income - month_expense:,} сум\n\n"
+            )
+            
+            if month_summary.get("expense_by_category"):
+                msg += "💸 *Расходы по категориям:*\n"
+                sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+                for cat, amount in sorted_expenses:
+                    cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
+                    percentage = (amount / month_expense * 100) if month_expense > 0 else 0
+                    msg += f"├ {cat_name}: {amount:,} ({percentage:.0f}%)\n"
+                msg += "\n"
+        
+        if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🤝 *ЛИЧНЫЕ ДОЛГИ:*\n"
+                f"├ 📤 Дал: {debt_summary['total_lent']:,} сум ({debt_summary['lent_count']})\n"
+                f"├ 📥 Взял: {debt_summary['total_borrowed']:,} сум ({debt_summary['borrowed_count']})\n"
+            )
+            net = debt_summary['net_balance']
+            if net > 0:
+                msg += f"└ 💚 Чистый: +{net:,} сум\n"
+            elif net < 0:
+                msg += f"└ 🔴 Чистый: {net:,} сум\n"
+            else:
+                msg += "└ ⚪ Чистый: 0 сум\n"
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_report"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def report_weekly_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show weekly report"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES
+    from datetime import datetime, timedelta
+    
+    week_summary = await get_transaction_summary(db, user["id"], days=7)
+    
+    week_income = week_summary.get("total_income", 0)
+    week_expense = week_summary.get("total_expense", 0)
+    week_balance = week_income - week_expense
+    
+    # Kunlik o'rtacha
+    avg_expense = week_expense / 7 if week_expense > 0 else 0
+    avg_income = week_income / 7 if week_income > 0 else 0
+    
+    start_date = (datetime.now() - timedelta(days=7)).strftime("%d.%m")
+    end_date = datetime.now().strftime("%d.%m")
+    
+    if lang == "uz":
+        msg = (
+            f"📅 *HAFTALIK HISOBOT*\n"
+            f"📆 {start_date} - {end_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            f"💰 *UMUMIY:*\n"
+            f"├ 📥 Kirim: +{week_income:,} so'm\n"
+            f"├ 📤 Chiqim: -{week_expense:,} so'm\n"
+        )
+        if week_balance >= 0:
+            msg += f"└ 💚 Balans: +{week_balance:,} so'm\n\n"
+        else:
+            msg += f"└ 🔴 Balans: {week_balance:,} so'm\n\n"
+        
+        msg += (
+            f"📊 *KUNLIK O'RTACHA:*\n"
+            f"├ Kirim: ~{avg_income:,.0f} so'm\n"
+            f"└ Chiqim: ~{avg_expense:,.0f} so'm\n\n"
+        )
+        
+        if week_summary.get("expense_by_category"):
+            msg += "💸 *XARAJATLAR:*\n"
+            sorted_expenses = sorted(week_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses[:7]:
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
+                percentage = (amount / week_expense * 100) if week_expense > 0 else 0
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
+    else:
+        msg = (
+            f"📅 *НЕДЕЛЬНЫЙ ОТЧЁТ*\n"
+            f"📆 {start_date} - {end_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            f"💰 *ИТОГО:*\n"
+            f"├ 📥 Приход: +{week_income:,} сум\n"
+            f"├ 📤 Расход: -{week_expense:,} сум\n"
+        )
+        if week_balance >= 0:
+            msg += f"└ 💚 Баланс: +{week_balance:,} сум\n\n"
+        else:
+            msg += f"└ 🔴 Баланс: {week_balance:,} сум\n\n"
+        
+        msg += (
+            f"📊 *СРЕДНЕЕ В ДЕНЬ:*\n"
+            f"├ Приход: ~{avg_income:,.0f} сум\n"
+            f"└ Расход: ~{avg_expense:,.0f} сум\n\n"
+        )
+        
+        if week_summary.get("expense_by_category"):
+            msg += "💸 *РАСХОДЫ:*\n"
+            sorted_expenses = sorted(week_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses[:7]:
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
+                percentage = (amount / week_expense * 100) if week_expense > 0 else 0
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_report"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def report_monthly_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show monthly report"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES
+    from datetime import datetime
+    
+    month_summary = await get_transaction_summary(db, user["id"], days=30)
+    
+    month_income = month_summary.get("total_income", 0)
+    month_expense = month_summary.get("total_expense", 0)
+    month_balance = month_income - month_expense
+    
+    # Kunlik o'rtacha
+    avg_expense = month_expense / 30 if month_expense > 0 else 0
+    avg_income = month_income / 30 if month_income > 0 else 0
+    
+    current_month = datetime.now().strftime("%B %Y")
+    
+    if lang == "uz":
+        msg = (
+            f"📆 *OYLIK HISOBOT*\n"
+            f"📅 {current_month}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            f"💰 *UMUMIY:*\n"
+            f"├ 📥 Kirim: +{month_income:,} so'm\n"
+            f"├ 📤 Chiqim: -{month_expense:,} so'm\n"
+        )
+        if month_balance >= 0:
+            msg += f"└ 💚 Balans: +{month_balance:,} so'm\n\n"
+        else:
+            msg += f"└ 🔴 Balans: {month_balance:,} so'm\n\n"
+        
+        msg += (
+            f"📊 *KUNLIK O'RTACHA:*\n"
+            f"├ Kirim: ~{avg_income:,.0f} so'm\n"
+            f"└ Chiqim: ~{avg_expense:,.0f} so'm\n\n"
+        )
+        
+        if month_summary.get("expense_by_category"):
+            msg += "💸 *XARAJATLAR TAQSIMOTI:*\n"
+            sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses:
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
+                percentage = (amount / month_expense * 100) if month_expense > 0 else 0
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
+    else:
+        msg = (
+            f"📆 *МЕСЯЧНЫЙ ОТЧЁТ*\n"
+            f"📅 {current_month}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            f"💰 *ИТОГО:*\n"
+            f"├ 📥 Приход: +{month_income:,} сум\n"
+            f"├ 📤 Расход: -{month_expense:,} сум\n"
+        )
+        if month_balance >= 0:
+            msg += f"└ 💚 Баланс: +{month_balance:,} сум\n\n"
+        else:
+            msg += f"└ 🔴 Баланс: {month_balance:,} сум\n\n"
+        
+        msg += (
+            f"📊 *СРЕДНЕЕ В ДЕНЬ:*\n"
+            f"├ Приход: ~{avg_income:,.0f} сум\n"
+            f"└ Расход: ~{avg_expense:,.0f} сум\n\n"
+        )
+        
+        if month_summary.get("expense_by_category"):
+            msg += "💸 *РАСПРЕДЕЛЕНИЕ РАСХОДОВ:*\n"
+            sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses:
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
+                percentage = (amount / month_expense * 100) if month_expense > 0 else 0
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
+                msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_report"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def back_to_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Go back to main report view"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Yangi xabar yuborish o'rniga 📊 Hisobotlarim funksiyasini chaqirish
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Foydalanuvchi ma'lumotlarini o'rnatish
+    class FakeMessage:
+        def __init__(self, user_id, chat_id, reply_func):
+            self.from_user = type('User', (), {'id': user_id})()
+            self.chat = type('Chat', (), {'id': chat_id})()
+            self.reply_text = reply_func
+    
+    async def edit_as_reply(text, **kwargs):
+        await query.edit_message_text(text, **kwargs)
+    
+    # menu_plan_handler ni chaqirish o'rniga sodda qaytarish
+    await query.edit_message_text(
+        "📊 *Hisobotga qaytish uchun* \"📊 Hisobotlarim\" *tugmasini bosing*" if lang == "uz" else 
+        "📊 *Для возврата к отчёту нажмите* \"📊 Мои отчёты\"",
+        parse_mode="Markdown"
+    )
+
+
 async def show_expense_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show today's expense report"""
     query = update.callback_query
@@ -4792,8 +5392,8 @@ async def show_expense_report_callback(update: Update, context: ContextTypes.DEF
     if not user:
         return
     
-    from app.ai_assistant import get_user_budget_status
-    budget_status = await get_user_budget_status(db, user["id"])
+    from app.ai_assistant import get_budget_status
+    budget_status = await get_budget_status(db, user["id"])
     
     if lang == "uz":
         msg = (
@@ -5525,7 +6125,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     from app.ai_assistant import format_expense_saved_with_budget
                     transaction_id = await save_transaction(db, user["id"], transaction)
                     
-                    # O'RGANISH UCHUN: Context da saqlash
+                    # Save original voice message ID for deletion after confirmation
+                    context.user_data["original_message_id"] = update.message.message_id
+                    
+                    # O'RGANISH UCHUN: Context da saqlash (ko'pni tozalash)
+                    context.user_data.pop("last_multi_transactions", None)
                     context.user_data["last_transaction"] = {
                         "original_text": text,
                         "transaction_id": transaction_id,
@@ -5534,7 +6138,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         "amount": transaction["amount"],
                         "description": transaction.get("description", ""),
                         "ai_source": transaction.get("ai_source", "local"),
-                        "needs_learning": transaction.get("ai_source") == "gemini"
+                        "needs_learning": True  # Har doim o'rganish
                     }
                     
                     # Format response with budget info
@@ -5600,7 +6204,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # Save all transactions
                     transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
                     
-                    # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash
+                    # Save original voice message ID for deletion after confirmation
+                    context.user_data["original_message_id"] = update.message.message_id
+                    
+                    # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash (bittani tozalash)
+                    context.user_data.pop("last_transaction", None)
                     context.user_data["last_multi_transactions"] = {
                         "original_text": text,
                         "transactions": transactions,
@@ -5719,6 +6327,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         transaction = transactions[0]
         from app.ai_assistant import format_expense_saved_with_budget
         transaction_id = await save_transaction(db, user["id"], transaction)
+        
+        # Save original voice message ID for deletion after confirmation
+        context.user_data["original_message_id"] = update.message.message_id
         
         # Context da saqlash
         context.user_data["last_transaction"] = {
@@ -5895,6 +6506,10 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             context.user_data["new_category_transaction_id"] = None
             return
     
+    # Skip if user is editing a profile field
+    if context.user_data.get("editing_field"):
+        return
+    
     # Skip if user is in some editing mode or ConversationHandler state
     editing_modes = [
         # Old modes
@@ -6021,7 +6636,8 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # Save transaction
             transaction_id = await save_transaction(db, user["id"], transaction)
             
-            # O'RGANISH UCHUN: Context da saqlash (text handler uchun ham)
+            # O'RGANISH UCHUN: Context da saqlash (ko'pni tozalash)
+            context.user_data.pop("last_multi_transactions", None)
             context.user_data["last_transaction"] = {
                 "original_text": text,
                 "transaction_id": transaction_id,
@@ -6030,7 +6646,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "amount": transaction["amount"],
                 "description": transaction.get("description", ""),
                 "ai_source": transaction.get("ai_source", "local"),
-                "needs_learning": transaction.get("ai_source") == "gemini"
+                "needs_learning": True  # Har doim o'rganish
             }
             
             # Format response with budget info
@@ -6085,7 +6701,8 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # Save all transactions
             transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
             
-            # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash
+            # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash (bittani tozalash)
+            context.user_data.pop("last_transaction", None)
             context.user_data["last_multi_transactions"] = {
                 "original_text": text,
                 "transactions": transactions,
@@ -6149,6 +6766,7 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
     """User confirmed transaction is correct - WITH learning from AI response"""
     query = update.callback_query
     lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
     
     # O'rganish uchun saqlangan ma'lumotlarni olish
     last_tx = context.user_data.get("last_transaction")
@@ -6182,20 +6800,89 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
         if transactions and original_text:
             learned = await learn_from_multi_transaction(original_text, transactions)
     
-    if learned:
-        await query.answer(
-            "✅ AI o'rgandi!" if lang == "uz" else "✅ AI обучился!",
-            show_alert=False
+    # Try to delete the original user message (voice or text)
+    original_message_id = context.user_data.get("original_message_id")
+    if original_message_id:
+        try:
+            await context.bot.delete_message(
+                chat_id=telegram_id,
+                message_id=original_message_id
+            )
+        except Exception:
+            pass  # Message may already be deleted or too old
+        context.user_data.pop("original_message_id", None)
+    
+    # Get daily statistics
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if user:
+        from app.ai_assistant import get_budget_status
+        budget_status = await get_budget_status(db, user["id"])
+        
+        today_income = budget_status.get('today_income', 0)
+        today_expense = budget_status.get('today_expense', 0)
+        today_balance = today_income - today_expense
+        
+        # Build beautiful confirmation message with daily stats
+        if lang == "uz":
+            msg = "✅ *TASDIQLANDI!*\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            msg += "┌─────────────────────┐\n"
+            msg += "│    📊 *BUGUNGI HISOBOT*    │\n"
+            msg += "└─────────────────────┘\n\n"
+            msg += f"💰 Daromad: *{format_number(today_income)}* so'm\n"
+            msg += f"💸 Xarajat: *{format_number(today_expense)}* so'm\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            
+            if today_balance >= 0:
+                msg += f"📈 Balans: *+{format_number(today_balance)}* so'm ✅"
+            else:
+                msg += f"📉 Balans: *{format_number(today_balance)}* so'm ⚠️"
+        else:
+            msg = "✅ *ПОДТВЕРЖДЕНО!*\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            msg += "┌─────────────────────┐\n"
+            msg += "│    📊 *ОТЧЁТ ЗА ДЕНЬ*    │\n"
+            msg += "└─────────────────────┘\n\n"
+            msg += f"💰 Доход: *{format_number(today_income)}* сум\n"
+            msg += f"💸 Расход: *{format_number(today_expense)}* сум\n"
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            
+            if today_balance >= 0:
+                msg += f"📈 Баланс: *+{format_number(today_balance)}* сум ✅"
+            else:
+                msg += f"📉 Баланс: *{format_number(today_balance)}* сум ⚠️"
+        
+        # Quick action buttons
+        keyboard = [[
+            InlineKeyboardButton(
+                "📊 Batafsil" if lang == "uz" else "📊 Подробнее",
+                callback_data="show_reports"
+            ),
+            InlineKeyboardButton(
+                "➕ Yana kiritish" if lang == "uz" else "➕ Ещё запись",
+                callback_data="add_transaction_menu"
+            )
+        ]]
+        
+        await query.answer("✅")
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        await query.answer("✅")
+        # Fallback - just remove buttons
+        await query.answer(
+            "✅ Qabul qilindi!" if lang == "uz" else "✅ Принято!",
+            show_alert=False
+        )
+        await query.edit_message_reply_markup(reply_markup=None)
     
     # Context ni tozalash
     context.user_data.pop("last_transaction", None)
     context.user_data.pop("last_multi_transactions", None)
-    
-    # Remove buttons
-    await query.edit_message_reply_markup(reply_markup=None)
 
 
 async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -9026,7 +9713,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "📤 *XABAR YUBORISH*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "Barcha foydalanuvchilarga yuboriladigan\n"
-            "xabarni yozing:\n\n"
+            "xabarni yozing yoki media yuboring:\n\n"
+            "✅ Matn\n"
+            "✅ 📷 Rasm + matn (caption)\n"
+            "✅ 🎬 Video + matn (caption)\n"
+            "✅ 📄 Fayl + matn (caption)\n\n"
             "💡 _Markdown formatlash qo'llab-quvvatlanadi_",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -9059,7 +9750,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send broadcast message to all users"""
+    """Send broadcast message to all users - supports text, photo, video, document, forward"""
     telegram_id = update.effective_user.id
     
     if telegram_id not in ADMIN_IDS:
@@ -9070,10 +9761,11 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     
     context.user_data["admin_broadcast"] = False
     
-    broadcast_text = update.message.text
+    message = update.message
     
-    if broadcast_text == "/cancel":
-        await update.message.reply_text("❌ Broadcast bekor qilindi")
+    # Check for cancel command
+    if message.text and message.text == "/cancel":
+        await message.reply_text("❌ Broadcast bekor qilindi")
         return
     
     db = await get_database()
@@ -9088,31 +9780,89 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
         rows = await cursor.fetchall()
         users = [row[0] for row in rows]
     
-    await update.message.reply_text(f"📤 Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    # Check if message is forwarded - use forward method
+    is_forwarded = message.forward_date is not None
+    
+    # Determine message type
+    has_photo = message.photo and len(message.photo) > 0
+    has_video = message.video is not None
+    has_document = message.document is not None
+    has_text = message.text is not None
+    caption = message.caption or ""
+    
+    if is_forwarded:
+        media_type = "forward"
+        await message.reply_text(f"📤 ↗️ Forward xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    elif has_photo:
+        media_type = "photo"
+        file_id = message.photo[-1].file_id
+        await message.reply_text(f"📤 📷 Rasm {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    elif has_video:
+        media_type = "video"
+        file_id = message.video.file_id
+        await message.reply_text(f"📤 🎬 Video {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    elif has_document:
+        media_type = "document"
+        file_id = message.document.file_id
+        await message.reply_text(f"📤 📄 Fayl {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    elif has_text:
+        media_type = "text"
+        file_id = None
+        broadcast_text = message.text
+        await message.reply_text(f"📤 Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    else:
+        await message.reply_text("❌ Noto'g'ri format. Matn, rasm, video yoki fayl yuboring.")
+        return
     
     success = 0
     failed = 0
+    errors_log = []
     
     for user_id in users:
         try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"📢 *HALOS BOT E'LON*\n\n{broadcast_text}",
-                parse_mode="Markdown"
-            )
+            if media_type == "forward":
+                # Forward the original message
+                await message.forward(chat_id=user_id)
+            elif media_type == "photo":
+                await context.bot.send_photo(
+                    chat_id=user_id,
+                    photo=file_id,
+                    caption=caption if caption else None
+                )
+            elif media_type == "video":
+                await context.bot.send_video(
+                    chat_id=user_id,
+                    video=file_id,
+                    caption=caption if caption else None
+                )
+            elif media_type == "document":
+                await context.bot.send_document(
+                    chat_id=user_id,
+                    document=file_id,
+                    caption=caption if caption else None
+                )
+            else:
+                # Text only - no prefix, no markdown parsing to avoid errors
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=broadcast_text
+                )
             success += 1
-        except Exception:
+        except Exception as e:
             failed += 1
+            if len(errors_log) < 3:
+                errors_log.append(f"{user_id}: {str(e)[:50]}")
         
         # Rate limiting
-        if success % 30 == 0:
+        if (success + failed) % 30 == 0:
             await asyncio.sleep(1)
     
-    await update.message.reply_text(
-        f"✅ Broadcast yakunlandi!\n\n"
-        f"✅ Yuborildi: {success} ta\n"
-        f"❌ Xato: {failed} ta"
-    )
+    result_msg = f"✅ Broadcast yakunlandi!\n\n✅ Yuborildi: {success} ta\n❌ Xato: {failed} ta"
+    
+    if errors_log:
+        result_msg += f"\n\n🔍 Xato namunalari:\n" + "\n".join(errors_log)
+    
+    await message.reply_text(result_msg)
 
 
 # ==================== DEBT REMINDER HANDLERS ====================

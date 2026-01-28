@@ -1,6 +1,6 @@
 """
 HALOS Subscription Handlers
-Click Payment Integration
+Click & Payme Payment Integration
 """
 import logging
 from datetime import datetime, timedelta
@@ -22,6 +22,7 @@ from app.subscription import (
     TRIAL_CONFIG,
 )
 from app.click_payment import generate_click_payment_url
+from app.payme_payment import generate_payme_payment_url, PAYME_TEST_MODE
 from app.config import ADMIN_IDS
 
 logger = logging.getLogger(__name__)
@@ -109,193 +110,182 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
-    # Get user's debt info for personalization
+    # Get user data
     db = await get_database()
     user = await db.get_user(telegram_id)
-    profile = None
-    simple_months = 0
-    pro_months = 0
-    months_saved = 0
-    savings_at_exit = 0
-    
-    if user:
-        profile = await db.get_financial_profile(user["id"])
-        if profile:
-            total_debt = profile.get("total_debt", 0)
-            loan_payment = profile.get("loan_payment", 0)
-            
-            if loan_payment > 0 and total_debt > 0:
-                import math
-                # Simple calculation (just paying minimum)
-                simple_months = math.ceil(total_debt / loan_payment)
-                
-                # PRO calculation (with acceleration)
-                income = profile.get("income_self", 0) + profile.get("income_partner", 0)
-                mandatory = profile.get("rent", 0) + profile.get("kindergarten", 0) + profile.get("utilities", 0)
-                free_cash = income - mandatory - loan_payment
-                
-                if free_cash > 0:
-                    accelerated_debt = free_cash * 0.2  # 20% extra to debt
-                    total_payment = loan_payment + accelerated_debt
-                    pro_months = math.ceil(total_debt / total_payment)
-                    months_saved = simple_months - pro_months
-                    savings_at_exit = (free_cash * 0.1) * pro_months  # 10% savings
-    
-    if lang == "uz":
-        # Personalized header if user has debt data
-        if simple_months > 0 and months_saved > 0:
-            header = (
-                f"💎 *HALOS PRO — Moliyaviy erkinlik yo'li*\n\n"
-                f"📍 Hozirgi tezligingiz: *{simple_months} oy*\n"
-                f"🚀 PRO bilan: *{pro_months} oy* — *{months_saved} oy tezroq!*\n"
-                f"💰 Bonus: *{format_number(int(savings_at_exit))} so'm* shaxsiy kapital\n\n"
-            )
-        else:
-            header = "💎 *HALOS PRO — Moliyaviy erkinlik yo'li*\n\n"
-        
-        msg = (
-            f"{header}"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *FAQAT PRO FOYDALANUVCHILAR UCHUN:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            
-            "🗓 *HALOS SANANGIZ*\n"
-            "Qarzlardan qachon xalos bo'lishingizni\n"
-            "aniq sana bilan ko'rasiz\n\n"
-            
-            "⚡ *TEZKOR QUTILISH REJASI*\n"
-            "Maxsus algoritm sizga eng optimal\n"
-            "to'lov strategiyasini tayyorlaydi\n\n"
-            
-            "💰 *SHAXSIY KAPITAL*\n"
-            "Qarz to'layotgan paytda ham\n"
-            "jamg'arma hosil qilasiz\n\n"
-            
-            "🎤 *OVOZLI AI YORDAMCHI*\n"
-            "Ovozingiz bilan xarajat va daromadni\n"
-            "bir zumda kiritasiz\n\n"
-            
-            "📊 *BATAFSIL STATISTIKA*\n"
-            "Haftalik, oylik, yillik hisobotlar\n"
-            "Xarajatlar tahlili va dinamikasi\n\n"
-            
-            "🔔 *AQLLI ESLATMALAR*\n"
-            "To'lov sanasi yaqinlashganda\n"
-            "avtomatik xabar olasiz\n\n"
-            
-            "📥 *EXCEL HISOBOT*\n"
-            "Barcha ma'lumotlaringizni Excel\n"
-            "formatida yuklab oling\n\n"
-            
-            "👨‍👩‍👧 *OILAVIY REJIM*\n"
-            "Oila byudjetini birgalikda boshqaring\n\n"
-            
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💰 *NARXLAR:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `14,990 so'm`\n"
-            "│   _Sinab ko'ring_\n"
-            "├ ⭐ *1 oy:* `29,990 so'm`\n"
-            "│   _Eng ommabop_\n"
-            "└ 🏆 *1 yil:* `249,990 so'm`\n"
-            "    _30% tejash!_\n\n"
-            "💳 *To'lov: Click orqali*"
-        )
-    else:
-        if simple_months > 0 and months_saved > 0:
-            header = (
-                f"💎 *HALOS PRO — Путь к финансовой свободе*\n\n"
-                f"📍 Текущая скорость: *{simple_months} мес*\n"
-                f"🚀 С PRO: *{pro_months} мес* — *на {months_saved} мес быстрее!*\n"
-                f"💰 Бонус: *{format_number(int(savings_at_exit))} сум* личный капитал\n\n"
-            )
-        else:
-            header = "💎 *HALOS PRO — Путь к финансовой свободе*\n\n"
-        
-        msg = (
-            f"{header}"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🎯 *ТОЛЬКО ДЛЯ PRO ПОЛЬЗОВАТЕЛЕЙ:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            
-            "🗓 *ДАТА HALOS*\n"
-            "Узнайте точную дату освобождения\n"
-            "от долгов\n\n"
-            
-            "⚡ *ПЛАН БЫСТРОГО ОСВОБОЖДЕНИЯ*\n"
-            "Специальный алгоритм создаст\n"
-            "оптимальную стратегию выплат\n\n"
-            
-            "💰 *ЛИЧНЫЙ КАПИТАЛ*\n"
-            "Копите даже пока\n"
-            "выплачиваете долги\n\n"
-            
-            "🎤 *ГОЛОСОВОЙ AI ПОМОЩНИК*\n"
-            "Вносите расходы и доходы\n"
-            "голосом за секунды\n\n"
-            
-            "📊 *ДЕТАЛЬНАЯ СТАТИСТИКА*\n"
-            "Еженедельные, ежемесячные отчёты\n"
-            "Анализ и динамика расходов\n\n"
-            
-            "🔔 *УМНЫЕ НАПОМИНАНИЯ*\n"
-            "Автоматические уведомления\n"
-            "о приближении платежей\n\n"
-            
-            "📥 *EXCEL ОТЧЁТ*\n"
-            "Скачивайте все данные\n"
-            "в формате Excel\n\n"
-            
-            "👨‍👩‍👧 *СЕМЕЙНЫЙ РЕЖИМ*\n"
-            "Управляйте бюджетом семьи вместе\n\n"
-            
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "💰 *ЦЕНЫ:*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `14,990 сум`\n"
-            "│   _Попробуйте_\n"
-            "├ ⭐ *1 месяц:* `29,990 сум`\n"
-            "│   _Самый популярный_\n"
-            "└ 🏆 *1 год:* `249,990 сум`\n"
-            "    _Скидка 30%!_\n\n"
-            "💳 *Оплата: через Click*"
-        )
     
     # Check if user can use trial (trial_used=0)
     trial_available = False
     if user and not user.get("trial_used", 0):
         trial_available = True
     
-    # Click Payment buttons
+    if lang == "uz":
+        msg = (
+            "💎 *HALOS PRO*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "🚀 *Nima uchun PRO kerak?*\n\n"
+            
+            "┌─────────────────────┐\n"
+            "│  🎯 *ASOSIY AFZALLIKLAR*  │\n"
+            "└─────────────────────┘\n\n"
+            
+            "📅 *Halos sanangiz*\n"
+            "   Qarzlardan qachon xalos bo'lishingizni\n"
+            "   aniq sana bilan ko'ring\n\n"
+            
+            "⚡ *Tezkor qutilish rejasi*\n"
+            "   Sizga mos optimal to'lov\n"
+            "   strategiyasi tayyorlanadi\n\n"
+            
+            "💰 *Shaxsiy kapital*\n"
+            "   Qarz to'layotganda ham\n"
+            "   jamg'arma hosil qiling\n\n"
+            
+            "┌─────────────────────┐\n"
+            "│  🤖 *AQLLI FUNKSIYALAR*  │\n"
+            "└─────────────────────┘\n\n"
+            
+            "🎤 *Ovozli AI yordamchi*\n"
+            "   Ovoz bilan xarajat yozing —\n"
+            "   _\"20 ming non\"_ degansiz, tayyor!\n\n"
+            
+            "📊 *Batafsil statistika*\n"
+            "   Haftalik, oylik, yillik hisobotlar\n"
+            "   Xarajatlar tahlili va dinamikasi\n\n"
+            
+            "🔔 *Aqlli eslatmalar*\n"
+            "   To'lov sanasi yaqinlashganda\n"
+            "   avtomatik xabar olasiz\n\n"
+            
+            "📥 *Excel eksport*\n"
+            "   Barcha ma'lumotlarni yuklab oling\n\n"
+            
+            "👨‍👩‍👧 *Oilaviy rejim*\n"
+            "   Oila byudjetini birgalikda boshqaring\n\n"
+        )
+        
+        # Trial section
+        if trial_available:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🎁 *3 KUNLIK BEPUL SINOV*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Hech qanday to'lovsiz barcha PRO\n"
+                "imkoniyatlarni 3 kun sinab ko'ring!\n\n"
+                "✅ Karta talab qilinmaydi\n"
+                "✅ Avtomatik uzaytirish yo'q\n"
+                "✅ To'liq PRO funksiyalar\n\n"
+            )
+        
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💳 *NARXLAR:*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "├ ⚡ 1 hafta — *14,990* so'm\n"
+            "├ ⭐ 1 oy — *29,990* so'm _(tavsiya)_\n"
+            "└ 🏆 1 yil — *249,990* so'm _(-30%)_\n\n"
+            "💳 To'lov: Click orqali xavfsiz"
+        )
+    else:
+        msg = (
+            "💎 *HALOS PRO*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            "🚀 *Зачем нужен PRO?*\n\n"
+            
+            "┌─────────────────────┐\n"
+            "│  🎯 *ОСНОВНЫЕ ПРЕИМУЩЕСТВА*  │\n"
+            "└─────────────────────┘\n\n"
+            
+            "📅 *Дата Halos*\n"
+            "   Узнайте точную дату\n"
+            "   освобождения от долгов\n\n"
+            
+            "⚡ *План быстрого погашения*\n"
+            "   Оптимальная стратегия\n"
+            "   выплат специально для вас\n\n"
+            
+            "💰 *Личный капитал*\n"
+            "   Копите даже пока\n"
+            "   выплачиваете долги\n\n"
+            
+            "┌─────────────────────┐\n"
+            "│  🤖 *УМНЫЕ ФУНКЦИИ*  │\n"
+            "└─────────────────────┘\n\n"
+            
+            "🎤 *Голосовой AI помощник*\n"
+            "   Записывайте расходы голосом —\n"
+            "   _\"20 тысяч хлеб\"_ и готово!\n\n"
+            
+            "📊 *Детальная статистика*\n"
+            "   Еженедельные, ежемесячные отчёты\n"
+            "   Анализ и динамика расходов\n\n"
+            
+            "🔔 *Умные напоминания*\n"
+            "   Автоматические уведомления\n"
+            "   о приближении платежей\n\n"
+            
+            "📥 *Экспорт в Excel*\n"
+            "   Скачивайте все данные\n\n"
+            
+            "👨‍👩‍👧 *Семейный режим*\n"
+            "   Управляйте бюджетом семьи вместе\n\n"
+        )
+        
+        # Trial section
+        if trial_available:
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🎁 *3 ДНЯ БЕСПЛАТНО*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Попробуйте все PRO функции\n"
+                "3 дня без оплаты!\n\n"
+                "✅ Карта не требуется\n"
+                "✅ Нет автопродления\n"
+                "✅ Полный PRO доступ\n\n"
+            )
+        
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💳 *ЦЕНЫ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "├ ⚡ 1 неделя — *14,990* сум\n"
+            "├ ⭐ 1 месяц — *29,990* сум _(реком.)_\n"
+            "└ 🏆 1 год — *249,990* сум _(-30%)_\n\n"
+            "💳 Оплата: Payme / Click"
+        )
+    
+    # Test mode label
+    payme_test_label = " (test)" if PAYME_TEST_MODE else ""
+    
+    # Build keyboard
     keyboard = []
     
-    # Show trial button FIRST if available
+    # Show trial button FIRST if available (highlighted)
     if trial_available:
         keyboard.append([InlineKeyboardButton(
-            "🎁 3 kunlik BEPUL sinov" if lang == "uz" else "🎁 3 дня БЕСПЛАТНО",
+            "🎁 3 kun BEPUL boshlash" if lang == "uz" else "🎁 Начать 3 дня БЕСПЛАТНО",
             callback_data="activate_trial"
         )])
     
+    # Payment method selection buttons
+    keyboard.append([InlineKeyboardButton(
+        f"💳 Payme{payme_test_label}" if lang == "uz" else f"💳 Payme{payme_test_label}",
+        callback_data="payment_method_payme"
+    ), InlineKeyboardButton(
+        "💳 Click" if lang == "uz" else "💳 Click",
+        callback_data="payment_method_click"
+    )])
+    
     keyboard.extend([
-        [InlineKeyboardButton(
-            "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
-            callback_data="click_buy_pro_weekly"
-        )],
-        [InlineKeyboardButton(
-            "⭐ 1 oy - 29,990 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 29,990 сум (реком.)",
-            callback_data="click_buy_pro_monthly"
-        )],
-        [InlineKeyboardButton(
-            "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
-            callback_data="click_buy_pro_yearly"
-        )],
         [InlineKeyboardButton(
             "🎁 Promo-kod" if lang == "uz" else "🎁 Промо-код",
             callback_data="enter_promo"
         )],
     ])
     
-    # Only show back button if not required (i.e., user came here voluntarily)
+    # Only show back button if not required
     if not is_required:
         keyboard.append([InlineKeyboardButton(
             "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
@@ -517,6 +507,190 @@ async def show_pricing_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 # ==================== PAYMENT METHOD SELECTION ====================
+
+async def payment_method_payme_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Payme payment method selection - show plan options"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    # Test mode label
+    payme_test_label = " (test)" if PAYME_TEST_MODE else ""
+    
+    if lang == "uz":
+        msg = (
+            f"💳 *Payme{payme_test_label} orqali to'lov*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Tarifni tanlang:\n\n"
+            "├ ⚡ 1 hafta — *14,990* so'm\n"
+            "├ ⭐ 1 oy — *29,990* so'm _(tavsiya)_\n"
+            "└ 🏆 1 yil — *249,990* so'm _(-30%)_\n"
+        )
+    else:
+        msg = (
+            f"💳 *Payme{payme_test_label} оплата*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Выберите тариф:\n\n"
+            "├ ⚡ 1 неделя — *14,990* сум\n"
+            "├ ⭐ 1 месяц — *29,990* сум _(реком.)_\n"
+            "└ 🏆 1 год — *249,990* сум _(-30%)_\n"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "⚡ 1 hafta — 14,990" if lang == "uz" else "⚡ 1 нед — 14,990",
+            callback_data="payme_buy_pro_weekly"
+        )],
+        [InlineKeyboardButton(
+            "⭐ 1 oy — 29,990 (tavsiya)" if lang == "uz" else "⭐ 1 мес — 29,990 (реком.)",
+            callback_data="payme_buy_pro_monthly"
+        )],
+        [InlineKeyboardButton(
+            "🏆 1 yil — 249,990 (-30%)" if lang == "uz" else "🏆 1 год — 249,990 (-30%)",
+            callback_data="payme_buy_pro_yearly"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="show_pricing"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def payment_method_click_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Click payment method selection - show plan options"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    if lang == "uz":
+        msg = (
+            "💳 *Click orqali to'lov*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Tarifni tanlang:\n\n"
+            "├ ⚡ 1 hafta — *14,990* so'm\n"
+            "├ ⭐ 1 oy — *29,990* so'm _(tavsiya)_\n"
+            "└ 🏆 1 yil — *249,990* so'm _(-30%)_\n"
+        )
+    else:
+        msg = (
+            "💳 *Click оплата*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Выберите тариф:\n\n"
+            "├ ⚡ 1 неделя — *14,990* сум\n"
+            "├ ⭐ 1 месяц — *29,990* сум _(реком.)_\n"
+            "└ 🏆 1 год — *249,990* сум _(-30%)_\n"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "⚡ 1 hafta — 14,990" if lang == "uz" else "⚡ 1 нед — 14,990",
+            callback_data="click_buy_pro_weekly"
+        )],
+        [InlineKeyboardButton(
+            "⭐ 1 oy — 29,990 (tavsiya)" if lang == "uz" else "⭐ 1 мес — 29,990 (реком.)",
+            callback_data="click_buy_pro_monthly"
+        )],
+        [InlineKeyboardButton(
+            "🏆 1 yil — 249,990 (-30%)" if lang == "uz" else "🏆 1 год — 249,990 (-30%)",
+            callback_data="click_buy_pro_yearly"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="show_pricing"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def payme_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Payme buy button - generate Payme checkout URL"""
+    query = update.callback_query
+    await query.answer()
+    
+    plan_id = query.data.replace("payme_buy_", "")
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    if plan_id not in PRICING_PLANS:
+        await query.answer("❌ Tarif topilmadi", show_alert=True)
+        return
+    
+    plan = PRICING_PLANS[plan_id]
+    
+    # Generate unique order ID
+    import time
+    order_id = f"halos_{telegram_id}_{plan_id}_{int(time.time())}"
+    
+    # Generate Payme checkout URL
+    payme_url = generate_payme_payment_url(
+        amount=plan.price_uzs,
+        order_id=order_id,
+        return_url="https://t.me/HalosRobot",
+        lang=lang
+    )
+    
+    # Test mode info
+    test_info = ""
+    if PAYME_TEST_MODE:
+        from app.payme_payment import get_payme_test_card
+        test_info = "\n\n" + get_payme_test_card()
+    
+    if lang == "uz":
+        msg = (
+            f"💳 *Payme orqali to'lov*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 Tarif: *{plan.description_uz}*\n"
+            f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
+            "👇 Quyidagi tugmani bosib Payme\n"
+            "orqali xavfsiz to'lang.\n\n"
+            "✅ Uzcard va Humo kartalari qabul qilinadi\n"
+            "✅ To'lov muvaffaqiyatli bo'lganidan keyin\n"
+            "   PRO avtomatik ochiladi"
+            f"{test_info}"
+        )
+        pay_btn = "💳 Payme orqali to'lash"
+    else:
+        msg = (
+            f"💳 *Оплата через Payme*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 Тариф: *{plan.description_ru}*\n"
+            f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
+            "👇 Нажмите кнопку и оплатите\n"
+            "безопасно через Payme.\n\n"
+            "✅ Принимаются карты Uzcard и Humo\n"
+            "✅ После успешной оплаты PRO\n"
+            "   активируется автоматически"
+            f"{test_info}"
+        )
+        pay_btn = "💳 Оплатить через Payme"
+    
+    keyboard = [
+        [InlineKeyboardButton(pay_btn, url=payme_url)],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="payment_method_payme"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 
 async def click_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle Click payment button - directly go to Telegram Payment"""
@@ -947,11 +1121,17 @@ async def activate_trial_callback(update: Update, context: ContextTypes.DEFAULT_
     
     # Check if trial already used
     if user.get("trial_used", 0):
+        keyboard = [[InlineKeyboardButton(
+            "💎 PRO sotib olish" if lang == "uz" else "💎 Купить PRO",
+            callback_data="show_pricing"
+        )]]
+        
         await query.edit_message_text(
-            "❌ Siz allaqachon bepul sinov davridan foydalangansiz.\n\n"
-            "💎 PRO obunasini sotib oling!" if lang == "uz" else 
-            "❌ Вы уже использовали бесплатный пробный период.\n\n"
-            "💎 Купите PRO подписку!"
+            "❌ Siz allaqachon 3 kunlik bepul sinov davridan foydalangansiz.\n\n"
+            "💎 PRO obunasini sotib oling va barcha imkoniyatlardan foydalaning!" if lang == "uz" else 
+            "❌ Вы уже использовали бесплатный 3-дневный пробный период.\n\n"
+            "💎 Купите PRO подписку и пользуйтесь всеми возможностями!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
     
@@ -964,21 +1144,19 @@ async def activate_trial_callback(update: Update, context: ContextTypes.DEFAULT_
             async with db._pool.acquire() as conn:
                 await conn.execute("""
                     UPDATE users 
-                    SET subscription_tier = 'trial', 
+                    SET subscription_tier = 'pro', 
+                        subscription_plan = 'trial',
                         subscription_expires = $1,
-                        trial_used = 1,
-                        voice_tier = 'trial',
-                        voice_messages_this_month = 0
+                        trial_used = 1
                     WHERE telegram_id = $2
                 """, expires, telegram_id)
         else:
             await db._connection.execute("""
                 UPDATE users 
-                SET subscription_tier = 'trial', 
+                SET subscription_tier = 'pro', 
+                    subscription_plan = 'trial',
                     subscription_expires = ?,
-                    trial_used = 1,
-                    voice_tier = 'trial',
-                    voice_messages_this_month = 0
+                    trial_used = 1
                 WHERE telegram_id = ?
             """, (expires.isoformat(), telegram_id))
             await db._connection.commit()

@@ -96,6 +96,12 @@ from app.handlers import (
     # Debt Reminder handlers
     debt_reminder_returned_callback,
     debt_reminder_snooze_callback,
+    # Report handlers
+    detailed_report_callback,
+    report_weekly_callback,
+    report_monthly_callback,
+    back_to_report_callback,
+    show_halos_status_callback,
     # Admin handlers
     admin_command,
     admin_callback,
@@ -118,6 +124,10 @@ from app.subscription_handlers import (
     buy_voice_plus_callback,
     buy_voice_unlimited_callback,
     cancel_voice_tier_callback,
+    # Payment method selection
+    payment_method_payme_callback,
+    payment_method_click_callback,
+    payme_buy_callback,
 )
 from app.telegram_payments import (
     pre_checkout_handler,
@@ -205,37 +215,41 @@ async def post_init(application: Application) -> None:
     # Setup JobQueue for daily/weekly/monthly reports
     job_queue = application.job_queue
     
-    from datetime import time as dt_time
-    import pytz
-    
-    # Toshkent vaqt zonasi
-    tz = pytz.timezone("Asia/Tashkent")
-    
-    # Kunlik hisobot - har kuni soat 21:00 da
-    job_queue.run_daily(
-        daily_report_job,
-        time=dt_time(hour=21, minute=0, tzinfo=tz),
-        name="daily_report"
-    )
-    logger.info("📊 Daily report job scheduled at 21:00 Tashkent time")
-    
-    # Haftalik hisobot - har yakshanba soat 20:00 da
-    job_queue.run_daily(
-        weekly_report_job,
-        time=dt_time(hour=20, minute=0, tzinfo=tz),
-        days=(6,),  # 6 = Sunday
-        name="weekly_report"
-    )
-    logger.info("📊 Weekly report job scheduled on Sundays at 20:00")
-    
-    # Oylik hisobot - har oyning 1-sanasi soat 19:00 da
-    job_queue.run_monthly(
-        monthly_report_job,
-        when=dt_time(hour=19, minute=0, tzinfo=tz),
-        day=1,  # Har oyning 1-sanasi
-        name="monthly_report"
-    )
-    logger.info("📊 Monthly report job scheduled on 1st of each month at 19:00")
+    if job_queue is None:
+        logger.warning("⚠️ JobQueue is not available. Scheduled reports will not work.")
+        logger.warning("Install with: pip install python-telegram-bot[job-queue]")
+    else:
+        from datetime import time as dt_time
+        import pytz
+        
+        # Toshkent vaqt zonasi
+        tz = pytz.timezone("Asia/Tashkent")
+        
+        # Kunlik hisobot - har kuni soat 21:00 da
+        job_queue.run_daily(
+            daily_report_job,
+            time=dt_time(hour=21, minute=0, tzinfo=tz),
+            name="daily_report"
+        )
+        logger.info("📊 Daily report job scheduled at 21:00 Tashkent time")
+        
+        # Haftalik hisobot - har yakshanba soat 20:00 da
+        job_queue.run_daily(
+            weekly_report_job,
+            time=dt_time(hour=20, minute=0, tzinfo=tz),
+            days=(6,),  # 6 = Sunday
+            name="weekly_report"
+        )
+        logger.info("📊 Weekly report job scheduled on Sundays at 20:00")
+        
+        # Oylik hisobot - har oyning 1-sanasi soat 19:00 da
+        job_queue.run_monthly(
+            monthly_report_job,
+            when=dt_time(hour=19, minute=0, tzinfo=tz),
+            day=1,  # Har oyning 1-sanasi
+            name="monthly_report"
+        )
+        logger.info("📊 Monthly report job scheduled on 1st of each month at 19:00")
 
 
 async def post_shutdown(application: Application) -> None:
@@ -316,9 +330,12 @@ def main() -> None:
         group=-1  # Highest priority
     )
     
-    # Admin broadcast message handler
+    # Admin broadcast message handler - supports text, photo, video, document
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, admin_broadcast_message),
+        MessageHandler(
+            (filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL) & ~filters.COMMAND, 
+            admin_broadcast_message
+        ),
         group=0
     )
     
@@ -459,6 +476,19 @@ def main() -> None:
         CallbackQueryHandler(show_pricing_callback, pattern="^show_pricing$")
     )
     
+    # Payment method selection handlers
+    application.add_handler(
+        CallbackQueryHandler(payment_method_payme_callback, pattern="^payment_method_payme$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(payment_method_click_callback, pattern="^payment_method_click$")
+    )
+    
+    # Payme Payment handlers
+    application.add_handler(
+        CallbackQueryHandler(payme_buy_callback, pattern="^payme_buy_pro_")
+    )
+    
     # Click Payment handlers
     application.add_handler(
         CallbackQueryHandler(click_buy_callback, pattern="^click_buy_pro_")
@@ -522,6 +552,25 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(toggle_reminders_callback, pattern="^toggle_reminders_")
+    )
+    
+    # Report handlers (new UX)
+    application.add_handler(
+        CallbackQueryHandler(detailed_report_callback, pattern="^detailed_report$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(report_weekly_callback, pattern="^report_weekly$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(report_monthly_callback, pattern="^report_monthly$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(back_to_report_callback, pattern="^back_to_report$")
+    )
+    
+    # HALOS usuli status handler
+    application.add_handler(
+        CallbackQueryHandler(show_halos_status_callback, pattern="^show_halos_status$")
     )
     
     # Report settings handlers
@@ -677,7 +726,7 @@ def main() -> None:
         asyncio.set_event_loop(loop)
         
         async def run_bot_with_webhook():
-            """Run bot polling alongside webhook server"""
+            """Run bot with webhook server (no polling)"""
             # Start webhook server
             from webhook_server import start_webhook_server_async
             webhook_runner = await start_webhook_server_async()
@@ -686,10 +735,19 @@ def main() -> None:
             # Initialize and start the bot
             await application.initialize()
             await application.start()
+            
+            # Delete any existing webhook first
+            await application.bot.delete_webhook(drop_pending_updates=True)
+            
+            # Note: We're NOT using Telegram webhooks for updates
+            # We use polling for Telegram updates + webhook server for Click payments
+            # This is intentional - webhook server is only for payment callbacks
             await application.updater.start_polling(
                 allowed_updates=["message", "callback_query", "pre_checkout_query"],
                 drop_pending_updates=True,
-                poll_interval=0.0,
+                poll_interval=1.0,  # Increased to avoid rate limiting
+                read_timeout=30,
+                write_timeout=30,
             )
             
             # Start PRO Care Scheduler (debt reminders, notifications, etc.)
