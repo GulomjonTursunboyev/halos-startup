@@ -5551,32 +5551,39 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
                         msg += limit_msg
                     
-                    # Keyboard with correction option
-                    # Agar kategoriya "boshqa" yoki needs_confirmation bo'lsa, aniqlashtirish tugmasini qo'shish
-                    needs_clarification = transaction.get("needs_confirmation", False) or transaction.get("category") == "boshqa"
+                    # Aniqlashtirish kerakmi tekshirish - kengaytirilgan
+                    needs_clarification = (
+                        transaction.get("needs_confirmation", False) or 
+                        transaction.get("needs_clarification", False) or
+                        transaction.get("category") == "boshqa" or
+                        transaction.get("category_key") == "boshqa"
+                    )
                     
-                    keyboard = [
-                        [
-                            InlineKeyboardButton(
-                                "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                                callback_data="ai_confirm_learn"
-                            ),
-                            InlineKeyboardButton(
-                                "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
-                                callback_data=f"ai_correct_{transaction_id}"
-                            )
-                        ]
-                    ]
+                    # Keyboard - birinchi aniqlashtirish (agar kerak)
+                    keyboard = []
                     
-                    # Aniqlashtirish tugmasi - ixtiyoriy
+                    # Aniqlashtirish tugmasi - ixtiyoriy (birinchi qatorda)
                     if needs_clarification:
-                        keyboard.insert(0, [InlineKeyboardButton(
+                        keyboard.append([InlineKeyboardButton(
                             "🔍 Kategoriyani aniqlashtirish" if lang == "uz" else "🔍 Уточнить категорию",
                             callback_data=f"ai_clarify_category_{transaction_id}"
                         )])
                         # Xabar oxiriga eslatma
                         msg += "\n\n_💡 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💡 Категория неточна. Уточнение необязательно._"
                     
+                    # To'g'ri/Noto'g'ri tugmalari
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                            callback_data="ai_confirm_learn"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                            callback_data=f"ai_correct_{transaction_id}"
+                        )
+                    ])
+                    
+                    # Hisobot tugmasi
                     keyboard.append([InlineKeyboardButton(
                         "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
                         callback_data="ai_report"
@@ -5902,11 +5909,16 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Profile editing states
         "editing_income_self", "editing_income_partner", "editing_rent",
         "editing_utilities", "editing_loan", "editing_mandatory",
+        "editing_kindergarten", "editing_total_debt",
         # Recurring/credit entry states  
         "adding_recurring", "adding_credit", "adding_fixed_income",
         "editing_recurring", "editing_credit", "editing_fixed_income",
         # Other input states
-        "awaiting_text_input", "awaiting_number_input"
+        "awaiting_text_input", "awaiting_number_input",
+        # Registration states
+        "awaiting_phone", "awaiting_contact", "awaiting_language",
+        # AI correction states
+        "ai_amount_editing", "ai_editing_amount"
     ]
     for mode in editing_modes:
         if context.user_data.get(mode):
@@ -5922,6 +5934,17 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
+    # Check if user is registered (has phone number)
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Agar ro'yxatdan o'tmagan bo'lsa (telefon raqam yo'q) - AI ishlamasin
+    if not user.get("phone_number"):
+        return
+    
     # Check PRO status
     from app.subscription_handlers import is_user_pro
     is_pro = await is_user_pro(telegram_id)
@@ -5930,12 +5953,6 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return  # Silently ignore for non-PRO users
     
     try:
-        db = await get_database()
-        user = await db.get_user(telegram_id)
-        
-        if not user:
-            return
-        
         # ==================== QARZ TEKSHIRISH ====================
         from app.ai_assistant import (
             parse_debt_transaction, save_personal_debt, format_debt_saved_message,
@@ -5998,7 +6015,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         budget_status = await get_budget_status(db, user["id"])
         
         if len(transactions) == 1:
-            # ==================== BITTA TRANZAKSIYA ====================
+            # ==================== BITTA TRANZAKSIYA - TO'LIQ IMKONIYATLAR ====================
             transaction = transactions[0]
             
             # Save transaction
@@ -6027,44 +6044,85 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             elif ai_source == "learned":
                 msg += f"\n\n🧠 _O'rganilgan pattern ({confidence}%)_" if lang == "uz" else f"\n\n🧠 _Изученный паттерн ({confidence}%)_"
             
-            # Keyboard with correction option
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                        callback_data="ai_confirm_learn"  # O'rganish bilan
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
-                        callback_data=f"ai_correct_{transaction_id}"
-                    )
-                ],
-                [InlineKeyboardButton(
-                    "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                    callback_data="ai_report"
-                )]
-            ]
+            # Aniqlashtirish kerakmi tekshirish
+            needs_clarification = (
+                transaction.get("needs_confirmation", False) or 
+                transaction.get("needs_clarification", False) or
+                transaction.get("category") == "boshqa" or
+                transaction.get("category_key") == "boshqa"
+            )
+            
+            # Keyboard with correction and clarification options
+            keyboard = []
+            
+            # Aniqlashtirish tugmasi - agar kerak bo'lsa, birinchi qatorda
+            if needs_clarification:
+                keyboard.append([InlineKeyboardButton(
+                    "🔍 Kategoriyani aniqlashtirish" if lang == "uz" else "🔍 Уточнить категорию",
+                    callback_data=f"ai_clarify_category_{transaction_id}"
+                )])
+                msg += "\n\n_💡 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💡 Категория неточна. Уточнение необязательно._"
+            
+            # To'g'ri/Noto'g'ri tugmalari
+            keyboard.append([
+                InlineKeyboardButton(
+                    "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                    callback_data="ai_confirm_learn"  # O'rganish bilan
+                ),
+                InlineKeyboardButton(
+                    "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                    callback_data=f"ai_correct_{transaction_id}"
+                )
+            ])
+            
+            # Hisobot tugmasi
+            keyboard.append([InlineKeyboardButton(
+                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                callback_data="ai_report"
+            )])
         else:
             # ==================== KO'P TRANZAKSIYALAR ====================
             # Save all transactions
             transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
             
-            # Format response
-            msg = format_multiple_transactions_message(transactions, budget_status, lang)
+            # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash
+            context.user_data["last_multi_transactions"] = {
+                "original_text": text,
+                "transactions": transactions,
+                "transaction_ids": transaction_ids
+            }
             
-            # Keyboard - show number of transactions saved
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
-                        callback_data="ai_confirm_ok"
-                    )
-                ],
-                [InlineKeyboardButton(
-                    "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                    callback_data="ai_report"
-                )]
-            ]
+            # Format response (returns tuple with needs_clarification_list)
+            msg, needs_clarification_list = format_multiple_transactions_message(transactions, budget_status, lang)
+            
+            # Keyboard
+            ids_str = ",".join([str(tid) for tid in transaction_ids])
+            keyboard = []
+            
+            # Aniqlashtirish tugmasi - agar kerak bo'lsa
+            if needs_clarification_list:
+                keyboard.append([InlineKeyboardButton(
+                    f"🔍 Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"🔍 Уточнить ({len(needs_clarification_list)})",
+                    callback_data=f"ai_clarify_multi_{ids_str}"
+                )])
+            
+            # To'g'ri/Tuzatish tugmalari
+            keyboard.append([
+                InlineKeyboardButton(
+                    "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
+                    callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
+                ),
+                InlineKeyboardButton(
+                    "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
+                    callback_data=f"ai_correct_multi_{ids_str}"
+                )
+            ])
+            
+            # Hisobot tugmasi
+            keyboard.append([InlineKeyboardButton(
+                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                callback_data="ai_report"
+            )])
         
         await update.message.reply_text(
             msg,
