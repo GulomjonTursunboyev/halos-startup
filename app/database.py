@@ -212,6 +212,9 @@ class Database:
                     bonus_voice_count INTEGER DEFAULT 0,
                     voice_tier TEXT DEFAULT 'basic',
                     voice_tier_expires TIMESTAMP,
+                    reports_daily BOOLEAN DEFAULT FALSE,
+                    reports_weekly BOOLEAN DEFAULT FALSE,
+                    reports_monthly BOOLEAN DEFAULT TRUE,
                     referral_code TEXT,
                     referred_by INTEGER,
                     last_active TIMESTAMP,
@@ -343,6 +346,7 @@ class Database:
                     amount REAL DEFAULT 0,
                     description TEXT,
                     original_text TEXT,
+                    debt_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -428,6 +432,9 @@ class Database:
                 bonus_voice_count INTEGER DEFAULT 0,
                 voice_tier TEXT DEFAULT 'basic',
                 voice_tier_expires TIMESTAMP,
+                reports_daily INTEGER DEFAULT 0,
+                reports_weekly INTEGER DEFAULT 0,
+                reports_monthly INTEGER DEFAULT 1,
                 referral_code TEXT,
                 referred_by INTEGER,
                 last_active TIMESTAMP,
@@ -553,6 +560,7 @@ class Database:
                 amount REAL DEFAULT 0,
                 description TEXT,
                 original_text TEXT,
+                debt_id INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );

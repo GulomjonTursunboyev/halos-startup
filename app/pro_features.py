@@ -627,7 +627,11 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             callback_data="pro_debt_monitor"
         )],
         [InlineKeyboardButton(
-            "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
+            "� Hisobot sozlamalari" if lang == "uz" else "📊 Настройки отчётов",
+            callback_data="report_settings"
+        )],
+        [InlineKeyboardButton(
+            "�📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
             callback_data="pro_export_excel"
         )],
         [InlineKeyboardButton(
@@ -693,3 +697,153 @@ async def toggle_reminders_callback(update: Update, context: ContextTypes.DEFAUL
     
     # Go back to reminders menu
     await show_reminders(update, context)
+
+# ==================== SCHEDULED REPORTS SETTINGS ====================
+
+async def show_report_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show scheduled report settings"""
+    query = update.callback_query
+    if query:
+        await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    telegram_id = update.effective_user.id
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Get current settings
+    daily = user.get("reports_daily", False)
+    weekly = user.get("reports_weekly", False)
+    monthly = user.get("reports_monthly", True)
+    
+    if lang == "uz":
+        msg = (
+            "📊 *HISOBOT SOZLAMALARI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔔 Avtomatik hisobotlar:\n\n"
+            f"📅 *Kunlik hisobot:* {'✅ Yoqilgan' if daily else '❌ O\'chirilgan'}\n"
+            f"   _Har kuni soat 21:00 da_\n\n"
+            f"📆 *Haftalik hisobot:* {'✅ Yoqilgan' if weekly else '❌ O\'chirilgan'}\n"
+            f"   _Har yakshanba soat 20:00 da_\n\n"
+            f"🗓 *Oylik hisobot:* {'✅ Yoqilgan' if monthly else '❌ O\'chirilgan'}\n"
+            f"   _Har oyning 1-sanasi soat 19:00 da_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Yoqish/o'chirish uchun tugmalarni bosing_"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton(
+                f"{'🔕 O\'chirish' if daily else '✅ Yoqish'} - Kunlik",
+                callback_data=f"toggle_report_daily_{'off' if daily else 'on'}"
+            )],
+            [InlineKeyboardButton(
+                f"{'🔕 O\'chirish' if weekly else '✅ Yoqish'} - Haftalik",
+                callback_data=f"toggle_report_weekly_{'off' if weekly else 'on'}"
+            )],
+            [InlineKeyboardButton(
+                f"{'🔕 O\'chirish' if monthly else '✅ Yoqish'} - Oylik",
+                callback_data=f"toggle_report_monthly_{'off' if monthly else 'on'}"
+            )],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="pro_menu")]
+        ]
+    else:
+        msg = (
+            "📊 *НАСТРОЙКИ ОТЧЁТОВ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔔 Автоматические отчёты:\n\n"
+            f"📅 *Ежедневный:* {'✅ Включён' if daily else '❌ Выключен'}\n"
+            f"   _Каждый день в 21:00_\n\n"
+            f"📆 *Еженедельный:* {'✅ Включён' if weekly else '❌ Выключен'}\n"
+            f"   _Каждое воскресенье в 20:00_\n\n"
+            f"🗓 *Ежемесячный:* {'✅ Включён' if monthly else '❌ Выключен'}\n"
+            f"   _1-го числа каждого месяца в 19:00_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Нажмите кнопки для настройки_"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton(
+                f"{'🔕 Выкл' if daily else '✅ Вкл'} - Ежедневный",
+                callback_data=f"toggle_report_daily_{'off' if daily else 'on'}"
+            )],
+            [InlineKeyboardButton(
+                f"{'🔕 Выкл' if weekly else '✅ Вкл'} - Еженедельный",
+                callback_data=f"toggle_report_weekly_{'off' if weekly else 'on'}"
+            )],
+            [InlineKeyboardButton(
+                f"{'🔕 Выкл' if monthly else '✅ Вкл'} - Ежемесячный",
+                callback_data=f"toggle_report_monthly_{'off' if monthly else 'on'}"
+            )],
+            [InlineKeyboardButton("◀️ Назад", callback_data="pro_menu")]
+        ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if query:
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+
+
+async def toggle_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Toggle report setting on/off"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Parse callback data: toggle_report_{period}_{on/off}
+    data = query.data.replace("toggle_report_", "")
+    parts = data.split("_")
+    period = parts[0]  # daily, weekly, monthly
+    action = parts[1]  # on, off
+    
+    new_value = action == "on"
+    column = f"reports_{period}"
+    
+    db = await get_database()
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE users SET {column} = $1 WHERE telegram_id = $2
+                """, new_value, telegram_id)
+        else:
+            await db._connection.execute(f"""
+                UPDATE users SET {column} = ? WHERE telegram_id = ?
+            """, (1 if new_value else 0, telegram_id))
+            await db._connection.commit()
+        
+        # Show success message
+        if lang == "uz":
+            period_names = {"daily": "Kunlik", "weekly": "Haftalik", "monthly": "Oylik"}
+            if new_value:
+                msg = f"✅ {period_names[period]} hisobot yoqildi!"
+            else:
+                msg = f"🔕 {period_names[period]} hisobot o'chirildi."
+        else:
+            period_names = {"daily": "Ежедневный", "weekly": "Еженедельный", "monthly": "Ежемесячный"}
+            if new_value:
+                msg = f"✅ {period_names[period]} отчёт включён!"
+            else:
+                msg = f"🔕 {period_names[period]} отчёт выключен."
+        
+        await query.answer(msg, show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"[REPORT] Toggle error: {e}")
+        await query.answer("❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка")
+    
+    # Refresh settings page
+    await show_report_settings(update, context)
+
+
+async def report_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Callback for report settings button"""
+    await show_report_settings(update, context)

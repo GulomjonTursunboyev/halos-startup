@@ -69,6 +69,7 @@ from app.handlers import (
     ai_report_callback,
     ai_recent_callback,
     ai_budget_callback,
+    ai_real_balance_callback,
     # AI Correction handlers
     ai_confirm_ok_callback,
     ai_correct_callback,
@@ -124,6 +125,14 @@ from app.pro_features import (
     pro_export_excel_callback,
     pro_menu_callback,
     toggle_reminders_callback,
+    # Report settings
+    report_settings_callback,
+    toggle_report_callback,
+)
+from app.ai_assistant import (
+    send_daily_reports,
+    send_weekly_reports,
+    send_monthly_reports,
 )
 
 # Configure logging
@@ -132,6 +141,37 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
+# ========== SCHEDULED REPORT JOBS ==========
+async def daily_report_job(context) -> None:
+    """Kunlik hisobot yuborish job"""
+    logger.info("🔔 Running daily report job...")
+    try:
+        count = await send_daily_reports(context)
+        logger.info(f"✅ Daily reports sent to {count} users")
+    except Exception as e:
+        logger.error(f"❌ Daily report job error: {e}")
+
+
+async def weekly_report_job(context) -> None:
+    """Haftalik hisobot yuborish job"""
+    logger.info("🔔 Running weekly report job...")
+    try:
+        count = await send_weekly_reports(context)
+        logger.info(f"✅ Weekly reports sent to {count} users")
+    except Exception as e:
+        logger.error(f"❌ Weekly report job error: {e}")
+
+
+async def monthly_report_job(context) -> None:
+    """Oylik hisobot yuborish job"""
+    logger.info("🔔 Running monthly report job...")
+    try:
+        count = await send_monthly_reports(context)
+        logger.info(f"✅ Monthly reports sent to {count} users")
+    except Exception as e:
+        logger.error(f"❌ Monthly report job error: {e}")
 
 
 async def post_init(application: Application) -> None:
@@ -153,6 +193,42 @@ async def post_init(application: Application) -> None:
         logger.error(f"Failed to start scheduler: {e}")
         import traceback
         traceback.print_exc()
+    
+    # ========== SCHEDULED REPORTS ==========
+    # Setup JobQueue for daily/weekly/monthly reports
+    job_queue = application.job_queue
+    
+    from datetime import time as dt_time
+    import pytz
+    
+    # Toshkent vaqt zonasi
+    tz = pytz.timezone("Asia/Tashkent")
+    
+    # Kunlik hisobot - har kuni soat 21:00 da
+    job_queue.run_daily(
+        daily_report_job,
+        time=dt_time(hour=21, minute=0, tzinfo=tz),
+        name="daily_report"
+    )
+    logger.info("📊 Daily report job scheduled at 21:00 Tashkent time")
+    
+    # Haftalik hisobot - har yakshanba soat 20:00 da
+    job_queue.run_daily(
+        weekly_report_job,
+        time=dt_time(hour=20, minute=0, tzinfo=tz),
+        days=(6,),  # 6 = Sunday
+        name="weekly_report"
+    )
+    logger.info("📊 Weekly report job scheduled on Sundays at 20:00")
+    
+    # Oylik hisobot - har oyning 1-sanasi soat 19:00 da
+    job_queue.run_monthly(
+        monthly_report_job,
+        when=dt_time(hour=19, minute=0, tzinfo=tz),
+        day=1,  # Har oyning 1-sanasi
+        name="monthly_report"
+    )
+    logger.info("📊 Monthly report job scheduled on 1st of each month at 19:00")
 
 
 async def post_shutdown(application: Application) -> None:
@@ -442,6 +518,14 @@ def main() -> None:
         CallbackQueryHandler(toggle_reminders_callback, pattern="^toggle_reminders_")
     )
     
+    # Report settings handlers
+    application.add_handler(
+        CallbackQueryHandler(report_settings_callback, pattern="^report_settings$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(toggle_report_callback, pattern="^toggle_report_")
+    )
+    
     # Debt Plan handlers (FREE vs PRO)
     application.add_handler(
         CallbackQueryHandler(debt_plan_free_callback, pattern="^debt_plan_free$")
@@ -467,6 +551,9 @@ def main() -> None:
     )
     application.add_handler(
         CallbackQueryHandler(ai_budget_callback, pattern="^ai_budget$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_real_balance_callback, pattern="^ai_real_balance$")
     )
     
     # AI Correction handlers

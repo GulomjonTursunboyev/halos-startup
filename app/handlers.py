@@ -6336,14 +6336,17 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show AI transaction report"""
+    """Show AI transaction report with real balance"""
     query = update.callback_query
     await query.answer()
     
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
-    from app.ai_assistant import get_transaction_summary, format_transaction_summary, get_budget_status
+    from app.ai_assistant import (
+        get_transaction_summary, format_transaction_summary, 
+        get_budget_status, get_user_real_balance, format_real_balance_message
+    )
     
     db = await get_database()
     user = await db.get_user(telegram_id)
@@ -6351,6 +6354,9 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not user:
         await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
+    
+    # Get real balance (including debts)
+    balance_data = await get_user_real_balance(db, user["id"])
     
     # Get summary for last 30 days
     summary = await get_transaction_summary(db, user["id"], days=30)
@@ -6376,11 +6382,17 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
     else:
         msg = format_transaction_summary(summary, lang)
+        # Append real balance info
+        msg += "\n\n" + format_real_balance_message(balance_data, lang)
     
     keyboard = [
         [InlineKeyboardButton(
             "📋 Oxirgi yozuvlar" if lang == "uz" else "📋 Последние записи",
             callback_data="ai_recent"
+        )],
+        [InlineKeyboardButton(
+            "💰 Haqiqiy balans" if lang == "uz" else "💰 Реальный баланс",
+            callback_data="ai_real_balance"
         )],
         [InlineKeyboardButton(
             "🎤 Yangi yozuv" if lang == "uz" else "🎤 Новая запись",
@@ -6389,6 +6401,49 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton(
             "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
             callback_data="back_to_main"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_real_balance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show user's real balance including debts"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import get_user_real_balance, format_real_balance_message
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
+        return
+    
+    # Get real balance
+    balance_data = await get_user_real_balance(db, user["id"])
+    msg = format_real_balance_message(balance_data, lang)
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📊 To'liq hisobot" if lang == "uz" else "📊 Полный отчёт",
+            callback_data="ai_report"
+        )],
+        [InlineKeyboardButton(
+            "💳 Qarzlarim" if lang == "uz" else "💳 Мои долги",
+            callback_data="ai_debt_list"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="ai_assistant"
         )]
     ]
     

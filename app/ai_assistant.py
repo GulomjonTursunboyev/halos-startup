@@ -3336,13 +3336,24 @@ def extract_due_date(text: str) -> Optional[str]:
     return None
 
 
-async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
+async def save_personal_debt(db, user_id: int, debt_info: Dict, save_as_transaction: bool = True) -> int:
     """
     Qarzni bazaga saqlash
+    
+    Args:
+        db: Database instance
+        user_id: Foydalanuvchi ID
+        debt_info: Qarz ma'lumotlari
+        save_as_transaction: True bo'lsa, berilgan qarzni harajat sifatida ham saqlaydi
     """
     # Convert string dates to date objects for PostgreSQL
     given_date = debt_info["given_date"]
     due_date = debt_info.get("due_date")
+    debt_type = debt_info["type"]  # "given" yoki "taken"
+    amount = debt_info["amount"]
+    person = debt_info["person"]
+    
+    debt_id = 0
     
     if db.is_postgres:
         # PostgreSQL requires date objects, not strings
@@ -3360,15 +3371,15 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
                 RETURNING id
             """, 
                 user_id,
-                debt_info["type"],
-                debt_info["person"],
-                debt_info["amount"],
+                debt_type,
+                person,
+                amount,
                 debt_info.get("description", ""),
                 debt_info.get("original_text", ""),
                 given_date,
                 due_date
             )
-            return row["id"] if row else 0
+            debt_id = row["id"] if row else 0
     else:
         await db._connection.execute("""
             INSERT INTO personal_debts 
@@ -3376,9 +3387,9 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """, (
             user_id,
-            debt_info["type"],
-            debt_info["person"],
-            debt_info["amount"],
+            debt_type,
+            person,
+            amount,
             debt_info.get("description", ""),
             debt_info.get("original_text", ""),
             given_date,
@@ -3388,7 +3399,37 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict) -> int:
         
         cursor = await db._connection.execute("SELECT last_insert_rowid()")
         row = await cursor.fetchone()
-        return row[0] if row else 0
+        debt_id = row[0] if row else 0
+    
+    # ========== BERILGAN QARZNI HARAJAT SIFATIDA SAQLASH ==========
+    # Agar "given" (men berdim) bo'lsa - bu harajat hisoblanadi
+    # Agar "taken" (menga berishdi) bo'lsa - bu daromad emas, qarz
+    if save_as_transaction and debt_type == "given" and debt_id > 0:
+        try:
+            description = f"Qarz berildi: {person}"
+            original_text = debt_info.get("original_text", f"{person}ga {amount} qarz berdim")
+            
+            if db.is_postgres:
+                async with db._pool.acquire() as conn:
+                    await conn.execute("""
+                        INSERT INTO transactions 
+                        (user_id, type, category, amount, description, original_text, debt_id, created_at)
+                        VALUES ($1, 'expense', 'qarz', $2, $3, $4, $5, NOW())
+                    """, user_id, amount, description, original_text, debt_id)
+            else:
+                from datetime import datetime as dt
+                await db._connection.execute("""
+                    INSERT INTO transactions 
+                    (user_id, type, category, amount, description, original_text, debt_id, created_at)
+                    VALUES (?, 'expense', 'qarz', ?, ?, ?, ?, ?)
+                """, (user_id, amount, description, original_text, debt_id, dt.now().isoformat()))
+                await db._connection.commit()
+            
+            logger.info(f"[DEBT] Berilgan qarz harajat sifatida saqlandi: {amount} so'm -> {person}")
+        except Exception as e:
+            logger.error(f"[DEBT] Qarzni harajat sifatida saqlashda xatolik: {e}")
+    
+    return debt_id
 
 
 async def get_user_debts(db, user_id: int, status: str = "active") -> List[Dict]:
@@ -3741,3 +3782,507 @@ async def parse_debt_transaction(text: str, lang: str = "uz") -> Optional[Dict]:
     return debt_info
 
 
+# ==================== HISOBOTLAR (REPORTS) ====================
+
+async def get_period_transactions(db, user_id: int, period: str = "daily") -> Dict:
+    """
+    Davr bo'yicha tranzaksiyalarni olish
+    
+    Args:
+        db: Database instance
+        user_id: Foydalanuvchi ID
+        period: "daily", "weekly", "monthly"
+    
+    Returns:
+        Dict: {income, expense, transactions, period_start, period_end}
+    """
+    from datetime import datetime, timedelta
+    
+    now = datetime.now()
+    
+    if period == "daily":
+        period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        period_end = now
+    elif period == "weekly":
+        # Dushanba - hafta boshi
+        days_since_monday = now.weekday()
+        period_start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+        period_end = now
+    else:  # monthly
+        period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        period_end = now
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT * FROM transactions 
+                    WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
+                    ORDER BY created_at DESC
+                """, user_id, period_start, period_end)
+                transactions = [dict(row) for row in rows]
+        else:
+            cursor = await db._connection.execute("""
+                SELECT * FROM transactions 
+                WHERE user_id = ? AND created_at >= ? AND created_at <= ?
+                ORDER BY created_at DESC
+            """, (user_id, period_start.isoformat(), period_end.isoformat()))
+            rows = await cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            transactions = [dict(zip(columns, row)) for row in rows]
+        
+        # Hisoblash
+        total_income = sum(t["amount"] for t in transactions if t["type"] == "income")
+        total_expense = sum(t["amount"] for t in transactions if t["type"] == "expense")
+        
+        # Kategoriyalar bo'yicha
+        expenses_by_category = {}
+        incomes_by_category = {}
+        
+        for t in transactions:
+            cat = t["category"]
+            if t["type"] == "expense":
+                expenses_by_category[cat] = expenses_by_category.get(cat, 0) + t["amount"]
+            else:
+                incomes_by_category[cat] = incomes_by_category.get(cat, 0) + t["amount"]
+        
+        return {
+            "income": total_income,
+            "expense": total_expense,
+            "balance": total_income - total_expense,
+            "transactions": transactions,
+            "transaction_count": len(transactions),
+            "expenses_by_category": expenses_by_category,
+            "incomes_by_category": incomes_by_category,
+            "period_start": period_start,
+            "period_end": period_end,
+            "period": period
+        }
+    except Exception as e:
+        logger.error(f"[REPORT] Davr tranzaksiyalarini olishda xatolik: {e}")
+        return {
+            "income": 0,
+            "expense": 0,
+            "balance": 0,
+            "transactions": [],
+            "transaction_count": 0,
+            "expenses_by_category": {},
+            "incomes_by_category": {},
+            "period_start": period_start,
+            "period_end": period_end,
+            "period": period
+        }
+
+
+def format_period_report(report_data: Dict, lang: str = "uz") -> str:
+    """Davr hisobotini formatlash"""
+    from app.languages import format_number
+    
+    period = report_data["period"]
+    income = report_data["income"]
+    expense = report_data["expense"]
+    balance = report_data["balance"]
+    count = report_data["transaction_count"]
+    expenses_by_cat = report_data["expenses_by_category"]
+    incomes_by_cat = report_data["incomes_by_category"]
+    
+    # Davr nomi
+    if lang == "uz":
+        period_names = {"daily": "KUNLIK", "weekly": "HAFTALIK", "monthly": "OYLIK"}
+        period_name = period_names.get(period, "")
+        
+        msg = (
+            f"📊 *{period_name} HISOBOT*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        if count == 0:
+            msg += "📭 Bu davr uchun tranzaksiyalar yo'q.\n"
+        else:
+            msg += f"📈 *Daromad:* +{format_number(income)} so'm\n"
+            msg += f"📉 *Xarajat:* -{format_number(expense)} so'm\n"
+            msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+            
+            if balance >= 0:
+                msg += f"💰 *Balans:* +{format_number(balance)} so'm ✅\n\n"
+            else:
+                msg += f"💰 *Balans:* {format_number(balance)} so'm ⚠️\n\n"
+            
+            msg += f"📝 Jami: *{count} ta* tranzaksiya\n\n"
+            
+            # Top xarajatlar
+            if expenses_by_cat:
+                msg += "📉 *Top xarajatlar:*\n"
+                sorted_exp = sorted(expenses_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
+                for cat, amt in sorted_exp:
+                    cat_emoji = CATEGORY_EMOJIS.get(cat, "📌")
+                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} so'm\n"
+                msg += "\n"
+            
+            # Top daromadlar
+            if incomes_by_cat:
+                msg += "📈 *Top daromadlar:*\n"
+                sorted_inc = sorted(incomes_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
+                for cat, amt in sorted_inc:
+                    cat_emoji = CATEGORY_EMOJIS.get(cat, "💵")
+                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} so'm\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Matnli kiritish BEPUL va cheksiz!_"
+        
+    else:  # Russian
+        period_names = {"daily": "ДНЕВНОЙ", "weekly": "НЕДЕЛЬНЫЙ", "monthly": "МЕСЯЧНЫЙ"}
+        period_name = period_names.get(period, "")
+        
+        msg = (
+            f"📊 *{period_name} ОТЧЁТ*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        if count == 0:
+            msg += "📭 Нет транзакций за этот период.\n"
+        else:
+            msg += f"📈 *Доход:* +{format_number(income)} сум\n"
+            msg += f"📉 *Расход:* -{format_number(expense)} сум\n"
+            msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+            
+            if balance >= 0:
+                msg += f"💰 *Баланс:* +{format_number(balance)} сум ✅\n\n"
+            else:
+                msg += f"💰 *Баланс:* {format_number(balance)} сум ⚠️\n\n"
+            
+            msg += f"📝 Всего: *{count}* транзакций\n\n"
+            
+            # Top расходы
+            if expenses_by_cat:
+                msg += "📉 *Топ расходы:*\n"
+                sorted_exp = sorted(expenses_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
+                for cat, amt in sorted_exp:
+                    cat_emoji = CATEGORY_EMOJIS.get(cat, "📌")
+                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} сум\n"
+                msg += "\n"
+            
+            # Top доходы
+            if incomes_by_cat:
+                msg += "📈 *Топ доходы:*\n"
+                sorted_inc = sorted(incomes_by_cat.items(), key=lambda x: x[1], reverse=True)[:5]
+                for cat, amt in sorted_inc:
+                    cat_emoji = CATEGORY_EMOJIS.get(cat, "💵")
+                    msg += f"├ {cat_emoji} {cat}: {format_number(amt)} сум\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Текстовый ввод БЕСПЛАТНО!_"
+    
+    return msg
+
+
+async def get_user_real_balance(db, user_id: int) -> Dict:
+    """
+    Foydalanuvchining haqiqiy balansini hisoblash
+    (berilgan qarzlar hisobga olingan)
+    
+    Returns:
+        Dict: {total_income, total_expense, balance, given_debts, taken_debts, net_balance}
+    """
+    try:
+        # Barcha tranzaksiyalar
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                # Daromadlar
+                income_row = await conn.fetchrow("""
+                    SELECT COALESCE(SUM(amount), 0) as total FROM transactions 
+                    WHERE user_id = $1 AND type = 'income'
+                """, user_id)
+                total_income = income_row["total"] if income_row else 0
+                
+                # Xarajatlar (qarzlar ham kiradi)
+                expense_row = await conn.fetchrow("""
+                    SELECT COALESCE(SUM(amount), 0) as total FROM transactions 
+                    WHERE user_id = $1 AND type = 'expense'
+                """, user_id)
+                total_expense = expense_row["total"] if expense_row else 0
+                
+                # Aktiv berilgan qarzlar
+                given_row = await conn.fetchrow("""
+                    SELECT COALESCE(SUM(amount), 0) as total FROM personal_debts 
+                    WHERE user_id = $1 AND debt_type = 'given' AND status = 'active'
+                """, user_id)
+                given_debts = given_row["total"] if given_row else 0
+                
+                # Aktiv olingan qarzlar
+                taken_row = await conn.fetchrow("""
+                    SELECT COALESCE(SUM(amount), 0) as total FROM personal_debts 
+                    WHERE user_id = $1 AND debt_type = 'taken' AND status = 'active'
+                """, user_id)
+                taken_debts = taken_row["total"] if taken_row else 0
+        else:
+            # SQLite
+            cursor = await db._connection.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM transactions 
+                WHERE user_id = ? AND type = 'income'
+            """, (user_id,))
+            row = await cursor.fetchone()
+            total_income = row[0] if row else 0
+            
+            cursor = await db._connection.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM transactions 
+                WHERE user_id = ? AND type = 'expense'
+            """, (user_id,))
+            row = await cursor.fetchone()
+            total_expense = row[0] if row else 0
+            
+            cursor = await db._connection.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM personal_debts 
+                WHERE user_id = ? AND debt_type = 'given' AND status = 'active'
+            """, (user_id,))
+            row = await cursor.fetchone()
+            given_debts = row[0] if row else 0
+            
+            cursor = await db._connection.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM personal_debts 
+                WHERE user_id = ? AND debt_type = 'taken' AND status = 'active'
+            """, (user_id,))
+            row = await cursor.fetchone()
+            taken_debts = row[0] if row else 0
+        
+        # Haqiqiy balans
+        balance = total_income - total_expense
+        # Sof balans (qaytarilmagan qarzlarni hisobga olgan holda)
+        # given_debts - men berdim, qaytib kelishi kerak (+)
+        # taken_debts - menga berishdi, qaytarishim kerak (-)
+        net_balance = balance + given_debts - taken_debts
+        
+        return {
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "balance": balance,
+            "given_debts": given_debts,
+            "taken_debts": taken_debts,
+            "net_balance": net_balance
+        }
+    except Exception as e:
+        logger.error(f"[BALANCE] Balans hisoblashda xatolik: {e}")
+        return {
+            "total_income": 0,
+            "total_expense": 0,
+            "balance": 0,
+            "given_debts": 0,
+            "taken_debts": 0,
+            "net_balance": 0
+        }
+
+
+def format_real_balance_message(balance_data: Dict, lang: str = "uz") -> str:
+    """Haqiqiy balans xabarini formatlash"""
+    from app.languages import format_number
+    
+    income = balance_data["total_income"]
+    expense = balance_data["total_expense"]
+    balance = balance_data["balance"]
+    given = balance_data["given_debts"]
+    taken = balance_data["taken_debts"]
+    net = balance_data["net_balance"]
+    
+    if lang == "uz":
+        msg = (
+            "💰 *HAQIQIY BALANS*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📈 Jami daromad: *{format_number(income)}* so'm\n"
+            f"📉 Jami xarajat: *{format_number(expense)}* so'm\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 Joriy balans: *{format_number(balance)}* so'm\n\n"
+        )
+        
+        if given > 0 or taken > 0:
+            msg += "🔄 *Qarz holati:*\n"
+            if given > 0:
+                msg += f"├ 📤 Berilgan qarz: *{format_number(given)}* so'm\n"
+                msg += f"│   _(qaytib kelishi kerak)_\n"
+            if taken > 0:
+                msg += f"├ 📥 Olingan qarz: *{format_number(taken)}* so'm\n"
+                msg += f"│   _(qaytarishingiz kerak)_\n"
+            msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+        
+        if net >= 0:
+            msg += f"🎯 *SOF BALANS: +{format_number(net)} so'm* ✅"
+        else:
+            msg += f"🎯 *SOF BALANS: {format_number(net)} so'm* ⚠️"
+    else:
+        msg = (
+            "💰 *РЕАЛЬНЫЙ БАЛАНС*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📈 Всего доход: *{format_number(income)}* сум\n"
+            f"📉 Всего расход: *{format_number(expense)}* сум\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 Текущий баланс: *{format_number(balance)}* сум\n\n"
+        )
+        
+        if given > 0 or taken > 0:
+            msg += "🔄 *Долги:*\n"
+            if given > 0:
+                msg += f"├ 📤 Дал в долг: *{format_number(given)}* сум\n"
+                msg += f"│   _(должны вернуть)_\n"
+            if taken > 0:
+                msg += f"├ 📥 Взял в долг: *{format_number(taken)}* сум\n"
+                msg += f"│   _(нужно вернуть)_\n"
+            msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+        
+        if net >= 0:
+            msg += f"🎯 *ЧИСТЫЙ БАЛАНС: +{format_number(net)} сум* ✅"
+        else:
+            msg += f"🎯 *ЧИСТЫЙ БАЛАНС: {format_number(net)} сум* ⚠️"
+    
+    return msg
+
+
+# ==================== SCHEDULED REPORTS (Job Queue) ====================
+
+async def send_scheduled_report(context, telegram_id: int, period: str = "daily") -> bool:
+    """
+    Foydalanuvchiga rejalashtirilgan hisobot yuborish
+    
+    Args:
+        context: Telegram context
+        telegram_id: Foydalanuvchi Telegram ID
+        period: "daily", "weekly", "monthly"
+    """
+    from app.database import get_database
+    
+    try:
+        db = await get_database()
+        user = await db.get_user(telegram_id)
+        
+        if not user:
+            return False
+        
+        lang = user.get("language", "uz")
+        
+        # Hisobotni olish
+        report_data = await get_period_transactions(db, user["id"], period)
+        
+        # Agar tranzaksiyalar bo'lmasa, yubormaslik
+        if report_data["transaction_count"] == 0:
+            return False
+        
+        # Formatlash
+        report_msg = format_period_report(report_data, lang)
+        
+        # Yuborish
+        await context.bot.send_message(
+            chat_id=telegram_id,
+            text=report_msg,
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"[REPORT] {period} hisobot yuborildi: {telegram_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"[REPORT] Hisobot yuborishda xatolik: {e}")
+        return False
+
+
+async def send_daily_reports(context) -> int:
+    """Barcha foydalanuvchilarga kunlik hisobot yuborish (JobQueue callback)"""
+    from app.database import get_database
+    
+    db = await get_database()
+    sent_count = 0
+    
+    try:
+        # Hisobot olish yoqilgan foydalanuvchilar (reports_enabled = true)
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT telegram_id FROM users 
+                    WHERE reports_daily = true AND telegram_id IS NOT NULL
+                """)
+        else:
+            cursor = await db._connection.execute("""
+                SELECT telegram_id FROM users 
+                WHERE reports_daily = 1 AND telegram_id IS NOT NULL
+            """)
+            rows = await cursor.fetchall()
+        
+        for row in rows:
+            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
+            success = await send_scheduled_report(context, telegram_id, "daily")
+            if success:
+                sent_count += 1
+        
+        logger.info(f"[REPORT] Kunlik hisobotlar yuborildi: {sent_count} ta")
+        
+    except Exception as e:
+        logger.error(f"[REPORT] Kunlik hisobotlar yuborishda xatolik: {e}")
+    
+    return sent_count
+
+
+async def send_weekly_reports(context) -> int:
+    """Barcha foydalanuvchilarga haftalik hisobot yuborish (JobQueue callback)"""
+    from app.database import get_database
+    
+    db = await get_database()
+    sent_count = 0
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT telegram_id FROM users 
+                    WHERE reports_weekly = true AND telegram_id IS NOT NULL
+                """)
+        else:
+            cursor = await db._connection.execute("""
+                SELECT telegram_id FROM users 
+                WHERE reports_weekly = 1 AND telegram_id IS NOT NULL
+            """)
+            rows = await cursor.fetchall()
+        
+        for row in rows:
+            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
+            success = await send_scheduled_report(context, telegram_id, "weekly")
+            if success:
+                sent_count += 1
+        
+        logger.info(f"[REPORT] Haftalik hisobotlar yuborildi: {sent_count} ta")
+        
+    except Exception as e:
+        logger.error(f"[REPORT] Haftalik hisobotlar yuborishda xatolik: {e}")
+    
+    return sent_count
+
+
+async def send_monthly_reports(context) -> int:
+    """Barcha foydalanuvchilarga oylik hisobot yuborish (JobQueue callback)"""
+    from app.database import get_database
+    
+    db = await get_database()
+    sent_count = 0
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT telegram_id FROM users 
+                    WHERE reports_monthly = true AND telegram_id IS NOT NULL
+                """)
+        else:
+            cursor = await db._connection.execute("""
+                SELECT telegram_id FROM users 
+                WHERE reports_monthly = 1 AND telegram_id IS NOT NULL
+            """)
+            rows = await cursor.fetchall()
+        
+        for row in rows:
+            telegram_id = row[0] if isinstance(row, tuple) else row["telegram_id"]
+            success = await send_scheduled_report(context, telegram_id, "monthly")
+            if success:
+                sent_count += 1
+        
+        logger.info(f"[REPORT] Oylik hisobotlar yuborildi: {sent_count} ta")
+        
+    except Exception as e:
+        logger.error(f"[REPORT] Oylik hisobotlar yuborishda xatolik: {e}")
+    
+    return sent_count
