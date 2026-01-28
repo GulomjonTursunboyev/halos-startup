@@ -5419,13 +5419,134 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # Increment voice usage AFTER successful transcription
         await increment_voice_usage(db, user["id"], voice_duration)
         
-        # ==================== QARZ TEKSHIRISH ====================
+        # ==================== AVVAL KO'P TRANZAKSIYA BORLIGINI TEKSHIRISH ====================
+        # Agar matnda bir nechta summa bo'lsa, avval parse_multiple_transactions chaqiriladi
+        # Bu "3 million tushdi, 1 million qarzga berdim, 500 ming ijaraga..." kabi xabarlar uchun
+        
         from app.ai_assistant import (
             parse_debt_transaction, save_personal_debt, format_debt_saved_message,
-            get_debt_summary, format_debt_summary_message
+            get_debt_summary, format_debt_summary_message,
+            find_all_amounts_with_context  # Ko'p summa borligini tekshirish uchun
         )
         
-        # Avval qarz ekanligini tekshirish
+        # Ko'p summa bormi tekshirish
+        amounts_found = find_all_amounts_with_context(text)
+        has_multiple_amounts = len(amounts_found) > 1
+        
+        logger.info(f"[VOICE] Summalar soni: {len(amounts_found)}, ko'p summa: {has_multiple_amounts}")
+        
+        # ==================== MULTI-TRANSACTION PARSING (BIRINCHI) ====================
+        # Agar ko'p summa bo'lsa YOKI matnda vergul/va bilan ajratilgan gaplar bo'lsa
+        if has_multiple_amounts or ',' in text or ' va ' in text.lower():
+            logger.info(f"[VOICE] Ko'p tranzaksiya rejimi - parse_multiple_transactions chaqirilmoqda")
+            
+            transactions = await parse_multiple_transactions(text, lang)
+            
+            if transactions and len(transactions) > 0:
+                logger.info(f"[VOICE] {len(transactions)} ta tranzaksiya topildi")
+                
+                # Get budget status
+                from app.ai_assistant import get_budget_status
+                budget_status = await get_budget_status(db, user["id"])
+                
+                if len(transactions) == 1:
+                    # ==================== BITTA TRANZAKSIYA ====================
+                    transaction = transactions[0]
+                    
+                    # Save transaction to database
+                    from app.ai_assistant import format_expense_saved_with_budget
+                    transaction_id = await save_transaction(db, user["id"], transaction)
+                    
+                    # O'RGANISH UCHUN: Context da saqlash
+                    context.user_data["last_transaction"] = {
+                        "original_text": text,
+                        "transaction_id": transaction_id,
+                        "type": transaction["type"],
+                        "category": transaction["category"],
+                        "amount": transaction["amount"],
+                        "description": transaction.get("description", ""),
+                        "ai_source": transaction.get("ai_source", "local"),
+                        "needs_learning": transaction.get("ai_source") == "gemini"
+                    }
+                    
+                    # Format response with budget info
+                    msg = format_expense_saved_with_budget(transaction, budget_status, lang)
+                    
+                    # AI manbasini ko'rsatish
+                    ai_source = transaction.get("ai_source", "local")
+                    if ai_source == "gemini":
+                        msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _Анализ с помощью Gemini AI_"
+                    
+                    # Get updated voice limit info
+                    new_limit_info = await check_voice_limit(db, user["id"])
+                    limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+                    msg += limit_msg
+                    
+                    # Keyboard with correction option
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(
+                                "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                                callback_data="ai_confirm_learn"
+                            ),
+                            InlineKeyboardButton(
+                                "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                                callback_data=f"ai_correct_{transaction_id}"
+                            )
+                        ],
+                        [InlineKeyboardButton(
+                            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                            callback_data="ai_report"
+                        )]
+                    ]
+                    
+                    await processing_msg.edit_text(
+                        msg,
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+                    return
+                else:
+                    # ==================== KO'P TRANZAKSIYALAR ====================
+                    # Save all transactions
+                    transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
+                    
+                    # Format response
+                    msg = format_multiple_transactions_message(transactions, budget_status, lang)
+                    
+                    # Get updated voice limit info
+                    new_limit_info = await check_voice_limit(db, user["id"])
+                    limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+                    msg += limit_msg
+                    
+                    # Keyboard
+                    ids_str = ",".join([str(tid) for tid in transaction_ids])
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(
+                                "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
+                                callback_data="ai_confirm_ok"
+                            ),
+                            InlineKeyboardButton(
+                                "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
+                                callback_data=f"ai_correct_multi_{ids_str}"
+                            )
+                        ],
+                        [InlineKeyboardButton(
+                            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                            callback_data="ai_report"
+                        )]
+                    ]
+                    
+                    await processing_msg.edit_text(
+                        msg,
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+                    return
+        
+        # ==================== QARZ TEKSHIRISH (BITTA SUMMA BO'LGANDA) ====================
+        # Faqat bitta summa bo'lganda qarz tekshiruvi
         debt_info = await parse_debt_transaction(text, lang)
         
         if debt_info:
@@ -5468,9 +5589,8 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             )
             return
         
-        # ==================== MULTI-TRANSACTION PARSING ====================
-        # Bir ovozli xabarda bir nechta tranzaksiyalarni aniqlash
-        
+        # ==================== QOLGAN HOLAT - SUMMA TOPILMADI ====================
+        # Agar yuqoridagi hech biri ishlamagan bo'lsa
         transactions = await parse_multiple_transactions(text, lang)
         
         if not transactions:
@@ -5487,88 +5607,32 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         from app.ai_assistant import get_budget_status
         budget_status = await get_budget_status(db, user["id"])
         
-        if len(transactions) == 1:
-            # ==================== BITTA TRANZAKSIYA ====================
-            transaction = transactions[0]
-            
-            # Save transaction to database
-            from app.ai_assistant import format_expense_saved_with_budget
-            transaction_id = await save_transaction(db, user["id"], transaction)
-            
-            # O'RGANISH UCHUN: Context da saqlash
-            context.user_data["last_transaction"] = {
-                "original_text": text,
-                "transaction_id": transaction_id,
-                "type": transaction["type"],
-                "category": transaction["category"],
-                "amount": transaction["amount"],
-                "description": transaction.get("description", ""),
-                "ai_source": transaction.get("ai_source", "local"),
-                "needs_learning": transaction.get("ai_source") == "gemini"  # Gemini dan kelgan bo'lsa o'rganish kerak
-            }
-            
-            # Format response with budget info
-            msg = format_expense_saved_with_budget(transaction, budget_status, lang)
-            
-            # AI manbasini ko'rsatish
-            ai_source = transaction.get("ai_source", "local")
-            if ai_source == "gemini":
-                msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _Анализ с помощью Gemini AI_"
-            elif ai_source == "learned":
-                msg += "\n\n🧠 _O'rganilgan pattern asosida_" if lang == "uz" else "\n\n🧠 _На основе изученного паттерна_"
-            
-            # Get updated voice limit info
-            new_limit_info = await check_voice_limit(db, user["id"])
-            limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
-            msg += limit_msg
-            
-            # Keyboard with correction option
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                        callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
-                        callback_data=f"ai_correct_{transaction_id}"
-                    )
-                ],
-                [InlineKeyboardButton(
-                    "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                    callback_data="ai_report"
-                )]
-            ]
-        else:
-            # ==================== KO'P TRANZAKSIYALAR ====================
-            # Save all transactions
-            transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
-            
-            # Format response
-            msg = format_multiple_transactions_message(transactions, budget_status, lang)
-            
-            # Get updated voice limit info
-            new_limit_info = await check_voice_limit(db, user["id"])
-            limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
-            msg += limit_msg
-            
-            # Keyboard - show correction options for each transaction
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
-                        callback_data="ai_confirm_ok"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
-                        callback_data=f"ai_correct_multi_{','.join(map(str, transaction_ids))}"
-                    )
-                ],
-                [InlineKeyboardButton(
-                    "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                    callback_data="ai_report"
-                )]
-            ]
+        # Bitta tranzaksiya
+        transaction = transactions[0]
+        from app.ai_assistant import format_expense_saved_with_budget
+        transaction_id = await save_transaction(db, user["id"], transaction)
+        
+        msg = format_expense_saved_with_budget(transaction, budget_status, lang)
+        new_limit_info = await check_voice_limit(db, user["id"])
+        limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+        msg += limit_msg
+        
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                    callback_data="ai_confirm_learn"
+                ),
+                InlineKeyboardButton(
+                    "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                    callback_data=f"ai_correct_{transaction_id}"
+                )
+            ],
+            [InlineKeyboardButton(
+                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                callback_data="ai_report"
+            )]
+        ]
         
         await processing_msg.edit_text(
             msg,
