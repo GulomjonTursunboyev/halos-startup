@@ -6698,54 +6698,50 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )])
         else:
             # ==================== KO'P TRANZAKSIYALAR ====================
-            # Save all transactions
-            transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
-            
-            # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash (bittani tozalash)
-            context.user_data.pop("last_transaction", None)
-            context.user_data["last_multi_transactions"] = {
-                "original_text": text,
-                "transactions": transactions,
-                "transaction_ids": transaction_ids
-            }
-            
-            # Format response (returns tuple with needs_clarification_list)
-            msg, needs_clarification_list = format_multiple_transactions_message(transactions, budget_status, lang)
-            
-            # Keyboard
-            ids_str = ",".join([str(tid) for tid in transaction_ids])
-            keyboard = []
-            
-            # Aniqlashtirish tugmasi - agar kerak bo'lsa
-            if needs_clarification_list:
+            # Faqat eng yaxshi bitta tranzaksiyani ko'rsatish (UX va mpl uchun)
+            best_tx = transactions[0] if transactions else None
+            if best_tx:
+                transaction_ids = await save_multiple_transactions(db, user["id"], [best_tx])
+                context.user_data.pop("last_transaction", None)
+                context.user_data["last_multi_transactions"] = {
+                    "original_text": text,
+                    "transactions": [best_tx],
+                    "transaction_ids": transaction_ids
+                }
+                # Format single transaction as if it was a multi
+                from app.ai_assistant import format_multiple_transactions_message
+                msg, needs_clarification_list = format_multiple_transactions_message([best_tx], budget_status, lang)
+                ids_str = ",".join([str(tid) for tid in transaction_ids])
+                keyboard = []
+                if needs_clarification_list:
+                    keyboard.append([InlineKeyboardButton(
+                        f"🔍 Aniqlashtirish (1 ta)" if lang == "uz" else f"🔍 Уточнить (1)",
+                        callback_data=f"ai_clarify_multi_{ids_str}"
+                    )])
+                keyboard.append([
+                    InlineKeyboardButton(
+                        "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
+                        callback_data="ai_confirm_learn"
+                    ),
+                    InlineKeyboardButton(
+                        "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
+                        callback_data=f"ai_correct_multi_{ids_str}"
+                    )
+                ])
                 keyboard.append([InlineKeyboardButton(
-                    f"🔍 Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"🔍 Уточнить ({len(needs_clarification_list)})",
-                    callback_data=f"ai_clarify_multi_{ids_str}"
+                    "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                    callback_data="ai_report"
                 )])
-            
-            # To'g'ri/Tuzatish tugmalari
-            keyboard.append([
-                InlineKeyboardButton(
-                    "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
-                    callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
-                ),
-                InlineKeyboardButton(
-                    "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
-                    callback_data=f"ai_correct_multi_{ids_str}"
+                await update.message.reply_text(
+                    msg,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
                 )
-            ])
-            
-            # Hisobot tugmasi
-            keyboard.append([InlineKeyboardButton(
-                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                callback_data="ai_report"
-            )])
-        
-        await update.message.reply_text(
-            msg,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+            else:
+                await update.message.reply_text(
+                    "❌ AI tranzaksiya aniqlay olmadi.",
+                    parse_mode="Markdown"
+                )
         
     except Exception as e:
         print(f"AI text handler error: {e}")
