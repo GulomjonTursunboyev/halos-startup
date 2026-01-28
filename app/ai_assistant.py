@@ -939,15 +939,55 @@ async def confirm_and_learn(text: str, confirmed_result: Dict) -> bool:
     return success
 
 
+async def learn_from_correction(text: str, wrong_result: Dict, correct_result: Dict) -> bool:
+    """
+    XATOLARDAN O'RGANISH - ENG QIMMATLI!
+    
+    Foydalanuvchi tuzatganda chaqiriladi
+    AI xatosidan xulosa chiqarib, keyingi safar to'g'ri qiladi
+    """
+    from app.self_learning_ai import get_self_learning_ai
+    
+    self_ai = get_self_learning_ai()
+    success = self_ai.learn_from_correction(text, wrong_result, correct_result)
+    
+    if success:
+        logger.info(f"[AI] XATADAN O'RGANILDI: {text[:30]}... | {wrong_result.get('category')} -> {correct_result.get('category')}")
+    
+    return success
+
+
+async def learn_from_multi_transaction(text: str, transactions: List[Dict]) -> bool:
+    """
+    Ko'p tranzaksiyali xabarlardan o'rganish
+    """
+    from app.self_learning_ai import get_self_learning_ai
+    
+    self_ai = get_self_learning_ai()
+    return self_ai.learn_from_multi_transaction(text, transactions)
+
+
+def check_learned_patterns(text: str) -> Optional[Dict]:
+    """
+    Avval o'rganilgan patternlarni tekshirish
+    Gemini ga murojaat qilishdan oldin chaqiriladi
+    """
+    from app.self_learning_ai import get_self_learning_ai
+    
+    self_ai = get_self_learning_ai()
+    return self_ai.check_learned_patterns_first(text)
+
+
 def get_ai_stats() -> Dict:
-    """AI statistikasini olish"""
+    """AI statistikasini olish - KENGAYTIRILGAN"""
     from app.self_learning_ai import get_self_learning_ai
     return get_self_learning_ai().get_stats()
 
 
-# ==================== ADVANCED MULTI-TRANSACTION PARSING ENGINE v3.0 ====================
+# ==================== ADVANCED MULTI-TRANSACTION PARSING ENGINE v4.0 ====================
 """
 KUCHLI ALGORITM - Bir xabarda bir nechta daromad va xarajatlarni aniqlash
+YANGI: O'rganilgan patternlarni birinchi tekshirish!
 
 Misol: "bugun yuz ming ishlab topdim on minga non oldim yigirma ming yolkira qildim 5 minga suv ichdim"
 

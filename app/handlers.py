@@ -5511,6 +5511,13 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # Save all transactions
                     transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
                     
+                    # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash
+                    context.user_data["last_multi_transactions"] = {
+                        "original_text": text,
+                        "transactions": transactions,
+                        "transaction_ids": transaction_ids
+                    }
+                    
                     # Format response
                     msg = format_multiple_transactions_message(transactions, budget_status, lang)
                     
@@ -5525,7 +5532,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         [
                             InlineKeyboardButton(
                                 "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
-                                callback_data="ai_confirm_ok"
+                                callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
                             ),
                             InlineKeyboardButton(
                                 "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
@@ -5956,15 +5963,18 @@ async def ai_confirm_ok_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """User confirmed transaction is correct - WITH learning from Gemini"""
+    """User confirmed transaction is correct - WITH learning from AI response"""
     query = update.callback_query
     lang = context.user_data.get("lang", "uz")
     
     # O'rganish uchun saqlangan ma'lumotlarni olish
     last_tx = context.user_data.get("last_transaction")
+    last_multi_tx = context.user_data.get("last_multi_transactions")  # Ko'p tranzaksiyalar
     
+    learned = False
+    
+    # Bitta tranzaksiyadan o'rganish
     if last_tx and last_tx.get("needs_learning"):
-        # Gemini dan kelgan natijadan o'rganish
         from app.ai_assistant import confirm_and_learn
         
         original_text = last_tx.get("original_text", "")
@@ -5975,21 +5985,29 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
             "description": last_tx.get("description")
         }
         
-        # O'rganish
-        success = await confirm_and_learn(original_text, confirmed_result)
+        learned = await confirm_and_learn(original_text, confirmed_result)
+    
+    # Ko'p tranzaksiyalardan o'rganish
+    if last_multi_tx:
+        from app.ai_assistant import learn_from_multi_transaction
         
-        if success:
-            await query.answer(
-                "✅ O'rganildi! Keyingi safar tezroq ishlayman" if lang == "uz" else "✅ Изучено! В следующий раз будет быстрее",
-                show_alert=True
-            )
-        else:
-            await query.answer("✅")
+        original_text = last_multi_tx.get("original_text", "")
+        transactions = last_multi_tx.get("transactions", [])
+        
+        if transactions:
+            learned = await learn_from_multi_transaction(original_text, transactions)
+    
+    if learned:
+        await query.answer(
+            "✅ AI o'rgandi! Keyingi safar aqlliroq bo'ladi" if lang == "uz" else "✅ AI обучился! В следующий раз будет умнее",
+            show_alert=True
+        )
     else:
         await query.answer("✅")
     
     # Context ni tozalash
     context.user_data.pop("last_transaction", None)
+    context.user_data.pop("last_multi_transactions", None)
     
     # Remove buttons
     await query.edit_message_reply_markup(reply_markup=None)
@@ -6212,7 +6230,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Swap transaction type (income <-> expense) and teach AI"""
+    """Swap transaction type (income <-> expense) and teach AI - XATOLARDAN O'RGANISH"""
     query = update.callback_query
     await query.answer()
     
@@ -6228,7 +6246,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except:
         return
     
-    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, learn_from_correction
     
     db = await get_database()
     user = await db.get_user(telegram_id)
@@ -6259,27 +6277,39 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
             new_category = "kiyim"
         elif any(w in desc_lower for w in ['dori', 'apteka']):
             new_category = "sog'liq"
+        elif any(w in desc_lower for w in ['ijara', 'arenda', 'kvartira']):
+            new_category = "uy_joy"
+        elif any(w in desc_lower for w in ['qarz', 'nasiya']):
+            new_category = "qarz_berdim"
         new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
     else:
         new_category = "ish_haqi"  # Default income category
+        desc_lower = description.lower()
+        if any(w in desc_lower for w in ['sotdim', 'savdo', 'foyda']):
+            new_category = "biznes"
+        elif any(w in desc_lower for w in ['ijara', 'arenda']):
+            new_category = "ijara_daromad"
+        elif any(w in desc_lower for w in ['qarz', 'qaytardi']):
+            new_category = "qarz_qaytarish"
         new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "💼 Ish haqi")
     
-    # ==================== AI GA O'RGATISH ====================
-    # Foydalanuvchi tuzatishini database ga saqlash
-    pattern = description.lower().strip()
-    if len(pattern) > 3:  # Faqat mazmunli patternlarni saqlash
-        try:
-            await db.save_ai_correction(
-                pattern=pattern,
-                wrong_type=old_type,
-                correct_type=new_type,
-                wrong_category=old_category,
-                correct_category=new_category,
-                context_keywords=original_text[:100] if original_text else None
-            )
-            print(f"[AI-LEARNING] 🧠 Yangi pattern o'rgatildi: '{pattern}' -> {new_type}/{new_category}")
-        except Exception as e:
-            print(f"[AI-LEARNING] Error saving correction: {e}")
+    # ==================== XATOLARDAN O'RGANISH (KUCHLI!) ====================
+    if original_text and (old_type != new_type or old_category != new_category):
+        wrong_result = {
+            "type": old_type,
+            "category": old_category,
+            "amount": transaction["amount"],
+            "description": description
+        }
+        correct_result = {
+            "type": new_type,
+            "category": new_category,
+            "amount": transaction["amount"],
+            "description": description
+        }
+        # Bu juda muhim o'rganish - type o'zgarishi!
+        await learn_from_correction(original_text, wrong_result, correct_result)
+        print(f"[AI-LEARNING] 🧠 TIP O'ZGARISHIDAN O'RGANILDI: {old_type}/{old_category} -> {new_type}/{new_category}")
     
     # ==================== TRANZAKSIYANI YANGILASH ====================
     try:
@@ -6308,25 +6338,27 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     if lang == "uz":
         msg = (
-            "✅ *Tuzatildi va AI o'rgandi!*\n"
+            "✅ *Tuzatildi va AI xatadan xulosa chiqardi!*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"🔄 Turi o'zgartirildi:\n"
             f"├ {'📥 Daromad' if old_type == 'income' else '📤 Xarajat'} → "
             f"{'📥 Daromad' if new_type == 'income' else '📤 Xarajat'}\n"
             f"├ Kategoriya: *{new_category_name}*\n"
             f"└ Summa: *{transaction['amount']:,}* so'm\n\n"
-            "🧠 _AI bu xatoni eslab qoldi va kelajakda takrorlamaydi!_"
+            "🧠 _AI bu xatoni chuqur tahlil qildi va eslab qoldi!_\n"
+            "_Keyingi safar xuddi shunday xabarni to'g'ri tahlil qiladi._"
         )
     else:
         msg = (
-            "✅ *Исправлено и AI обучился!*\n"
+            "✅ *Исправлено! AI сделал выводы!*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"🔄 Тип изменён:\n"
             f"├ {'📥 Доход' if old_type == 'income' else '📤 Расход'} → "
             f"{'📥 Доход' if new_type == 'income' else '📤 Расход'}\n"
             f"├ Категория: *{new_category_name}*\n"
             f"└ Сумма: *{transaction['amount']:,}* сум\n\n"
-            "🧠 _AI запомнил эту ошибку и не повторит её!_"
+            "🧠 _AI глубоко проанализировал эту ошибку!_\n"
+            "_В следующий раз подобное сообщение будет обработано правильно._"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -6578,7 +6610,7 @@ async def ai_new_category_callback(update: Update, context: ContextTypes.DEFAULT
 
 
 async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Tanlangan kategoriyani o'rnatish va AI'ga o'rgatish"""
+    """Tanlangan kategoriyani o'rnatish va AI'ga o'rgatish - XATOLARDAN O'RGANISH"""
     query = update.callback_query
     await query.answer()
     
@@ -6594,7 +6626,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     except:
         return
     
-    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, confirm_and_learn
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, confirm_and_learn, learn_from_correction
     
     db = await get_database()
     user = await db.get_user(telegram_id)
@@ -6608,6 +6640,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         return
     
     tx_type = transaction["type"]
+    old_category = transaction.get("category_key") or transaction.get("category", "boshqa")
     
     # Kategoriya nomini olish
     if tx_type == "income":
@@ -6636,9 +6669,27 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
         return
     
-    # AI'ga o'rgatish
+    # AI'ga o'rgatish - XATOLARDAN O'RGANISH
     original_text = transaction.get("description", "") or context.user_data.get("ai_correction_original", "")
-    if original_text:
+    
+    if original_text and old_category != new_category:
+        # Kategoriya o'zgargan - XATADAN O'RGANISH!
+        wrong_result = {
+            "type": tx_type,
+            "category": old_category,
+            "amount": transaction["amount"],
+            "description": transaction.get("description", "")
+        }
+        correct_result = {
+            "type": tx_type,
+            "category": new_category,
+            "amount": transaction["amount"],
+            "description": transaction.get("description", "")
+        }
+        # Xatadan o'rganish
+        await learn_from_correction(original_text, wrong_result, correct_result)
+    elif original_text:
+        # Oddiy tasdiqlash
         await confirm_and_learn(original_text, {
             "type": tx_type,
             "category": new_category,
@@ -6652,7 +6703,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📂 Yangi kategoriya: *{new_category_name}*\n"
             f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
-            "🧠 _AI bu o'zgarishni o'rgandi!_"
+            "🧠 _AI bu xatadan xulosa chiqardi va o'rgandi!_"
         )
     else:
         msg = (
@@ -6660,7 +6711,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📂 Новая категория: *{new_category_name}*\n"
             f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
-            "🧠 _AI запомнил это изменение!_"
+            "🧠 _AI сделал выводы из этой ошибки и запомнил!_"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
