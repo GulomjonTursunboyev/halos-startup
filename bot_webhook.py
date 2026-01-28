@@ -59,6 +59,7 @@ from app.handlers import (
     ai_budget_callback,
     # AI Correction handlers
     ai_confirm_ok_callback,
+    ai_confirm_learn_callback,
     ai_correct_callback,
     ai_correct_multi_callback,
     ai_swap_type_callback,
@@ -288,6 +289,9 @@ def setup_handlers(app: Application) -> None:
     # AI Correction handlers
     app.add_handler(
         CallbackQueryHandler(ai_confirm_ok_callback, pattern="^ai_confirm_ok$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_confirm_learn_callback, pattern="^ai_confirm_learn$")
     )
     app.add_handler(
         CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_")

@@ -5481,8 +5481,27 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             from app.ai_assistant import format_expense_saved_with_budget
             transaction_id = await save_transaction(db, user["id"], transaction)
             
+            # O'RGANISH UCHUN: Context da saqlash
+            context.user_data["last_transaction"] = {
+                "original_text": text,
+                "transaction_id": transaction_id,
+                "type": transaction["type"],
+                "category": transaction["category"],
+                "amount": transaction["amount"],
+                "description": transaction.get("description", ""),
+                "ai_source": transaction.get("ai_source", "local"),
+                "needs_learning": transaction.get("ai_source") == "gemini"  # Gemini dan kelgan bo'lsa o'rganish kerak
+            }
+            
             # Format response with budget info
             msg = format_expense_saved_with_budget(transaction, budget_status, lang)
+            
+            # AI manbasini ko'rsatish
+            ai_source = transaction.get("ai_source", "local")
+            if ai_source == "gemini":
+                msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _Анализ с помощью Gemini AI_"
+            elif ai_source == "learned":
+                msg += "\n\n🧠 _O'rganilgan pattern asosida_" if lang == "uz" else "\n\n🧠 _На основе изученного паттерна_"
             
             # Get updated voice limit info
             new_limit_info = await check_voice_limit(db, user["id"])
@@ -5494,7 +5513,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 [
                     InlineKeyboardButton(
                         "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                        callback_data="ai_confirm_ok"
+                        callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
                     ),
                     InlineKeyboardButton(
                         "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
@@ -5721,11 +5740,51 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def ai_confirm_ok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """User confirmed transaction is correct"""
+    """User confirmed transaction is correct - WITHOUT learning"""
     query = update.callback_query
     await query.answer("✅" if context.user_data.get("lang") == "uz" else "✅")
     
     # Just remove the buttons, keep the message
+    await query.edit_message_reply_markup(reply_markup=None)
+
+
+async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """User confirmed transaction is correct - WITH learning from Gemini"""
+    query = update.callback_query
+    lang = context.user_data.get("lang", "uz")
+    
+    # O'rganish uchun saqlangan ma'lumotlarni olish
+    last_tx = context.user_data.get("last_transaction")
+    
+    if last_tx and last_tx.get("needs_learning"):
+        # Gemini dan kelgan natijadan o'rganish
+        from app.ai_assistant import confirm_and_learn
+        
+        original_text = last_tx.get("original_text", "")
+        confirmed_result = {
+            "type": last_tx.get("type"),
+            "category": last_tx.get("category"),
+            "amount": last_tx.get("amount"),
+            "description": last_tx.get("description")
+        }
+        
+        # O'rganish
+        success = await confirm_and_learn(original_text, confirmed_result)
+        
+        if success:
+            await query.answer(
+                "✅ O'rganildi! Keyingi safar tezroq ishlayman" if lang == "uz" else "✅ Изучено! В следующий раз будет быстрее",
+                show_alert=True
+            )
+        else:
+            await query.answer("✅")
+    else:
+        await query.answer("✅")
+    
+    # Context ni tozalash
+    context.user_data.pop("last_transaction", None)
+    
+    # Remove buttons
     await query.edit_message_reply_markup(reply_markup=None)
 
 

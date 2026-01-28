@@ -1,0 +1,40 @@
+{
+  "patterns": [
+    {
+      "id": 1,
+      "main_keyword": "taksi",
+      "keywords": [
+        "taksiga",
+        "berdim"
+      ],
+      "type": "expense",
+      "category": "transport",
+      "description": "taksi",
+      "examples": [
+        "taksiga 15 ming berdim"
+      ],
+      "learned_at": "2026-01-28T09:23:21.968537",
+      "usage_count": 1
+    }
+  ],
+  "keyword_scores": {
+    "taksiga": {
+      "category": "transport",
+      "type": "expense",
+      "weight": 5,
+      "count": 1
+    },
+    "berdim": {
+      "category": "transport",
+      "type": "expense",
+      "weight": 5,
+      "count": 1
+    }
+  },
+  "category_examples": {},
+  "stats": {
+    "total_learned": 1,
+    "gemini_requests": 0,
+    "local_success": 0
+  }
+}

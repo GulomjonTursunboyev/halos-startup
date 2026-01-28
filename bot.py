@@ -72,6 +72,7 @@ from app.handlers import (
     ai_real_balance_callback,
     # AI Correction handlers
     ai_confirm_ok_callback,
+    ai_confirm_learn_callback,  # O'rganish bilan tasdiqlash
     ai_correct_callback,
     ai_correct_multi_callback,
     ai_swap_type_callback,
@@ -559,6 +560,9 @@ def main() -> None:
     # AI Correction handlers
     application.add_handler(
         CallbackQueryHandler(ai_confirm_ok_callback, pattern="^ai_confirm_ok$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_confirm_learn_callback, pattern="^ai_confirm_learn$")
     )
     application.add_handler(
         CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_")

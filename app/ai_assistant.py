@@ -820,20 +820,59 @@ def extract_description(text: str, amount: Optional[int]) -> str:
 
 async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
     """
+    SELF-LEARNING AI TIZIMI
+    =======================
     Matndan to'liq tranzaksiya ma'lumotlarini ajratib olish
     
-    1. Avval Gemini AI bilan tahlil qilishga harakat qiladi
-    2. Agar Gemini ishlamasa, oddiy algoritm ishlatiladi
+    ISHLASH TARTIBI:
+    1. Avval Local AI (o'rganilgan patternlar) bilan tahlil
+    2. Agar ishonch past bo'lsa → Gemini'dan so'rash
+    3. Foydalanuvchi tasdiqlasa → Pattern saqlanadi
+    4. Keyingi safar tezroq va aniqroq ishlaydi
     """
+    from app.self_learning_ai import get_self_learning_ai
     
-    # ========== GEMINI AI BILAN TAHLIL ==========
+    # Self-Learning AI instance
+    self_ai = get_self_learning_ai()
+    
+    # ========== 1. LOCAL AI TAHLILI (O'rganilgan patternlar) ==========
+    local_result = self_ai.analyze(text)
+    
+    logger.info(f"[AI] Local tahlil: {local_result['category']} (confidence: {local_result['confidence']}%)")
+    
+    # Agar ishonch yuqori bo'lsa - to'g'ridan-to'g'ri qaytarish
+    if local_result["confidence"] >= 70 and not local_result.get("needs_confirmation"):
+        # Kategoriya nomini olish
+        if local_result["type"] == "income":
+            category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(local_result["category"], "📦 Boshqa")
+        else:
+            category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(local_result["category"], "📦 Boshqa")
+        
+        return {
+            "type": local_result["type"],
+            "category": local_result["category"],
+            "category_name": category_name,
+            "amount": local_result["amount"],
+            "description": local_result["description"],
+            "original_text": text,
+            "timestamp": datetime.now().isoformat(),
+            "ai_source": local_result["source"],
+            "confidence": local_result["confidence"],
+            "needs_confirmation": False
+        }
+    
+    # ========== 2. GEMINI AI YORDAMI (Ishonch past bo'lsa) ==========
     if GEMINI_ENABLED and is_gemini_available():
         try:
+            logger.info("[AI] Ishonch past, Gemini'dan so'ralmoqda...")
+            self_ai.increment_gemini_requests()
+            
             gemini_result = await analyze_with_gemini(text, lang)
+            
             if gemini_result:
                 transaction_type = gemini_result.get("type", "expense")
                 category = gemini_result.get("category", "boshqa")
-                amount = gemini_result.get("amount")
+                amount = gemini_result.get("amount") or local_result["amount"]
                 description = gemini_result.get("description", text[:50])
                 
                 # Kategoriya nomini olish
@@ -842,7 +881,7 @@ async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
                 else:
                     category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
                 
-                logger.info(f"[AI] Gemini tahlili muvaffaqiyatli: {transaction_type} - {category} - {amount}")
+                logger.info(f"[AI] Gemini tahlili: {transaction_type} - {category}")
                 
                 return {
                     "type": transaction_type,
@@ -852,43 +891,54 @@ async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
                     "description": description,
                     "original_text": text,
                     "timestamp": datetime.now().isoformat(),
-                    "ai_source": "gemini"
+                    "ai_source": "gemini",
+                    "confidence": 85,
+                    "needs_confirmation": True  # Foydalanuvchi tasdiqlashi kerak
                 }
         except Exception as e:
-            logger.warning(f"[AI] Gemini xatosi, oddiy algoritmga o'tilmoqda: {e}")
+            logger.warning(f"[AI] Gemini xatosi: {e}")
     
-    # ========== ODDIY ALGORITM (FALLBACK) ==========
-    transaction_type = detect_transaction_type(text)
-    category = detect_category(text, transaction_type)
-    amount = extract_amount(text)
-    description = extract_description(text, amount)
-    
-    # Gemini bilan kategoriyani yangilash (tez so'rov)
-    if GEMINI_ENABLED and is_gemini_available():
-        try:
-            smart_cat = await smart_categorize(text, transaction_type)
-            if smart_cat:
-                category = smart_cat
-                logger.info(f"[AI] Gemini kategoriya: {category}")
-        except:
-            pass
-    
-    # Kategoriya nomini olish
-    if transaction_type == "income":
-        category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+    # ========== 3. FALLBACK - Local natija (tasdiqlash bilan) ==========
+    if local_result["type"] == "income":
+        category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(local_result["category"], "📦 Boshqa")
     else:
-        category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+        category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(local_result["category"], "📦 Boshqa")
     
     return {
-        "type": transaction_type,
-        "category": category,
+        "type": local_result["type"],
+        "category": local_result["category"],
         "category_name": category_name,
-        "amount": amount,
-        "description": description,
+        "amount": local_result["amount"],
+        "description": local_result["description"],
         "original_text": text,
         "timestamp": datetime.now().isoformat(),
-        "ai_source": "local"
+        "ai_source": "local",
+        "confidence": local_result["confidence"],
+        "needs_confirmation": True  # Past ishonch - tasdiqlash kerak
     }
+
+
+async def confirm_and_learn(text: str, confirmed_result: Dict) -> bool:
+    """
+    Foydalanuvchi tasdiqlagan natijadan o'rganish
+    
+    Bu funksiya callback handler'da chaqiriladi
+    """
+    from app.self_learning_ai import get_self_learning_ai
+    
+    self_ai = get_self_learning_ai()
+    success = self_ai.learn_from_confirmation(text, confirmed_result)
+    
+    if success:
+        logger.info(f"[AI] Yangi pattern o'rganildi: {text[:30]}... -> {confirmed_result['category']}")
+    
+    return success
+
+
+def get_ai_stats() -> Dict:
+    """AI statistikasini olish"""
+    from app.self_learning_ai import get_self_learning_ai
+    return get_self_learning_ai().get_stats()
 
 
 # ==================== ADVANCED MULTI-TRANSACTION PARSING ENGINE v3.0 ====================
