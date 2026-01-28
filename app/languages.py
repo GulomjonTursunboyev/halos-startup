@@ -11,28 +11,20 @@ MESSAGES = {
     # ==================== WELCOME & REGISTRATION ====================
     "welcome": {
         "uz": (
-            "✨ *Salom!*\n\n"
-            "Men HALOS — sizning moliyaviy xaloskorigingizman.\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📍 *Bitta savol bor:*\n\n"
-            "_Sizning qarzingiz qachon tugashini bilasizmi?_\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Men sizga aniq javob beraman:\n"
-            "📅 *Qaysi oyda* qarzdan xalos bo'lasiz\n"
-            "💎 *Qancha* shaxsiy kapital qurasiz\n\n"
-            "Tayyor bo'lsangiz, *ro'yxatdan o'ting* 👇"
+            "Assalomu alaykum! Siz HALOS botidasiz.\n\n"
+            "HALOS kredit to'lovlarini hisoblash va rejalashga yordam beradi.\n"
+            "Shuningdek, kundalik xarajatlar hamda kirim-chiqimlarni yozib borish imkonini beradi.\n\n"
+            "Botdan foydalanish uchun qisqa ro'yxatdan o'tish talab qilinadi.\n"
+            "Telefon raqamingiz hisobingizni saqlash va keyinchalik davom ettirish uchun ishlatiladi.\n\n"
+            "Davom etish uchun telefon raqamingizni ulashing."
         ),
         "ru": (
-            "✨ *Привет!*\n\n"
-            "Я HALOS — ваш финансовый спаситель.\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📍 *Один вопрос:*\n\n"
-            "_Вы знаете, когда закончится ваш долг?_\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Я дам вам точный ответ:\n"
-            "📅 *В каком месяце* вы освободитесь от долга\n"
-            "💎 *Сколько* личного капитала создадите\n\n"
-            "Если готовы, *зарегистрируйтесь* 👇"
+            "Здравствуйте! Вы в боте HALOS.\n\n"
+            "HALOS помогает рассчитать и спланировать кредитные платежи.\n"
+            "А также вести учёт ежедневных расходов и доходов.\n\n"
+            "Для использования бота требуется короткая регистрация.\n"
+            "Ваш номер телефона используется для сохранения аккаунта и продолжения в будущем.\n\n"
+            "Для продолжения поделитесь номером телефона."
         )
     },
     
