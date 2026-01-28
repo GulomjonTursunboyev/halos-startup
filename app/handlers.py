@@ -6156,8 +6156,8 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
     
     learned = False
     
-    # Bitta tranzaksiyadan o'rganish
-    if last_tx and last_tx.get("needs_learning"):
+    # Bitta tranzaksiyadan o'rganish - har doim o'rganish
+    if last_tx:
         from app.ai_assistant import confirm_and_learn
         
         original_text = last_tx.get("original_text", "")
@@ -6168,7 +6168,9 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
             "description": last_tx.get("description")
         }
         
-        learned = await confirm_and_learn(original_text, confirmed_result)
+        # Original text bo'lsa o'rganish
+        if original_text and confirmed_result.get("type") and confirmed_result.get("category"):
+            learned = await confirm_and_learn(original_text, confirmed_result)
     
     # Ko'p tranzaksiyalardan o'rganish
     if last_multi_tx:
@@ -6177,13 +6179,13 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
         original_text = last_multi_tx.get("original_text", "")
         transactions = last_multi_tx.get("transactions", [])
         
-        if transactions:
+        if transactions and original_text:
             learned = await learn_from_multi_transaction(original_text, transactions)
     
     if learned:
         await query.answer(
-            "✅ AI o'rgandi! Keyingi safar aqlliroq bo'ladi" if lang == "uz" else "✅ AI обучился! В следующий раз будет умнее",
-            show_alert=True
+            "✅ AI o'rgandi!" if lang == "uz" else "✅ AI обучился!",
+            show_alert=False
         )
     else:
         await query.answer("✅")
