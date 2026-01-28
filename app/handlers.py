@@ -5298,17 +5298,27 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     logger.info(f"[VOICE] User {telegram_id} - Tier: {voice_tier}, Max Duration: {max_duration}s, Bonus: {bonus_voice}")
     
-    # Check voice duration limit (based on tier)
+    # ==================== ADMIN UCHUN CHEKSIZ ====================
+    from app.config import ADMIN_IDS
+    is_admin = telegram_id in ADMIN_IDS
+    
+    # Check voice duration limit (based on tier) - KOTIB.AI GA YUBORISHDAN OLDIN!
     voice_duration = voice.duration or 0
-    if voice_duration > max_duration:
+    
+    # Admin uchun limitlarni tekshirmaslik
+    if not is_admin and voice_duration > max_duration:
         await update.message.reply_text(
             format_voice_duration_error(voice_duration, voice_tier, lang),
             parse_mode="Markdown"
         )
         return
     
-    # Check monthly voice limit (based on tier)
-    limit_info = await check_voice_limit(db, user["id"], voice_tier=voice_tier, bonus_voice=bonus_voice)
+    # Check monthly voice limit (based on tier) - Admin uchun skip
+    if not is_admin:
+        limit_info = await check_voice_limit(db, user["id"], voice_tier=voice_tier, bonus_voice=bonus_voice)
+    else:
+        # Admin uchun cheksiz
+        limit_info = {"allowed": True, "remaining": 999, "limit": 999, "used": 0}
     
     if not limit_info["allowed"]:
         # Limit tugagan - tier ga qarab upgrade opsiyalarini ko'rsatish
@@ -5344,46 +5354,33 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     try:
-        # Send beautiful processing message
+        # ==================== BOSQICH 1: Ovoz qabul qilindi ====================
         tier_name = VOICE_TIERS[voice_tier]["name_uz"] if lang == "uz" else VOICE_TIERS[voice_tier]["name_ru"]
         
+        # Admin uchun limit ko'rsatmaslik
+        if is_admin:
+            limit_text = ""
+        elif voice_tier == "unlimited":
+            limit_text = f"\n\n🎤 _{tier_name} (cheksiz)_" if lang == "uz" else f"\n\n🎤 _{tier_name} (безлимит)_"
+        else:
+            limit_text = f"\n\n🎤 _{limit_info['remaining']}/{limit_info['limit']} ta qoldi_" if lang == "uz" else f"\n\n🎤 _{limit_info['remaining']}/{limit_info['limit']} осталось_"
+        
         if lang == "uz":
-            if voice_tier == "unlimited":
-                limit_text = f"🎤 _Voice Tier: {tier_name} (cheksiz)_"
-            else:
-                limit_text = f"📊 _Qolgan: {limit_info['remaining']}/{limit_info['limit']} ta | Tier: {tier_name}_"
-            
-            processing_text = (
-                "🤖 *AI Yordamchi*\n\n"
-                "🎙 *Ovozingiz qabul qilindi!*\n\n"
-                "⏳ Ishlov berish jarayoni:\n"
-                "├ 🔊 Ovoz yuklanmoqda...\n"
-                "├ 🧠 Sun'iy intellekt tahlil qilmoqda...\n"
-                "└ 💾 Tranzaksiya saqlanmoqda...\n\n"
-                f"{limit_text}"
+            step1_text = (
+                "🎙 *Ovoz qabul qilindi*\n\n"
+                f"⏱ Davomiyligi: {voice_duration} sekund\n\n"
+                "⏳ _Yuklanmoqda..._"
             )
         else:
-            if voice_tier == "unlimited":
-                limit_text = f"🎤 _Voice Tier: {tier_name} (безлимит)_"
-            else:
-                limit_text = f"📊 _Осталось: {limit_info['remaining']}/{limit_info['limit']} | Tier: {tier_name}_"
-            
-            processing_text = (
-                "🤖 *AI Помощник*\n\n"
-                "🎙 *Голос получен!*\n\n"
-                "⏳ Процесс обработки:\n"
-                "├ 🔊 Загрузка голоса...\n"
-                "├ 🧠 Анализ ИИ...\n"
-                "└ 💾 Сохранение транзакции...\n\n"
-                f"{limit_text}"
+            step1_text = (
+                "🎙 *Голос получен*\n\n"
+                f"⏱ Длительность: {voice_duration} сек\n\n"
+                "⏳ _Загрузка..._"
             )
         
-        processing_msg = await update.message.reply_text(
-            processing_text,
-            parse_mode="Markdown"
-        )
+        processing_msg = await update.message.reply_text(step1_text, parse_mode="Markdown")
         
-        # Download voice file
+        # ==================== BOSQICH 2: Faylni yuklash ====================
         voice_file = await voice.get_file()
         logger.info(f"[VOICE] Got file: {voice_file.file_path}")
         
@@ -5394,7 +5391,23 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await voice_file.download_to_drive(tmp_path)
         logger.info(f"[VOICE] Downloaded to: {tmp_path}")
         
-        # Transcribe voice
+        # Update message - AI tahlil qilmoqda
+        if lang == "uz":
+            step2_text = (
+                "🎙 *Ovoz qabul qilindi*\n\n"
+                f"⏱ Davomiyligi: {voice_duration} sekund\n\n"
+                "🤖 _AI tahlil qilmoqda..._"
+            )
+        else:
+            step2_text = (
+                "🎙 *Голос получен*\n\n"
+                f"⏱ Длительность: {voice_duration} сек\n\n"
+                "🤖 _AI анализирует..._"
+            )
+        
+        await processing_msg.edit_text(step2_text, parse_mode="Markdown")
+        
+        # ==================== BOSQICH 3: Transcribe voice ====================
         logger.info(f"[VOICE] Calling transcribe_voice...")
         text = await transcribe_voice(tmp_path)
         logger.info(f"[VOICE] Transcribed text: '{text}'")
@@ -5416,8 +5429,12 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         logger.info(f"[VOICE] Successfully transcribed: '{text}'")
         
-        # Increment voice usage AFTER successful transcription
-        await increment_voice_usage(db, user["id"], voice_duration)
+        # Matnni qisqartirish (40 belgidan ko'p bo'lsa)
+        short_text = text[:37] + "..." if len(text) > 40 else text
+        
+        # Increment voice usage AFTER successful transcription (Admin uchun skip)
+        if not is_admin:
+            await increment_voice_usage(db, user["id"], voice_duration)
         
         # ==================== AVVAL KO'P TRANZAKSIYA BORLIGINI TEKSHIRISH ====================
         # Agar matnda bir nechta summa bo'lsa, avval parse_multiple_transactions chaqiriladi
@@ -5477,10 +5494,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     if ai_source == "gemini":
                         msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _Анализ с помощью Gemini AI_"
                     
-                    # Get updated voice limit info
-                    new_limit_info = await check_voice_limit(db, user["id"])
-                    limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
-                    msg += limit_msg
+                    # Get updated voice limit info (Admin uchun ko'rsatmaslik)
+                    if not is_admin:
+                        new_limit_info = await check_voice_limit(db, user["id"])
+                        limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+                        msg += limit_msg
                     
                     # Keyboard with correction option
                     keyboard = [
@@ -5521,10 +5539,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # Format response
                     msg = format_multiple_transactions_message(transactions, budget_status, lang)
                     
-                    # Get updated voice limit info
-                    new_limit_info = await check_voice_limit(db, user["id"])
-                    limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
-                    msg += limit_msg
+                    # Get updated voice limit info (Admin uchun ko'rsatmaslik)
+                    if not is_admin:
+                        new_limit_info = await check_voice_limit(db, user["id"])
+                        limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+                        msg += limit_msg
                     
                     # Keyboard
                     ids_str = ",".join([str(tid) for tid in transaction_ids])
@@ -5567,10 +5586,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             msg = format_debt_saved_message(debt_info, lang)
             msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
             
-            # Get updated voice limit info
-            new_limit_info = await check_voice_limit(db, user["id"])
-            limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
-            msg += limit_msg
+            # Get updated voice limit info (Admin uchun ko'rsatmaslik)
+            if not is_admin:
+                new_limit_info = await check_voice_limit(db, user["id"])
+                limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+                msg += limit_msg
             
             keyboard = [
                 [
@@ -5620,9 +5640,12 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         transaction_id = await save_transaction(db, user["id"], transaction)
         
         msg = format_expense_saved_with_budget(transaction, budget_status, lang)
-        new_limit_info = await check_voice_limit(db, user["id"])
-        limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
-        msg += limit_msg
+        
+        # Admin uchun limit ko'rsatmaslik
+        if not is_admin:
+            new_limit_info = await check_voice_limit(db, user["id"])
+            limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
+            msg += limit_msg
         
         keyboard = [
             [
