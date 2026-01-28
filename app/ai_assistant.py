@@ -267,11 +267,17 @@ async def get_kotib_balance() -> Optional[Dict]:
     
     Returns:
         Dict with balance info or None if error
+        
+    API Response format:
+    {
+        "balance": "8685",
+        "balance_as_duration": "~9m 39s",
+        "balance_as_translation": "~45,770 chars"
+    }
     """
     try:
-        # Kotib.ai balance endpoint (agar mavjud bo'lsa)
-        # Hozircha taxminiy balans - keyinchalik real API bilan almashtiriladi
-        balance_url = "https://developer.kotib.ai/api/v1/balance"
+        # Kotib.ai balance endpoint - GET /api/v1/get-balance
+        balance_url = "https://developer.kotib.ai/api/v1/get-balance"
         
         async with aiohttp.ClientSession() as session:
             headers = {'Authorization': f'Bearer {KOTIB_API_KEY}'}
@@ -282,21 +288,27 @@ async def get_kotib_balance() -> Optional[Dict]:
                         result = await response.json()
                         logger.info(f"[Kotib.ai Balance] Response: {result}")
                         
-                        # API formatiga qarab
+                        # API response: balance, balance_as_duration, balance_as_translation
                         if "balance" in result:
+                            # Balance string ko'rinishda keladi, int ga aylantirish
+                            balance_str = result.get("balance", "0")
+                            try:
+                                balance_value = int(balance_str.replace(",", "").strip())
+                            except:
+                                balance_value = 0
+                            
                             return {
-                                "balance": result.get("balance", 0),
-                                "currency": result.get("currency", "UZS"),
-                                "status": "success"
-                            }
-                        elif "data" in result and "balance" in result["data"]:
-                            return {
-                                "balance": result["data"]["balance"],
-                                "currency": result["data"].get("currency", "UZS"),
+                                "balance": balance_value,
+                                "balance_raw": balance_str,
+                                "duration": result.get("balance_as_duration", "N/A"),
+                                "translation": result.get("balance_as_translation", "N/A"),
+                                "currency": "UZS",
                                 "status": "success"
                             }
                     
                     logger.warning(f"[Kotib.ai Balance] Non-200 status: {response.status}")
+                    response_text = await response.text()
+                    logger.warning(f"[Kotib.ai Balance] Response: {response_text}")
             except Exception as e:
                 logger.warning(f"[Kotib.ai Balance] API error: {e}")
         

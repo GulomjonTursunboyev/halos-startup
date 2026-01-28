@@ -7920,9 +7920,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         balance_info = await get_kotib_balance()
         
-        if balance_info:
+        if balance_info and balance_info.get("status") == "success":
             balance = balance_info.get("balance", 0)
-            currency = balance_info.get("currency", "UZS")
+            duration = balance_info.get("duration", "N/A")
+            translation = balance_info.get("translation", "N/A")
             
             # Status aniqlash
             if balance > 100000:
@@ -7944,10 +7945,12 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 f"{status_emoji} *Status:* {status_text}\n\n"
                 
-                f"💵 *Balans:* *{balance:,.0f}* {currency}\n\n"
+                f"💵 *Balans:* *{balance:,}*\n"
+                f"🎙 *Audio:* {duration}\n"
+                f"📝 *Tarjima:* {translation}\n\n"
                 
                 "📊 *TAXMINIY ISHLATISH*\n"
-                f"┌ 🎙 1 ovozli xabar: ~100-200 so'm\n"
+                f"┌ 🎙 1 ovozli xabar: ~100-200 kredit\n"
                 f"├ 📈 Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n"
                 f"└ 📅 Taxminan: ~*{int(balance / 150 / 50)}* kun\n\n"
                 
@@ -7962,7 +7965,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 "❌ *Balansni olishda xatolik!*\n\n"
                 "_API bilan bog'lanishda muammo yoki_\n"
-                "_balans API mavjud emas._\n\n"
+                "_API kaliti noto'g'ri._\n\n"
                 
                 f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             )
