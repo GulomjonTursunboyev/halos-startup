@@ -154,9 +154,92 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"Pre-checkout approved for user {query.from_user.id}")
 
 
+async def handle_voice_pack_payment(update: Update, context: ContextTypes.DEFAULT_TYPE, payment) -> None:
+    """Handle successful Voice Pack payment"""
+    message = update.message
+    telegram_id = update.effective_user.id
+    
+    from app.ai_assistant import VOICE_PACK_PRICE, VOICE_PACK_COUNT
+    from app.subscription_handlers import add_bonus_voice
+    from app.languages import format_number
+    
+    logger.info(f"Voice Pack payment received from user {telegram_id}")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        logger.error(f"User not found for Voice Pack: {telegram_id}")
+        await message.reply_text("❌ Foydalanuvchi topilmadi. /start bosing.")
+        return
+    
+    # Add bonus voice messages
+    success = await add_bonus_voice(telegram_id, VOICE_PACK_COUNT)
+    
+    if not success:
+        logger.error(f"Failed to add Voice Pack for user {telegram_id}")
+        await message.reply_text("❌ Xatolik yuz berdi. Admin: @halos_support")
+        return
+    
+    # Record payment
+    now = datetime.now()
+    try:
+        await db.execute_update(
+            """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
+               VALUES ($1, $2, $3, 'telegram_click', $4, 'completed', $5)""" if db.is_postgres else
+            """INSERT INTO payments (user_id, plan_id, amount_uzs, payment_method, payment_id, status, completed_at)
+               VALUES (?, ?, ?, 'telegram_click', ?, 'completed', ?)""",
+            user['id'], 'voice_pack', VOICE_PACK_PRICE, payment.telegram_payment_charge_id, now
+        )
+    except Exception as e:
+        logger.error(f"Failed to record Voice Pack payment: {e}")
+    
+    # Get updated bonus count
+    updated_user = await db.get_user(telegram_id)
+    total_bonus = updated_user.get("bonus_voice_count", 0) if updated_user else VOICE_PACK_COUNT
+    
+    lang = user.get("language", "uz")
+    
+    if lang == "uz":
+        success_msg = (
+            "🎉 *VOICE PACK MUVAFFAQIYATLI AKTIVLASHTIRILDI!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🎤 *+{VOICE_PACK_COUNT} ta* ovozli xabar qo'shildi!\n\n"
+            f"💰 To'landi: *{format_number(VOICE_PACK_PRICE)} so'm*\n"
+            f"📊 Jami bonus: *{total_bonus} ta*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "✨ Endi ovozli xabar yuborishingiz mumkin!\n\n"
+            "💡 _Maslahat: PRO obuna bilan cheksiz ovozli xabar!_"
+        )
+    else:
+        success_msg = (
+            "🎉 *VOICE PACK УСПЕШНО АКТИВИРОВАН!*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🎤 *+{VOICE_PACK_COUNT}* голосовых добавлено!\n\n"
+            f"💰 Оплачено: *{format_number(VOICE_PACK_PRICE)} сум*\n"
+            f"📊 Всего бонус: *{total_bonus}*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "✨ Теперь можно отправлять голосовые!\n\n"
+            "💡 _Совет: PRO подписка = безлимит!_"
+        )
+    
+    keyboard = [[InlineKeyboardButton(
+        "💎 PRO obuna" if lang == "uz" else "💎 PRO подписка",
+        callback_data="show_pricing"
+    )]]
+    
+    await message.reply_text(
+        success_msg,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    
+    logger.info(f"Voice Pack activated for user {telegram_id}: +{VOICE_PACK_COUNT} messages, total: {total_bonus}")
+
+
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handle successful payment - activate PRO subscription
+    Handle successful payment - activate PRO subscription or add Voice Pack
     """
     message = update.message
     payment = message.successful_payment
@@ -167,10 +250,16 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
     logger.info(f"Payment received from user {telegram_id}: {payment.total_amount} {payment.currency}")
     
     try:
-        # Parse payload: h_{user_id}_{plan_short}_{time}
+        # Parse payload
         payload = payment.invoice_payload
         parts = payload.split('_')
         
+        # Check if it's Voice Pack payment: vp_{user_id}_{count}_{time}
+        if payload.startswith("vp_"):
+            await handle_voice_pack_payment(update, context, payment)
+            return
+        
+        # PRO subscription payment: h_{user_id}_{plan_short}_{time}
         plan_short = parts[2] if len(parts) > 2 else 'mon'
         
         # Convert short to full plan_id
@@ -343,6 +432,11 @@ async def telegram_pay_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # Extract plan_id from callback data
     plan_id = query.data.replace("tg_pay_", "")
     
+    # Check if it's voice pack
+    if plan_id == "voice_pack":
+        await send_voice_pack_invoice(update, context)
+        return
+    
     # Delete the message with buttons
     try:
         await query.message.delete()
@@ -351,3 +445,70 @@ async def telegram_pay_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Send invoice
     await send_payment_invoice(update, context, plan_id)
+
+
+async def send_voice_pack_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send Voice Pack payment invoice"""
+    query = update.callback_query
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    from app.ai_assistant import VOICE_PACK_PRICE, VOICE_PACK_COUNT
+    
+    # Telegram Payments uses tiyin (100 tiyin = 1 UZS)
+    amount_tiyin = int(VOICE_PACK_PRICE * 100)
+    
+    # Create payload
+    payload = f"vp_{telegram_id}_{VOICE_PACK_COUNT}_{datetime.now().strftime('%m%d%H%M')}"
+    
+    if lang == "uz":
+        title = "Voice Pack"
+        description = f"🎤 {VOICE_PACK_COUNT} ta qo'shimcha ovozli xabar"
+        price_label = f"Voice Pack ({VOICE_PACK_COUNT} ta)"
+    else:
+        title = "Voice Pack"
+        description = f"🎤 {VOICE_PACK_COUNT} дополнительных голосовых"
+        price_label = f"Voice Pack ({VOICE_PACK_COUNT} шт)"
+    
+    prices = [LabeledPrice(label=price_label, amount=amount_tiyin)]
+    
+    try:
+        # Delete the previous message
+        try:
+            await query.message.delete()
+        except:
+            pass
+        
+        chat_id = update.effective_chat.id
+        
+        await context.bot.send_invoice(
+            chat_id=chat_id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=CLICK_PROVIDER_TOKEN,
+            currency="UZS",
+            prices=prices,
+            start_parameter="voicepack",
+            need_name=False,
+            need_phone_number=False,
+            need_email=False,
+            need_shipping_address=False,
+            is_flexible=False,
+        )
+        
+        logger.info(f"Voice Pack invoice sent to user {telegram_id}, amount: {VOICE_PACK_PRICE} UZS")
+        
+    except Exception as e:
+        logger.error(f"Failed to send Voice Pack invoice: {e}")
+        
+        error_msg = (
+            "❌ To'lov tizimida xatolik yuz berdi.\n"
+            "Iltimos, keyinroq urinib ko'ring."
+        ) if lang == "uz" else (
+            "❌ Ошибка платежной системы.\n"
+            "Пожалуйста, попробуйте позже."
+        )
+        
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=error_msg)

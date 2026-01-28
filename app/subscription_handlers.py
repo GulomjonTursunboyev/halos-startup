@@ -1053,3 +1053,110 @@ async def increment_feature_usage(user_id: int, feature: str, db) -> None:
         """, (user_id, feature))
         await db._connection.commit()
 
+
+# ==================== VOICE PACK PURCHASE ====================
+
+async def buy_voice_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Voice Pack purchase request"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    from app.ai_assistant import VOICE_PACK_PRICE, VOICE_PACK_COUNT
+    
+    # Show Voice Pack purchase options
+    if lang == "uz":
+        msg = (
+            "🎤 *VOICE PACK*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 *{VOICE_PACK_COUNT} ta* qo'shimcha ovozli xabar\n\n"
+            "✅ *Afzalliklari:*\n"
+            "├ Bir marta to'lov\n"
+            "├ Muddatsiz amal qiladi\n"
+            "└ Har qanday vaqtda ishlatish mumkin\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Narxi:* `{format_number(VOICE_PACK_PRICE)} so'm`\n\n"
+            "💳 *To'lov: Telegram Payment*"
+        )
+    else:
+        msg = (
+            "🎤 *VOICE PACK*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 *{VOICE_PACK_COUNT}* дополнительных голосовых\n\n"
+            "✅ *Преимущества:*\n"
+            "├ Разовый платёж\n"
+            "├ Бессрочно\n"
+            "└ Использовать в любое время\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Цена:* `{format_number(VOICE_PACK_PRICE)} сум`\n\n"
+            "💳 *Оплата: Telegram Payment*"
+        )
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            f"💳 To'lash {format_number(VOICE_PACK_PRICE)} so'm" if lang == "uz" else f"💳 Оплатить {format_number(VOICE_PACK_PRICE)} сум",
+            callback_data="tg_pay_voice_pack"
+        )],
+        [InlineKeyboardButton(
+            "💎 PRO obuna (cheksiz)" if lang == "uz" else "💎 PRO (безлимит)",
+            callback_data="show_pricing"
+        )],
+        [InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="cancel_voice_pack"
+        )]
+    ]
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def cancel_voice_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel voice pack purchase"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    
+    await query.edit_message_text(
+        "✅ Bekor qilindi" if lang == "uz" else "✅ Отменено"
+    )
+
+
+async def add_bonus_voice(telegram_id: int, count: int = 100) -> bool:
+    """Add bonus voice messages to user account"""
+    db = await get_database()
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET bonus_voice_count = COALESCE(bonus_voice_count, 0) + $1
+                    WHERE telegram_id = $2
+                """, count, telegram_id)
+        else:
+            await db._connection.execute("""
+                UPDATE users 
+                SET bonus_voice_count = COALESCE(bonus_voice_count, 0) + ?
+                WHERE telegram_id = ?
+            """, (count, telegram_id))
+            await db._connection.commit()
+        
+        logger.info(f"[VOICE_PACK] Added {count} bonus voice messages for user {telegram_id}")
+        return True
+    except Exception as e:
+        logger.error(f"[VOICE_PACK] Error adding bonus voice: {e}")
+        return False
+

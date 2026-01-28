@@ -5237,24 +5237,13 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     logger.info(f"[VOICE] Voice message received from {telegram_id}, duration={voice.duration}s")
     
-    # Check PRO status - PRO users can use voice anywhere
-    from app.subscription_handlers import is_user_pro
-    is_pro = await is_user_pro(telegram_id)
-    
-    if not is_pro:
-        # For non-PRO users, just ignore voice messages (don't show error)
-        logger.info(f"[VOICE] User {telegram_id} is not PRO, ignoring voice")
-        return
-    
-    logger.info(f"[VOICE] User {telegram_id} is PRO, processing voice...")
-    
     # Import AI functions
     import os
     import tempfile
     from app.ai_assistant import (
         transcribe_voice, parse_voice_transaction, save_transaction,
         EXPENSE_CATEGORIES, INCOME_CATEGORIES,
-        MAX_VOICE_DURATION, MONTHLY_VOICE_LIMIT,
+        MAX_VOICE_DURATION, MONTHLY_VOICE_LIMIT, VOICE_PACK_PRICE,
         check_voice_limit, increment_voice_usage,
         format_voice_limit_message, format_voice_duration_error,
         # Multi-transaction imports
@@ -5269,6 +5258,15 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.warning(f"[VOICE] User {telegram_id} not found in DB")
         return
     
+    # Check PRO status
+    from app.subscription_handlers import is_user_pro
+    is_pro = await is_user_pro(telegram_id)
+    
+    # Get bonus voice count
+    bonus_voice = user.get("bonus_voice_count", 0) or 0
+    
+    logger.info(f"[VOICE] User {telegram_id} - PRO: {is_pro}, Bonus: {bonus_voice}")
+    
     # Check voice duration limit
     voice_duration = voice.duration or 0
     if voice_duration > MAX_VOICE_DURATION:
@@ -5278,18 +5276,37 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
     
-    # Check monthly voice limit
-    limit_info = await check_voice_limit(db, user["id"])
+    # Check monthly voice limit (PRO = cheksiz)
+    limit_info = await check_voice_limit(db, user["id"], is_pro=is_pro, bonus_voice=bonus_voice)
+    
     if not limit_info["allowed"]:
+        # Limit tugagan - sotib olish tugmalarini ko'rsatish
+        keyboard = [
+            [InlineKeyboardButton(
+                "💎 PRO obuna (cheksiz)" if lang == "uz" else "💎 PRO подписка (безлимит)",
+                callback_data="show_pricing"
+            )],
+            [InlineKeyboardButton(
+                f"🎤 Voice Pack (+100) - {format_number(VOICE_PACK_PRICE)} so'm" if lang == "uz" else f"🎤 Voice Pack (+100) - {format_number(VOICE_PACK_PRICE)} сум",
+                callback_data="buy_voice_pack"
+            )]
+        ]
+        
         await update.message.reply_text(
             format_voice_limit_message(limit_info, lang),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
     
     try:
         # Send beautiful processing message
         if lang == "uz":
+            if limit_info.get("is_pro"):
+                limit_text = "♾️ _PRO: Cheksiz ovozli xabar_"
+            else:
+                limit_text = f"📊 _Qolgan limit: {limit_info['remaining']}/{limit_info['limit']} ta_"
+            
             processing_text = (
                 "🤖 *AI Yordamchi*\n\n"
                 "🎙 *Ovozingiz qabul qilindi!*\n\n"
@@ -5297,9 +5314,14 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 "├ 🔊 Ovoz yuklanmoqda...\n"
                 "├ 🧠 Sun'iy intellekt tahlil qilmoqda...\n"
                 "└ 💾 Tranzaksiya saqlanmoqda...\n\n"
-                f"📊 _Qolgan limit: {limit_info['remaining']}/{limit_info['limit']} ta_"
+                f"{limit_text}"
             )
         else:
+            if limit_info.get("is_pro"):
+                limit_text = "♾️ _PRO: Безлимит голосовых_"
+            else:
+                limit_text = f"📊 _Осталось: {limit_info['remaining']}/{limit_info['limit']}_"
+            
             processing_text = (
                 "🤖 *AI Помощник*\n\n"
                 "🎙 *Голос получен!*\n\n"
@@ -5307,7 +5329,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 "├ 🔊 Загрузка голоса...\n"
                 "├ 🧠 Анализ ИИ...\n"
                 "└ 💾 Сохранение транзакции...\n\n"
-                f"📊 _Осталось: {limit_info['remaining']}/{limit_info['limit']}_"
+                f"{limit_text}"
             )
         
         processing_msg = await update.message.reply_text(

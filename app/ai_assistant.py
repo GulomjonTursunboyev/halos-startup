@@ -26,7 +26,9 @@ KOTIB_STT_URL = "https://developer.kotib.ai/api/v1/stt"
 
 # ==================== LIMITS ====================
 MAX_VOICE_DURATION = 60  # Maksimal ovozli xabar uzunligi (sekundda)
-MONTHLY_VOICE_LIMIT = 30  # PRO uchun oylik ovozli xabar limiti
+MONTHLY_VOICE_LIMIT = 30  # Bepul oylik ovozli xabar limiti
+VOICE_PACK_COUNT = 100   # Voice Pack - 100 ta qo'shimcha ovozli xabar
+VOICE_PACK_PRICE = 9990  # Voice Pack narxi (so'm)
 
 # Xarajat kategoriyalari
 EXPENSE_CATEGORIES = {
@@ -2638,57 +2640,99 @@ async def increment_voice_usage(db, user_id: int, duration: int = 0) -> bool:
     return True
 
 
-async def check_voice_limit(db, user_id: int) -> Dict:
+async def check_voice_limit(db, user_id: int, is_pro: bool = False, bonus_voice: int = 0) -> Dict:
     """
     Ovozli xabar limitini tekshirish
-    Returns: {"allowed": bool, "remaining": int, "message": str}
-    """
-    usage = await get_voice_usage(db, user_id)
     
-    if usage["voice_count"] >= MONTHLY_VOICE_LIMIT:
+    PRO foydalanuvchilar - CHEKSIZ
+    FREE foydalanuvchilar - 30 ta asosiy + bonus_voice_count
+    
+    Returns: {"allowed": bool, "remaining": int, "used": int, "limit": int, "is_pro": bool}
+    """
+    # PRO foydalanuvchilar - cheksiz
+    if is_pro:
+        usage = await get_voice_usage(db, user_id)
+        return {
+            "allowed": True,
+            "remaining": -1,  # -1 = cheksiz
+            "used": usage["voice_count"],
+            "limit": -1,  # -1 = cheksiz
+            "is_pro": True
+        }
+    
+    # FREE foydalanuvchilar - asosiy limit + bonus
+    usage = await get_voice_usage(db, user_id)
+    total_limit = MONTHLY_VOICE_LIMIT + bonus_voice
+    remaining = max(0, total_limit - usage["voice_count"])
+    
+    if usage["voice_count"] >= total_limit:
         return {
             "allowed": False,
             "remaining": 0,
             "used": usage["voice_count"],
-            "limit": MONTHLY_VOICE_LIMIT
+            "limit": total_limit,
+            "bonus": bonus_voice,
+            "is_pro": False
         }
     else:
         return {
             "allowed": True,
-            "remaining": usage["remaining"],
+            "remaining": remaining,
             "used": usage["voice_count"],
-            "limit": MONTHLY_VOICE_LIMIT
+            "limit": total_limit,
+            "bonus": bonus_voice,
+            "is_pro": False
         }
 
 
 def format_voice_limit_message(limit_info: Dict, lang: str = "uz") -> str:
     """
-    Ovozli xabar limiti haqida xabar
+    Ovozli xabar limiti haqida xabar - limit tugaganda
     """
+    from app.languages import format_number
+    
     if lang == "uz":
         if not limit_info["allowed"]:
             return (
-                "🔒 *LIMIT TUGADI*\n"
+                "🔒 *OVOZLI XABAR LIMITI TUGADI*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"Bu oy uchun ovozli xabar limitingiz tugadi.\n\n"
                 f"📊 Ishlatilgan: *{limit_info['used']}/{limit_info['limit']}*\n\n"
-                "💡 Keyingi oy boshida limit yangilanadi.\n"
-                "✍️ Matnli xabar orqali davom eting!"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 *DAVOM ETISH UCHUN:*\n\n"
+                "1️⃣ *PRO obuna* — cheksiz ovozli xabar\n"
+                f"   ├ 1 hafta: `14,990 so'm`\n"
+                f"   ├ 1 oy: `29,990 so'm`\n"
+                f"   └ 1 yil: `249,990 so'm`\n\n"
+                "2️⃣ *Voice Pack* — 100 ta qo'shimcha\n"
+                f"   └ Narxi: `{format_number(VOICE_PACK_PRICE)} so'm`\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "✍️ Yoki matnli xabar orqali davom eting!"
             )
         else:
-            return f"🎤 Qolgan ovozli xabarlar: *{limit_info['remaining']}/{limit_info['limit']}*"
+            if limit_info.get("is_pro"):
+                return "🎤 PRO: *Cheksiz* ovozli xabar"
+            return f"🎤 Qolgan: *{limit_info['remaining']}/{limit_info['limit']}*"
     else:
         if not limit_info["allowed"]:
             return (
-                "🔒 *ЛИМИТ ИСЧЕРПАН*\n"
+                "🔒 *ЛИМИТ ГОЛОСОВЫХ ИСЧЕРПАН*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"Лимит голосовых сообщений на этот месяц исчерпан.\n\n"
                 f"📊 Использовано: *{limit_info['used']}/{limit_info['limit']}*\n\n"
-                "💡 Лимит обновится в начале следующего месяца.\n"
-                "✍️ Продолжайте текстовыми сообщениями!"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "💡 *ЧТОБЫ ПРОДОЛЖИТЬ:*\n\n"
+                "1️⃣ *PRO подписка* — безлимит\n"
+                f"   ├ 1 неделя: `14,990 сум`\n"
+                f"   ├ 1 месяц: `29,990 сум`\n"
+                f"   └ 1 год: `249,990 сум`\n\n"
+                "2️⃣ *Voice Pack* — 100 дополнительных\n"
+                f"   └ Цена: `{format_number(VOICE_PACK_PRICE)} сум`\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "✍️ Или продолжайте текстом!"
             )
         else:
-            return f"🎤 Осталось голосовых: *{limit_info['remaining']}/{limit_info['limit']}*"
+            if limit_info.get("is_pro"):
+                return "🎤 PRO: *Безлимит* голосовых"
+            return f"🎤 Осталось: *{limit_info['remaining']}/{limit_info['limit']}*"
 
 
 def format_voice_duration_error(duration: int, lang: str = "uz") -> str:
