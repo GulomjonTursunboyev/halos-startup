@@ -297,8 +297,12 @@ def setup_handlers(app: Application) -> None:
     app.add_handler(
         CallbackQueryHandler(ai_confirm_learn_callback, pattern="^ai_confirm_learn$")
     )
+    # MUHIM: ai_correct_multi_ OLDIN ro'yxatdan o'tishi kerak!
     app.add_handler(
-        CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_")
+        CallbackQueryHandler(ai_correct_multi_callback, pattern="^ai_correct_multi_")
+    )
+    app.add_handler(
+        CallbackQueryHandler(ai_correct_callback, pattern="^ai_correct_\\d+$")
     )
     # Gemini bilan qayta tahlil
     app.add_handler(
@@ -325,9 +329,6 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(ai_cancel_correct_callback, pattern="^ai_cancel_correct$")
-    )
-    app.add_handler(
-        CallbackQueryHandler(ai_correct_multi_callback, pattern="^ai_correct_multi_")
     )
     app.add_handler(
         CallbackQueryHandler(ai_swap_type_callback, pattern="^ai_swap_type_")
