@@ -5526,24 +5526,45 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
                     msg += limit_msg
                     
-                    # Keyboard
+                    # Keyboard - asosiy tugmalar
                     ids_str = ",".join([str(tid) for tid in transaction_ids])
-                    keyboard = [
-                        [
-                            InlineKeyboardButton(
-                                "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
-                                callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
-                            ),
-                            InlineKeyboardButton(
-                                "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
-                                callback_data=f"ai_correct_multi_{ids_str}"
-                            )
-                        ],
-                        [InlineKeyboardButton(
-                            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                            callback_data="ai_report"
-                        )]
-                    ]
+                    keyboard = []
+                    
+                    # ==================== ANIQLASHTIRISH TUGMALARI ====================
+                    # Aniqlashtirish kerak bo'lgan tranzaksiyalar uchun tugmalar
+                    clarification_buttons = []
+                    for i, (tx, tx_id) in enumerate(zip(transactions, transaction_ids)):
+                        if tx.get("needs_clarification"):
+                            clarification_type = tx.get("clarification_type", "unknown")
+                            # Har bir clarification type uchun tayyor javoblar
+                            if clarification_type in CLARIFICATION_OPTIONS:
+                                opts = CLARIFICATION_OPTIONS[clarification_type].get(lang, CLARIFICATION_OPTIONS[clarification_type]["uz"])
+                                # Savolni ko'rsatish
+                                question_btn = InlineKeyboardButton(
+                                    f"❓ #{i+1}: {opts['question'][:25]}...",
+                                    callback_data=f"ai_show_clarify_{tx_id}_{clarification_type}"
+                                )
+                                clarification_buttons.append([question_btn])
+                    
+                    # Agar aniqlashtirish tugmalari bo'lsa, qo'shish
+                    if clarification_buttons:
+                        keyboard.extend(clarification_buttons)
+                    
+                    # Asosiy tugmalar
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
+                            callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
+                        ),
+                        InlineKeyboardButton(
+                            "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
+                            callback_data=f"ai_correct_multi_{ids_str}"
+                        )
+                    ])
+                    keyboard.append([InlineKeyboardButton(
+                        "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                        callback_data="ai_report"
+                    )])
                     
                     await processing_msg.edit_text(
                         msg,
@@ -6797,6 +6818,443 @@ async def ai_rewrite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+# ==================== ANIQLASHTIRISH HANDLERS ====================
+
+# Aniqlashtirish turlari uchun tayyor javoblar
+CLARIFICATION_OPTIONS = {
+    "chicken_type": {
+        "uz": {
+            "question": "🐔 Bu tovuq qanday?",
+            "options": [
+                ("gosht", "🍗 Tovuq go'shti (oziq-ovqat)"),
+                ("jonli", "🐓 Jonli tovuq (fermerchilik)")
+            ]
+        },
+        "ru": {
+            "question": "🐔 Какая это курица?",
+            "options": [
+                ("gosht", "🍗 Куриное мясо (еда)"),
+                ("jonli", "🐓 Живая курица (фермерство)")
+            ]
+        }
+    },
+    "debt_recipient": {
+        "uz": {
+            "question": "💰 Qarzni kimga berdingiz?",
+            "options": [
+                ("tanish", "👤 Tanishga/Do'stga"),
+                ("qarindosh", "👨‍👩‍👧‍👦 Qarindoshga"),
+                ("hamkasb", "💼 Hamkasbga"),
+                ("boshqa", "📝 Boshqa...")
+            ]
+        },
+        "ru": {
+            "question": "💰 Кому вы дали в долг?",
+            "options": [
+                ("tanish", "👤 Знакомому/Другу"),
+                ("qarindosh", "👨‍👩‍👧‍👦 Родственнику"),
+                ("hamkasb", "💼 Коллеге"),
+                ("boshqa", "📝 Другому...")
+            ]
+        }
+    },
+    "payment_reason": {
+        "uz": {
+            "question": "💳 Bu to'lov nima uchun?",
+            "options": [
+                ("xizmat", "🔧 Xizmat uchun"),
+                ("tovar", "📦 Tovar uchun"),
+                ("qarz", "💰 Qarz qaytarish"),
+                ("yordam", "🤝 Yordam/Hadya"),
+                ("boshqa", "📝 Boshqa...")
+            ]
+        },
+        "ru": {
+            "question": "💳 За что этот платёж?",
+            "options": [
+                ("xizmat", "🔧 За услугу"),
+                ("tovar", "📦 За товар"),
+                ("qarz", "💰 Возврат долга"),
+                ("yordam", "🤝 Помощь/Подарок"),
+                ("boshqa", "📝 Другое...")
+            ]
+        }
+    }
+}
+
+
+async def ai_show_clarify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Aniqlashtirish variantlarini ko'rsatish
+    callback_data: ai_show_clarify_{tx_id}_{clarification_type}
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract data: ai_show_clarify_123_chicken_type
+    callback_data = query.data
+    parts = callback_data.split("_")
+    
+    try:
+        tx_id = int(parts[3])
+        clarification_type = "_".join(parts[4:])
+    except (IndexError, ValueError):
+        await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, tx_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        return
+    
+    # Clarification variantlarini olish
+    if clarification_type not in CLARIFICATION_OPTIONS:
+        await query.edit_message_text("❌ Noma'lum savol turi" if lang == "uz" else "❌ Неизвестный тип вопроса")
+        return
+    
+    opts = CLARIFICATION_OPTIONS[clarification_type].get(lang, CLARIFICATION_OPTIONS[clarification_type]["uz"])
+    
+    # Xabar va tugmalar
+    if lang == "uz":
+        desc = transaction.get('description', 'Nomalum')
+        msg = (
+            f"❓ *ANIQLASHTIRISH*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💰 Summa: *{transaction['amount']:,}* som\n"
+            f"📝 Tavsif: _{desc}_\n\n"
+            f"*{opts['question']}*\n\n"
+            f"Quyidagilardan birini tanlang yoki ozingiz yozing:"
+        )
+    else:
+        desc = transaction.get('description', 'Неизвестно')
+        msg = (
+            f"❓ *УТОЧНЕНИЕ*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💰 Сумма: *{transaction['amount']:,}* сум\n"
+            f"📝 Описание: _{desc}_\n\n"
+            f"*{opts['question']}*\n\n"
+            f"Выберите из списка или напишите свой вариант:"
+        )
+    
+    # Tugmalarni yaratish
+    keyboard = []
+    for option_key, option_label in opts['options']:
+        if option_key == "boshqa":
+            # "Boshqa" tugmasi - foydalanuvchi o'zi kiritadi
+            keyboard.append([InlineKeyboardButton(
+                option_label,
+                callback_data=f"ai_clarify_custom_{tx_id}_{clarification_type}"
+            )])
+        else:
+            keyboard.append([InlineKeyboardButton(
+                option_label,
+                callback_data=f"ai_clarify_{tx_id}_{clarification_type}_{option_key}"
+            )])
+    
+    # Orqaga tugmasi
+    keyboard.append([InlineKeyboardButton(
+        "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+        callback_data="ai_cancel_correct"
+    )])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_clarify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Aniqlashtirish so'roviga javob berish - tayyor variantlardan tanlash
+    callback_data formati: ai_clarify_{tx_id}_{clarification_type}_{answer}
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract data from callback: ai_clarify_123_chicken_type_gosht
+    callback_data = query.data
+    parts = callback_data.split("_")
+    
+    try:
+        # ai_clarify_123_chicken_type_gosht
+        tx_id = int(parts[2])
+        clarification_type = "_".join(parts[3:-1])  # chicken_type
+        answer = parts[-1]  # gosht
+    except (IndexError, ValueError):
+        await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, tx_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        return
+    
+    # Javobga qarab kategoriyani yangilash
+    new_category = None
+    new_description = transaction.get("description", "")
+    
+    if clarification_type == "chicken_type":
+        if answer == "gosht":
+            new_category = "oziq_ovqat"
+            new_description = "Tovuq go'shti"
+        elif answer == "jonli":
+            new_category = "boshqa"  # yoki fermerchilik kategoriyasi
+            new_description = "Jonli tovuq (fermerchilik)"
+    
+    elif clarification_type == "debt_recipient":
+        # Qarz oluvchi nomini qo'shish
+        recipient_names = {
+            "tanish": "Tanish/Do'st",
+            "qarindosh": "Qarindosh",
+            "hamkasb": "Hamkasb"
+        }
+        recipient = recipient_names.get(answer, answer)
+        new_description = f"Qarz berdim - {recipient}"
+    
+    elif clarification_type == "payment_reason":
+        reason_names = {
+            "xizmat": "Xizmat to'lovi",
+            "tovar": "Tovar sotib olish",
+            "qarz": "Qarz qaytarish",
+            "yordam": "Yordam/Hadya"
+        }
+        new_description = reason_names.get(answer, transaction.get("description", ""))
+    
+    # Bazani yangilash
+    try:
+        if new_category:
+            from app.ai_assistant import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+            if transaction["type"] == "income":
+                new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
+            else:
+                new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📦 Boshqa")
+            
+            if db._use_postgres:
+                async with db._pool.acquire() as conn:
+                    await conn.execute("""
+                        UPDATE transactions 
+                        SET category = $1, category_key = $2, description = $3
+                        WHERE id = $4 AND user_id = $5
+                    """, new_category_name, new_category, new_description, tx_id, user["id"])
+            else:
+                await db._connection.execute("""
+                    UPDATE transactions 
+                    SET category = ?, category_key = ?, description = ?
+                    WHERE id = ? AND user_id = ?
+                """, (new_category_name, new_category, new_description, tx_id, user["id"]))
+                await db._connection.commit()
+        else:
+            # Faqat description yangilanadi
+            if db._use_postgres:
+                async with db._pool.acquire() as conn:
+                    await conn.execute("""
+                        UPDATE transactions SET description = $1 WHERE id = $2 AND user_id = $3
+                    """, new_description, tx_id, user["id"])
+            else:
+                await db._connection.execute("""
+                    UPDATE transactions SET description = ? WHERE id = ? AND user_id = ?
+                """, (new_description, tx_id, user["id"]))
+                await db._connection.commit()
+        
+        # Muvaffaqiyat xabari
+        if lang == "uz":
+            msg = (
+                "✅ *ANIQLASHTIRILDI*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📝 Yangilangan: _{new_description}_\n\n"
+                "🧠 _AI bu ma'lumotni eslab qoldi!_"
+            )
+        else:
+            msg = (
+                "✅ *УТОЧНЕНО*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📝 Обновлено: _{new_description}_\n\n"
+                "🧠 _AI запомнил эту информацию!_"
+            )
+        
+        await query.edit_message_text(msg, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"[CLARIFY] Error updating: {e}")
+        await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+
+
+async def ai_clarify_custom_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Foydalanuvchi o'zi javob kiritishi uchun
+    callback_data: ai_clarify_custom_{tx_id}_{clarification_type}
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract data: ai_clarify_custom_123_debt_recipient
+    callback_data = query.data
+    parts = callback_data.split("_")
+    
+    try:
+        tx_id = int(parts[3])
+        clarification_type = "_".join(parts[4:])
+    except (IndexError, ValueError):
+        return
+    
+    # Context'ga saqlash - keyingi matnli xabarni kutish
+    context.user_data["awaiting_clarification"] = {
+        "tx_id": tx_id,
+        "type": clarification_type
+    }
+    
+    # Savolni aniqlash
+    type_questions = {
+        "debt_recipient": {
+            "uz": "💰 Qarzni kimga berdingiz?\n\nIsmini yozing:",
+            "ru": "💰 Кому вы дали в долг?\n\nНапишите имя:"
+        },
+        "chicken_type": {
+            "uz": "🐔 Tovuq qanday ekanligini yozing:",
+            "ru": "🐔 Напишите, какая это курица:"
+        },
+        "payment_reason": {
+            "uz": "💳 To'lov nimaga ekanligini yozing:",
+            "ru": "💳 Напишите, за что платёж:"
+        }
+    }
+    
+    question = type_questions.get(clarification_type, {}).get(lang, "❓ Ma'lumot kiriting:" if lang == "uz" else "❓ Введите информацию:")
+    
+    if lang == "uz":
+        msg = (
+            "✏️ *O'ZINGIZ KIRITING*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{question}\n\n"
+            "_Bekor qilish: /cancel_"
+        )
+    else:
+        msg = (
+            "✏️ *ВВЕДИТЕ САМИ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{question}\n\n"
+            "_Для отмены: /cancel_"
+        )
+    
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
+async def ai_clarification_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Foydalanuvchi kiritgan aniqlashtirish javobini qabul qilish
+    Returns True if handled, False otherwise
+    """
+    awaiting = context.user_data.get("awaiting_clarification")
+    if not awaiting:
+        return False
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text.strip()
+    
+    if text.lower() in ["/cancel", "bekor", "отмена"]:
+        context.user_data.pop("awaiting_clarification", None)
+        await update.message.reply_text(
+            "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        )
+        return True
+    
+    tx_id = awaiting["tx_id"]
+    clarification_type = awaiting["type"]
+    
+    from app.ai_assistant import get_transaction_by_id
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        context.user_data.pop("awaiting_clarification", None)
+        return True
+    
+    transaction = await get_transaction_by_id(db, tx_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        context.user_data.pop("awaiting_clarification", None)
+        return True
+    
+    # Description ni yangilash
+    old_desc = transaction.get("description", "")
+    
+    if clarification_type == "debt_recipient":
+        new_description = f"Qarz berdim - {text}"
+    elif clarification_type == "chicken_type":
+        new_description = f"Tovuq - {text}"
+    elif clarification_type == "payment_reason":
+        new_description = f"{old_desc} - {text}"
+    else:
+        new_description = f"{old_desc} ({text})"
+    
+    # Bazani yangilash
+    try:
+        if db._use_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE transactions SET description = $1 WHERE id = $2 AND user_id = $3
+                """, new_description, tx_id, user["id"])
+        else:
+            await db._connection.execute("""
+                UPDATE transactions SET description = ? WHERE id = ? AND user_id = ?
+            """, (new_description, tx_id, user["id"]))
+            await db._connection.commit()
+        
+        context.user_data.pop("awaiting_clarification", None)
+        
+        if lang == "uz":
+            msg = (
+                "✅ *ANIQLASHTIRILDI*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📝 Yangilangan: _{new_description}_\n\n"
+                "🧠 _AI bu ma'lumotni eslab qoldi!_"
+            )
+        else:
+            msg = (
+                "✅ *УТОЧНЕНО*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📝 Обновлено: _{new_description}_\n\n"
+                "🧠 _AI запомнил эту информацию!_"
+            )
+        
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        return True
+        
+    except Exception as e:
+        logger.error(f"[CLARIFY INPUT] Error: {e}")
+        context.user_data.pop("awaiting_clarification", None)
+        await update.message.reply_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
+        return True
 
 
 async def ai_edit_amount_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

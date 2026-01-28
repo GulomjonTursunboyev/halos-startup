@@ -86,6 +86,12 @@ from app.handlers import (
     ai_edit_amount_callback,
     ai_amount_input_handler,
     ai_cancel_correct_callback,
+    # AI Clarification handlers
+    ai_show_clarify_callback,
+    ai_clarify_callback,
+    ai_clarify_custom_callback,
+    ai_clarification_input_handler,
+    CLARIFICATION_OPTIONS,
     # AI Debt handlers
     ai_debt_list_callback,
     ai_debt_mark_returned_callback,
@@ -589,8 +595,12 @@ def main() -> None:
     application.add_handler(
         CallbackQueryHandler(ai_set_category_callback, pattern="^ai_set_category_")
     )
+    # MUHIM: ai_delete_all_ OLDIN ro'yxatdan o'tishi kerak!
     application.add_handler(
-        CallbackQueryHandler(ai_delete_callback, pattern="^ai_delete_")
+        CallbackQueryHandler(ai_delete_all_callback, pattern="^ai_delete_all_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_delete_callback, pattern="^ai_delete_\\d+$")
     )
     application.add_handler(
         CallbackQueryHandler(ai_rewrite_callback, pattern="^ai_rewrite_")
@@ -604,8 +614,15 @@ def main() -> None:
     application.add_handler(
         CallbackQueryHandler(ai_swap_type_callback, pattern="^ai_swap_type_")
     )
+    # Aniqlashtirish tugmalari - MUHIM: ai_show_clarify_ va ai_clarify_custom_ OLDIN!
     application.add_handler(
-        CallbackQueryHandler(ai_delete_all_callback, pattern="^ai_delete_all_")
+        CallbackQueryHandler(ai_show_clarify_callback, pattern="^ai_show_clarify_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_clarify_custom_callback, pattern="^ai_clarify_custom_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(ai_clarify_callback, pattern="^ai_clarify_")
     )
     
     # AI Debt handlers
