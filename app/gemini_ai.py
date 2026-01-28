@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Gemini API konfiguratsiyasi
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 # Kategoriyalar (AI uchun yo'riqnoma)
 EXPENSE_CATEGORIES_AI = {
@@ -65,37 +65,25 @@ async def analyze_with_gemini(text: str, lang: str = "uz") -> Optional[Dict]:
         return None
     
     # Kategoriyalar ro'yxati
-    expense_cats = ", ".join([f"{k}: {v}" for k, v in EXPENSE_CATEGORIES_AI.items()])
-    income_cats = ", ".join([f"{k}: {v}" for k, v in INCOME_CATEGORIES_AI.items()])
+    expense_cats = ", ".join([f"{k}" for k in EXPENSE_CATEGORIES_AI.keys()])
+    income_cats = ", ".join([f"{k}" for k in INCOME_CATEGORIES_AI.keys()])
     
-    prompt = f"""Sen moliyaviy tranzaksiyalarni tahlil qiluvchi AI assistantisin.
-
-Quyidagi matnni tahlil qil va JSON formatida javob ber.
+    prompt = f"""Moliyaviy tranzaksiyani tahlil qil.
 
 MATN: "{text}"
 
-VAZIFA:
-1. Bu XARAJAT (expense) yoki DAROMAD (income) ekanini aniqla
-2. Qaysi kategoriyaga tegishli
-3. Summani aniqla (faqat raqam, valyutasiz)
-4. Qisqa tavsif yoz
-
-XARAJAT KATEGORIYALARI:
-{expense_cats}
-
-DAROMAD KATEGORIYALARI:
-{income_cats}
-
 QOIDALAR:
-- "oldim", "sotib oldim", "to'ladim", "berdim", "sarfladim" = XARAJAT
-- "sotdim", "topdim", "ishladim", "maosh", "oylik" = DAROMAD
-- "pul oldim", "qarz oldim" = DAROMAD (pul keldi)
-- "non oldim", "go'sht oldim" = XARAJAT (narsa oldim)
+- "oldim" + narsa (non, go'sht, kiyim) = expense
+- "oldim" + pul (pul oldim, maosh oldim) = income
+- "to'ladim", "berdim", "sarfladim" = expense
+- "sotdim", "topdim", "ishladim" = income
+- ming = 1000, million = 1000000
 
-JAVOB FORMATI (faqat JSON, boshqa hech narsa yo'q):
-{{"type": "expense|income", "category": "kategoriya_nomi", "amount": 12345, "description": "qisqa tavsif", "confidence": 0.95}}
+EXPENSE kategoriyalari: {expense_cats}
+INCOME kategoriyalari: {income_cats}
 
-MUHIM: Faqat JSON qaytaring, boshqa hech qanday matn yo'q!"""
+Faqat JSON qaytar:
+{{"type":"expense","category":"oziq_ovqat","amount":50000,"description":"non"}}"""
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -103,16 +91,14 @@ MUHIM: Faqat JSON qaytaring, boshqa hech qanday matn yo'q!"""
             data = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
-                    "temperature": 0.1,
-                    "topP": 0.8,
-                    "topK": 40,
-                    "maxOutputTokens": 256
+                    "temperature": 0,
+                    "maxOutputTokens": 150
                 }
             }
             
             url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
             
-            async with session.post(url, headers=headers, json=data, timeout=10) as response:
+            async with session.post(url, headers=headers, json=data, timeout=15) as response:
                 if response.status == 200:
                     result = await response.json()
                     
@@ -120,16 +106,25 @@ MUHIM: Faqat JSON qaytaring, boshqa hech qanday matn yo'q!"""
                     if "candidates" in result and result["candidates"]:
                         text_response = result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "")
                         
-                        # JSON ni parse qilish
-                        # Markdown code block ichidan chiqarish
+                        # JSON ni ajratib olish
                         text_response = text_response.strip()
-                        if text_response.startswith("```json"):
-                            text_response = text_response[7:]
-                        if text_response.startswith("```"):
-                            text_response = text_response[3:]
-                        if text_response.endswith("```"):
-                            text_response = text_response[:-3]
+                        
+                        # Markdown code block olib tashlash
+                        if "```json" in text_response:
+                            text_response = text_response.split("```json")[-1]
+                        if "```" in text_response:
+                            text_response = text_response.split("```")[0]
                         text_response = text_response.strip()
+                        
+                        # JSON objectni topish - nested bo'lmagan
+                        import re
+                        json_match = re.search(r'\{[^{}]+\}', text_response, re.DOTALL)
+                        if json_match:
+                            text_response = json_match.group()
+                        
+                        # Newlines olib tashlash
+                        text_response = text_response.replace('\n', ' ').replace('\r', '')
+                        text_response = ' '.join(text_response.split())
                         
                         try:
                             parsed = json.loads(text_response)
