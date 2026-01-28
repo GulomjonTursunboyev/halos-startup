@@ -86,12 +86,6 @@ from app.handlers import (
     ai_edit_amount_callback,
     ai_amount_input_handler,
     ai_cancel_correct_callback,
-    # AI Clarification handlers
-    ai_show_clarify_callback,
-    ai_clarify_callback,
-    ai_clarify_custom_callback,
-    ai_clarification_input_handler,
-    CLARIFICATION_OPTIONS,
     # AI Debt handlers
     ai_debt_list_callback,
     ai_debt_mark_returned_callback,
@@ -110,6 +104,7 @@ from app.subscription_handlers import (
     cancel_promo_callback,
     click_buy_callback,
     handle_promo_code_input,
+    activate_trial_callback,
 )
 from app.pro_features import (
     show_pro_menu,
@@ -204,6 +199,11 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(cancel_promo_callback, pattern="^cancel_promo$")
+    )
+    
+    # Trial activation handler
+    app.add_handler(
+        CallbackQueryHandler(activate_trial_callback, pattern="^activate_trial$")
     )
     
     # Profile handlers
@@ -389,13 +389,6 @@ def setup_handlers(app: Application) -> None:
     )
     app.add_handler(
         CallbackQueryHandler(ai_swap_type_callback, pattern="^ai_swap_type_")
-    )
-    # Aniqlashtirish tugmalari
-    app.add_handler(
-        CallbackQueryHandler(ai_clarify_callback, pattern="^ai_clarify_")
-    )
-    app.add_handler(
-        CallbackQueryHandler(ai_clarify_custom_callback, pattern="^ai_clarify_custom_")
     )
     
     # AI Debt handlers

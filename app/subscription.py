@@ -13,14 +13,28 @@ from datetime import datetime
 class SubscriptionTier(Enum):
     """User subscription tiers"""
     FREE = "free"
+    TRIAL = "trial"  # 3 kunlik bepul sinov
     PRO = "pro"
 
 
 class SubscriptionPeriod(Enum):
     """Subscription period in days"""
+    TRIAL = 3       # Sinov muddati
     WEEKLY = 7
     MONTHLY = 30
     YEARLY = 365
+
+
+# ==================== TRIAL CONFIGURATION ====================
+# Bepul 3 kunlik PRO sinov - cheklangan limitlar bilan
+
+TRIAL_CONFIG = {
+    "duration_days": 3,           # 3 kun
+    "voice_limit": 10,            # 10 ta ovozli xabar
+    "max_voice_duration": 10,     # 10 soniya audio
+    "all_pro_features": True,     # Barcha PRO imkoniyatlar
+    "one_time_only": True,        # Faqat bir marta
+}
 
 
 # ==================== DATA CLASSES ====================
@@ -82,6 +96,18 @@ FEATURE_LIMITS = {
         "ai_advice": False,
         "pdf_reports": False,
         "priority_support": False,
+    },
+    SubscriptionTier.TRIAL: {
+        "calculations_per_day": -1,  # Unlimited
+        "can_use_bot": True,         # Full bot access
+        "katm_analysis": True,
+        "card_import": True,
+        "ai_advice": True,
+        "pdf_reports": True,
+        "priority_support": False,   # No priority support in trial
+        # Trial-specific limits
+        "voice_limit": 10,           # 10 ta ovozli xabar
+        "max_voice_duration": 10,    # 10 soniya audio
     },
     SubscriptionTier.PRO: {
         "calculations_per_day": -1,  # Unlimited

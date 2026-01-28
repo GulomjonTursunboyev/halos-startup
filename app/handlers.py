@@ -7748,7 +7748,7 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("📈 Faollik", callback_data="admin_activity")
         ],
         [
-            InlineKeyboardButton("� Eslatma yuborish", callback_data="admin_send_reminders"),
+            InlineKeyboardButton("🎁 TRIAL barchaga", callback_data="admin_trial_all"),
             InlineKeyboardButton("📤 Broadcast", callback_data="admin_broadcast")
         ],
         [
@@ -8346,6 +8346,217 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         await query.edit_message_text(
             message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== TRIAL BARCHAGA ====================
+    if query.data == "admin_trial_all":
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Ha, boshlayman", callback_data="admin_trial_confirm"),
+                InlineKeyboardButton("❌ Yo'q", callback_data="admin_main")
+            ]
+        ]
+        
+        await query.edit_message_text(
+            "🎁 *3 KUNLIK TRIAL YOQISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "⚠️ Bu amalni bajarsangiz:\n\n"
+            "• Barcha foydalanuvchilarga 3 kunlik\n"
+            "  TRIAL PRO obuna beriladi\n"
+            "• 10 ta ovozli xabar limiti\n"
+            "• 10 soniya audio limiti\n"
+            "• Barcha PRO funksiyalar ochiladi\n\n"
+            "📢 Keyin broadcast xabar yuborishingiz mumkin\n\n"
+            "*Davom etasizmi?*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if query.data == "admin_trial_confirm":
+        await query.edit_message_text(
+            "⏳ *TRIAL yoqilmoqda...*\n\n"
+            "Iltimos kuting...",
+            parse_mode="Markdown"
+        )
+        
+        # Trial yoqish
+        from app.subscription import TRIAL_CONFIG
+        from datetime import datetime, timedelta
+        
+        trial_end_date = (datetime.now() + timedelta(days=TRIAL_CONFIG["duration_days"])).strftime("%Y-%m-%d")
+        
+        # Barcha foydalanuvchilarni olish
+        users = db.get_all_users_for_broadcast()
+        
+        success_count = 0
+        skip_count = 0
+        error_count = 0
+        
+        for user in users:
+            try:
+                user_id = user.get("id") or user.get("telegram_id")
+                if not user_id:
+                    continue
+                
+                # Foydalanuvchi ma'lumotlarini olish
+                user_data = await db.get_user(user_id)
+                
+                if not user_data:
+                    continue
+                
+                # Agar PRO obunasi bo'lsa yoki trial ishlatgan bo'lsa - o'tkazib yuborish
+                current_tier = user_data.get("subscription_tier", "free")
+                trial_used = user_data.get("trial_used", 0)
+                
+                if current_tier == "pro":
+                    skip_count += 1
+                    continue
+                
+                if trial_used == 1:
+                    skip_count += 1
+                    continue
+                
+                # Trial yoqish
+                await db.update_user(
+                    user_id,
+                    subscription_tier="trial",
+                    subscription_expires=trial_end_date,
+                    voice_tier="trial",
+                    trial_used=1
+                )
+                success_count += 1
+                
+            except Exception as e:
+                logger.error(f"Trial yoqishda xato (user {user_id}): {e}")
+                error_count += 1
+        
+        keyboard = [
+            [InlineKeyboardButton("📤 Broadcast yuborish", callback_data="admin_trial_broadcast")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            "🎁 *TRIAL YOQILDI!*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"✅ Muvaffaqiyatli: *{success_count}* ta\n"
+            f"⏭ O'tkazib yuborildi: *{skip_count}* ta\n"
+            f"❌ Xatolik: *{error_count}* ta\n\n"
+            f"📅 Trial tugash sanasi: *{trial_end_date}*\n\n"
+            "📢 Endi foydalanuvchilarga xabar yuborasizmi?",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if query.data == "admin_trial_broadcast":
+        # Trial haqida tayyor xabar
+        trial_message = (
+            "🎁 *SIZGA SOVG'A!*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Hurmatli foydalanuvchi!\n\n"
+            "Sizga *3 kunlik BEPUL PRO* obuna taqdim etildi! 🎉\n\n"
+            "✨ *Sizda ochilgan imkoniyatlar:*\n"
+            "• 🎤 10 ta ovozli xabar\n"
+            "• ⏱ 10 soniyagacha audio\n"
+            "• 📊 Hisobotlar va statistika\n"
+            "• 💳 Cheksiz kategoriyalar\n"
+            "• 📈 Export va arxiv\n\n"
+            "⏰ *Muddati:* 3 kun\n\n"
+            "💡 _Bu imkoniyatlarni sinab ko'ring va\n"
+            "moliyangizni oson boshqaring!_\n\n"
+            "PRO sotib olish: /pro"
+        )
+        
+        context.user_data["admin_trial_broadcast_message"] = trial_message
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Yuborish", callback_data="admin_trial_broadcast_send"),
+                InlineKeyboardButton("✏️ Tahrirlash", callback_data="admin_trial_broadcast_edit")
+            ],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            "📤 *TRIAL XABARI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Quyidagi xabar yuboriladi:\n\n"
+            "─────────────────────\n"
+            f"{trial_message}\n"
+            "─────────────────────\n\n"
+            "*Yuborishni tasdiqlaysizmi?*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if query.data == "admin_trial_broadcast_edit":
+        context.user_data["admin_trial_broadcast_editing"] = True
+        
+        keyboard = [
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            "✏️ *XABARNI TAHRIRLASH*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Yangi xabar matnini yozing:\n\n"
+            "💡 _Markdown formatlash qo'llab-quvvatlanadi_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if query.data == "admin_trial_broadcast_send":
+        trial_message = context.user_data.get("admin_trial_broadcast_message", "")
+        if not trial_message:
+            await query.answer("❌ Xabar topilmadi!", show_alert=True)
+            return
+        
+        await query.edit_message_text(
+            "📤 *XABAR YUBORILMOQDA...*\n\n"
+            "⏳ Iltimos kuting...",
+            parse_mode="Markdown"
+        )
+        
+        # Barcha foydalanuvchilarga yuborish
+        users = db.get_all_users_for_broadcast()
+        
+        success_count = 0
+        error_count = 0
+        
+        for user in users:
+            try:
+                user_id = user.get("id") or user.get("telegram_id")
+                if not user_id:
+                    continue
+                
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=trial_message,
+                    parse_mode="Markdown"
+                )
+                success_count += 1
+                
+                # Rate limit uchun
+                await asyncio.sleep(0.05)
+                
+            except Exception as e:
+                error_count += 1
+        
+        keyboard = [
+            [InlineKeyboardButton("◀️ Admin panel", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            "✅ *XABAR YUBORILDI!*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📤 Yuborildi: *{success_count}* ta\n"
+            f"❌ Xatolik: *{error_count}* ta",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )

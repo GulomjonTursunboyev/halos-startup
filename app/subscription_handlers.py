@@ -19,8 +19,10 @@ from app.subscription import (
     FEATURE_LIMITS,
     SubscriptionTier,
     validate_promo_code,
+    TRIAL_CONFIG,
 )
 from app.click_payment import generate_click_payment_url
+from app.config import ADMIN_IDS
 
 logger = logging.getLogger(__name__)
 
@@ -259,8 +261,22 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "💳 *Оплата: через Click*"
         )
     
+    # Check if user can use trial (trial_used=0)
+    trial_available = False
+    if user and not user.get("trial_used", 0):
+        trial_available = True
+    
     # Click Payment buttons
-    keyboard = [
+    keyboard = []
+    
+    # Show trial button FIRST if available
+    if trial_available:
+        keyboard.append([InlineKeyboardButton(
+            "🎁 3 kunlik BEPUL sinov" if lang == "uz" else "🎁 3 дня БЕСПЛАТНО",
+            callback_data="activate_trial"
+        )])
+    
+    keyboard.extend([
         [InlineKeyboardButton(
             "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
             callback_data="click_buy_pro_weekly"
@@ -277,7 +293,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "🎁 Promo-kod" if lang == "uz" else "🎁 Промо-код",
             callback_data="enter_promo"
         )],
-    ]
+    ])
     
     # Only show back button if not required (i.e., user came here voluntarily)
     if not is_required:
@@ -910,10 +926,125 @@ async def cancel_promo_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await show_pricing(update, context)
 
 
+# ==================== FREE TRIAL ACTIVATION ====================
+
+async def activate_trial_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Activate 3-day FREE trial for user (one-time only)"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        await query.edit_message_text(
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
+        )
+        return
+    
+    # Check if trial already used
+    if user.get("trial_used", 0):
+        await query.edit_message_text(
+            "❌ Siz allaqachon bepul sinov davridan foydalangansiz.\n\n"
+            "💎 PRO obunasini sotib oling!" if lang == "uz" else 
+            "❌ Вы уже использовали бесплатный пробный период.\n\n"
+            "💎 Купите PRO подписку!"
+        )
+        return
+    
+    # Activate trial
+    trial_days = TRIAL_CONFIG.get("duration_days", 3)
+    expires = datetime.now() + timedelta(days=trial_days)
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET subscription_tier = 'trial', 
+                        subscription_expires = $1,
+                        trial_used = 1,
+                        voice_tier = 'trial',
+                        voice_messages_this_month = 0
+                    WHERE telegram_id = $2
+                """, expires, telegram_id)
+        else:
+            await db._connection.execute("""
+                UPDATE users 
+                SET subscription_tier = 'trial', 
+                    subscription_expires = ?,
+                    trial_used = 1,
+                    voice_tier = 'trial',
+                    voice_messages_this_month = 0
+                WHERE telegram_id = ?
+            """, (expires.isoformat(), telegram_id))
+            await db._connection.commit()
+        
+        logger.info(f"[TRIAL] Activated for user {telegram_id} until {expires}")
+        
+        # Success message
+        if lang == "uz":
+            msg = (
+                "🎉 *TABRIKLAYMIZ!*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "✅ 3 kunlik BEPUL PRO sinov davri faollashtirildi!\n\n"
+                "📅 *Tugash sanasi:* " + expires.strftime("%d.%m.%Y") + "\n\n"
+                "🎁 *Sizga berilgan imkoniyatlar:*\n"
+                "├ 🎤 10 ta ovozli xabar\n"
+                "├ ⏱ Har biri 10 sekundgacha\n"
+                "├ 📊 PRO statistika\n"
+                "├ 📅 HALOS sanasi\n"
+                "└ 💰 Qutulish rejasi\n\n"
+                "💡 _Sinov muddati tugagach PRO obunasini sotib olishingiz mumkin_"
+            )
+        else:
+            msg = (
+                "🎉 *ПОЗДРАВЛЯЕМ!*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "✅ 3-дневный БЕСПЛАТНЫЙ PRO период активирован!\n\n"
+                "📅 *Дата окончания:* " + expires.strftime("%d.%m.%Y") + "\n\n"
+                "🎁 *Ваши возможности:*\n"
+                "├ 🎤 10 голосовых сообщений\n"
+                "├ ⏱ До 10 секунд каждое\n"
+                "├ 📊 PRO статистика\n"
+                "├ 📅 Дата HALOS\n"
+                "└ 💰 План освобождения\n\n"
+                "💡 _После окончания пробного периода вы можете купить PRO подписку_"
+            )
+        
+        keyboard = [[InlineKeyboardButton(
+            "🏠 Bosh menyu" if lang == "uz" else "🏠 Главное меню",
+            callback_data="back_to_main"
+        )]]
+        
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+    except Exception as e:
+        logger.error(f"[TRIAL] Error activating trial: {e}")
+        await query.edit_message_text(
+            "❌ Xatolik yuz berdi. Qayta urinib ko'ring." if lang == "uz" else 
+            "❌ Произошла ошибка. Попробуйте снова."
+        )
+
+
 # ==================== FEATURE ACCESS CHECK ====================
 
 async def is_user_pro(telegram_id: int) -> bool:
-    """Check if user has active PRO subscription"""
+    """Check if user has active PRO or TRIAL subscription
+    
+    Admin users always return True (unlimited access)
+    """
+    # Admin har doim PRO
+    if telegram_id in ADMIN_IDS:
+        return True
+    
     db = await get_database()
     user = await db.get_user(telegram_id)
     
@@ -926,13 +1057,55 @@ async def is_user_pro(telegram_id: int) -> bool:
     if tier == "free":
         return False
     
-    if expires:
-        if isinstance(expires, str):
-            expires = datetime.fromisoformat(expires)
-        if datetime.now() > expires:
-            return False
+    # PRO yoki TRIAL - ikkalasi ham "pro" huquqlarini beradi
+    if tier in ["pro", "trial"]:
+        if expires:
+            if isinstance(expires, str):
+                expires = datetime.fromisoformat(expires)
+            if datetime.now() > expires:
+                # Muddati tugagan - free ga qaytarish
+                return False
+        return True
     
-    return True
+    return False
+
+
+async def is_admin(telegram_id: int) -> bool:
+    """Check if user is admin"""
+    return telegram_id in ADMIN_IDS
+
+
+async def is_user_on_trial(telegram_id: int) -> dict:
+    """Check if user is on trial and return trial info"""
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return {"on_trial": False, "trial_used": True}
+    
+    tier = user.get("subscription_tier", "free")
+    trial_used = user.get("trial_used", 0)
+    expires = user.get("subscription_expires")
+    
+    if tier == "trial":
+        days_left = 0
+        if expires:
+            if isinstance(expires, str):
+                expires = datetime.fromisoformat(expires)
+            delta = expires - datetime.now()
+            days_left = max(0, delta.days)
+        
+        return {
+            "on_trial": True,
+            "trial_used": True,
+            "days_left": days_left,
+            "expires": expires
+        }
+    
+    return {
+        "on_trial": False,
+        "trial_used": trial_used == 1
+    }
 
 
 async def require_pro(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:

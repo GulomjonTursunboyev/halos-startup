@@ -36,11 +36,18 @@ KOTIB_STT_URL = "https://developer.kotib.ai/api/v1/stt"
 
 # ==================== VOICE LIMITS & TIERS ====================
 # Voice Tier System:
+# - trial: 10 ta, 10 soniya max (3 kunlik sinov)
 # - basic: 30 ta/oy, 30 soniya max (FREE va PRO Basic)
 # - plus: 60 ta/oy, 60 soniya max (Voice+ obuna)
 # - unlimited: cheksiz, 60 soniya max (Voice Unlimited obuna)
 
 VOICE_TIERS = {
+    "trial": {
+        "monthly_limit": 10,
+        "max_duration": 10,  # soniya - trial uchun cheklangan
+        "name_uz": "Sinov",
+        "name_ru": "Пробный"
+    },
     "basic": {
         "monthly_limit": 30,
         "max_duration": 30,  # soniya
