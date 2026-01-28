@@ -9,4 +9,4 @@ lxml
 openpyxl==3.1.2
 pandas
 requests
-aiohttp==3.9.3
+aiohttp==3.9.3Pillow==10.2.0

@@ -10,6 +10,7 @@ Bir ovozli xabarda bir nechta tranzaksiyalarni aniqlash va saqlash
 import aiohttp
 import os
 import re
+import io
 import json
 import logging
 from datetime import datetime
@@ -4139,7 +4140,11 @@ def format_real_balance_message(balance_data: Dict, lang: str = "uz") -> str:
 
 async def send_scheduled_report(context, telegram_id: int, period: str = "daily") -> bool:
     """
-    Foydalanuvchiga rejalashtirilgan hisobot yuborish
+    Foydalanuvchiga rejalashtirilgan hisobot yuborish (GIBRID USUL)
+    
+    - Kunlik: Faqat matn (tez, arzon)
+    - Haftalik: Matn + mini grafik rasm
+    - Oylik: To'liq rasm hisobot
     
     Args:
         context: Telegram context
@@ -4147,6 +4152,7 @@ async def send_scheduled_report(context, telegram_id: int, period: str = "daily"
         period: "daily", "weekly", "monthly"
     """
     from app.database import get_database
+    from telegram import InputFile
     
     try:
         db = await get_database()
@@ -4164,21 +4170,92 @@ async def send_scheduled_report(context, telegram_id: int, period: str = "daily"
         if report_data["transaction_count"] == 0:
             return False
         
-        # Formatlash
-        report_msg = format_period_report(report_data, lang)
-        
-        # Yuborish
-        await context.bot.send_message(
-            chat_id=telegram_id,
-            text=report_msg,
-            parse_mode="Markdown"
-        )
+        # ========== GIBRID USUL ==========
+        if period == "daily":
+            # KUNLIK: Faqat matn
+            report_msg = format_period_report(report_data, lang)
+            await context.bot.send_message(
+                chat_id=telegram_id,
+                text=report_msg,
+                parse_mode="Markdown"
+            )
+            
+        elif period == "weekly":
+            # HAFTALIK: Matn + rasm (agar mavjud bo'lsa)
+            from app.report_images import generate_weekly_report_image, is_image_generation_available
+            
+            if is_image_generation_available():
+                image_bytes = generate_weekly_report_image(report_data, lang)
+                if image_bytes:
+                    # Rasm yuborish
+                    await context.bot.send_photo(
+                        chat_id=telegram_id,
+                        photo=InputFile(io.BytesIO(image_bytes), filename="weekly_report.png"),
+                        caption="📆 " + ("Haftalik hisobot" if lang == "uz" else "Недельный отчёт")
+                    )
+                else:
+                    # Rasm yaratilmadi - matn yuborish
+                    report_msg = format_period_report(report_data, lang)
+                    await context.bot.send_message(
+                        chat_id=telegram_id,
+                        text=report_msg,
+                        parse_mode="Markdown"
+                    )
+            else:
+                # PIL mavjud emas - matn yuborish
+                report_msg = format_period_report(report_data, lang)
+                await context.bot.send_message(
+                    chat_id=telegram_id,
+                    text=report_msg,
+                    parse_mode="Markdown"
+                )
+                
+        elif period == "monthly":
+            # OYLIK: To'liq rasm hisobot
+            from app.report_images import generate_monthly_report_image, is_image_generation_available
+            
+            if is_image_generation_available():
+                # Balans ma'lumotlarini olish
+                balance_data = await get_user_real_balance(db, user["id"])
+                
+                image_bytes = generate_monthly_report_image(report_data, balance_data, lang)
+                if image_bytes:
+                    # Rasm yuborish
+                    caption = "🗓 " + ("Oylik hisobot" if lang == "uz" else "Месячный отчёт")
+                    caption += "\n\n💡 " + ("Batafsil: /report" if lang == "uz" else "Подробнее: /report")
+                    
+                    await context.bot.send_photo(
+                        chat_id=telegram_id,
+                        photo=InputFile(io.BytesIO(image_bytes), filename="monthly_report.png"),
+                        caption=caption
+                    )
+                else:
+                    # Rasm yaratilmadi - matn yuborish
+                    report_msg = format_period_report(report_data, lang)
+                    balance_msg = format_real_balance_message(balance_data, lang)
+                    await context.bot.send_message(
+                        chat_id=telegram_id,
+                        text=report_msg + "\n\n" + balance_msg,
+                        parse_mode="Markdown"
+                    )
+            else:
+                # PIL mavjud emas - matn yuborish
+                report_msg = format_period_report(report_data, lang)
+                balance_data = await get_user_real_balance(db, user["id"])
+                balance_msg = format_real_balance_message(balance_data, lang)
+                await context.bot.send_message(
+                    chat_id=telegram_id,
+                    text=report_msg + "\n\n" + balance_msg,
+                    parse_mode="Markdown"
+                )
         
         logger.info(f"[REPORT] {period} hisobot yuborildi: {telegram_id}")
         return True
         
     except Exception as e:
         logger.error(f"[REPORT] Hisobot yuborishda xatolik: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
