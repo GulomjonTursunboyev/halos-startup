@@ -264,12 +264,14 @@ class SelfLearningAI:
         
         # 2. Kategoriya kalit so'zlari bo'lsa +15
         category_keywords = {
-            "oziq_ovqat": ["non", "ovqat", "yedim", "ichdim", "restoran", "kafe"],
-            "transport": ["taksi", "avtobus", "metro", "benzin", "yol", "yo'l"],
-            "uy_joy": ["ijara", "kvartira", "uy", "remont"],
-            "kommunal": ["gaz", "suv", "elektr", "tok"],
-            "ish_haqi": ["maosh", "oylik", "ish haqi", "ishladim"],
-            "biznes": ["sotdim", "savdo", "do'kon", "foyda"],
+            "oziq_ovqat": ["non", "ovqat", "yedim", "ichdim", "restoran", "kafe", 
+                          "tovuq", "tovoq", "tovuk", "go'sht", "mol", "qo'y", "baliq",
+                          "sabzavot", "meva", "bozor", "palov", "somsa", "osh"],
+            "transport": ["taksi", "avtobus", "metro", "benzin", "yol", "yo'l", "uber", "bolt"],
+            "uy_joy": ["ijara", "kvartira", "uy", "remont", "arenda", "mebel"],
+            "kommunal": ["gaz", "suv", "elektr", "tok", "internet"],
+            "ish_haqi": ["maosh", "oylik", "ish haqi", "ishladim", "avans"],
+            "biznes": ["sotdim", "savdo", "do'kon", "foyda", "tushum"],
         }
         
         if category in category_keywords:

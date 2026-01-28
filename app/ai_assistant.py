@@ -143,7 +143,10 @@ CATEGORY_KEYWORDS = {
         "osh", "palov", "somsa", "lag'mon", "shashlik", "tushlik", "nonushta", "kechki",
         "ovqatlandim", "yedim", "ichdim", "olib yedim", "olgani", "sotib oldim ovqat",
         "choyxona", "oshxona", "fastfood", "burger", "pizza", "lavash", "kabob",
-        "moshxo'rda", "sho'rva", "manti", "chuchvara", "qazi", "norin"
+        "moshxo'rda", "sho'rva", "manti", "chuchvara", "qazi", "norin",
+        # Tovuq variantlari - to'liq qo'shildi
+        "tovuq", "tovoq", "tovuk", "tuvuq", "chicken", "курица", "курятина",
+        "mol", "qo'y", "baliq", "kolbasa", "sosiska", "tuxum", "sut", "qatiq", "suzma"
     ],
     "transport": [
         "taksi", "avtobus", "metro", "benzin", "mashina", "yoqilg'i", "uber", "yandex",

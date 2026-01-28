@@ -5501,6 +5501,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         msg += limit_msg
                     
                     # Keyboard with correction option
+                    # Agar kategoriya "boshqa" yoki needs_confirmation bo'lsa, aniqlashtirish tugmasini qo'shish
+                    needs_clarification = transaction.get("needs_confirmation", False) or transaction.get("category") == "boshqa"
+                    
                     keyboard = [
                         [
                             InlineKeyboardButton(
@@ -5511,12 +5514,22 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                                 "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
                                 callback_data=f"ai_correct_{transaction_id}"
                             )
-                        ],
-                        [InlineKeyboardButton(
-                            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                            callback_data="ai_report"
-                        )]
+                        ]
                     ]
+                    
+                    # Aniqlashtirish tugmasi - ixtiyoriy
+                    if needs_clarification:
+                        keyboard.insert(0, [InlineKeyboardButton(
+                            "🔍 Kategoriyani aniqlashtirish" if lang == "uz" else "🔍 Уточнить категорию",
+                            callback_data=f"ai_clarify_category_{transaction_id}"
+                        )])
+                        # Xabar oxiriga eslatma
+                        msg += "\n\n_💡 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💡 Категория неточна. Уточнение необязательно._"
+                    
+                    keyboard.append([InlineKeyboardButton(
+                        "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+                        callback_data="ai_report"
+                    )])
                     
                     await processing_msg.edit_text(
                         msg,
@@ -5639,6 +5652,18 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         from app.ai_assistant import format_expense_saved_with_budget
         transaction_id = await save_transaction(db, user["id"], transaction)
         
+        # Context da saqlash
+        context.user_data["last_transaction"] = {
+            "original_text": text,
+            "transaction_id": transaction_id,
+            "type": transaction["type"],
+            "category": transaction["category"],
+            "amount": transaction["amount"],
+            "description": transaction.get("description", ""),
+            "ai_source": transaction.get("ai_source", "local"),
+            "needs_learning": transaction.get("ai_source") == "gemini"
+        }
+        
         msg = format_expense_saved_with_budget(transaction, budget_status, lang)
         
         # Admin uchun limit ko'rsatmaslik
@@ -5646,6 +5671,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             new_limit_info = await check_voice_limit(db, user["id"])
             limit_msg = f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🎤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
             msg += limit_msg
+        
+        # Aniqlashtirish kerakmi tekshirish
+        needs_clarification = transaction.get("needs_confirmation", False) or transaction.get("category") == "boshqa"
         
         keyboard = [
             [
@@ -5657,12 +5685,20 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
                     callback_data=f"ai_correct_{transaction_id}"
                 )
-            ],
-            [InlineKeyboardButton(
-                "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
-                callback_data="ai_report"
-            )]
+            ]
         ]
+        
+        if needs_clarification:
+            keyboard.insert(0, [InlineKeyboardButton(
+                "🔍 Kategoriyani aniqlashtirish" if lang == "uz" else "🔍 Уточнить категорию",
+                callback_data=f"ai_clarify_category_{transaction_id}"
+            )])
+            msg += "\n\n_💡 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💡 Категория неточна. Уточнение необязательно._"
+        
+        keyboard.append([InlineKeyboardButton(
+            "📊 Hisobot" if lang == "uz" else "📊 Отчёт",
+            callback_data="ai_report"
+        )])
         
         await processing_msg.edit_text(
             msg,
@@ -6113,6 +6149,190 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+
+async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Kategoriyani aniqlashtirish uchun kategoriya ro'yxatini ko'rsatish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID from callback data: ai_clarify_category_123
+    callback_data = query.data
+    try:
+        transaction_id = int(callback_data.split("_")[-1])
+    except:
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, transaction_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        await query.edit_message_text(
+            "❌ Tranzaksiya topilmadi" if lang == "uz" else "❌ Транзакция не найдена"
+        )
+        return
+    
+    # Kategoriyalar ro'yxati
+    if transaction["type"] == "income":
+        categories = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"])
+    else:
+        categories = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
+    
+    if lang == "uz":
+        msg = (
+            "🔍 *Kategoriyani tanlang*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 Tavsif: _{transaction['description']}_\n"
+            f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
+            "_Qaysi kategoriyaga saqlash kerak?_"
+        )
+    else:
+        msg = (
+            "🔍 *Выберите категорию*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📝 Описание: _{transaction['description']}_\n"
+            f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
+            "_В какую категорию сохранить?_"
+        )
+    
+    # Kategoriyalar tugmalari (2 ta qatorda)
+    keyboard = []
+    cat_items = list(categories.items())
+    
+    for i in range(0, len(cat_items), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(cat_items):
+                cat_key, cat_name = cat_items[i + j]
+                row.append(InlineKeyboardButton(
+                    cat_name,
+                    callback_data=f"ai_set_category_{transaction_id}_{cat_key}"
+                ))
+        keyboard.append(row)
+    
+    # Bekor qilish tugmasi
+    keyboard.append([InlineKeyboardButton(
+        "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
+        callback_data="ai_cancel_correct"
+    )])
+    
+    await query.edit_message_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Tanlangan kategoriyani saqlash va AI ga o'rgatish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    # Extract transaction ID and category: ai_set_category_123_oziq_ovqat
+    callback_data = query.data
+    parts = callback_data.replace("ai_set_category_", "").split("_", 1)
+    
+    try:
+        transaction_id = int(parts[0])
+        new_category = parts[1] if len(parts) > 1 else "boshqa"
+    except:
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
+        return
+    
+    from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, learn_from_correction
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    transaction = await get_transaction_by_id(db, transaction_id)
+    
+    if not transaction or transaction["user_id"] != user["id"]:
+        await query.edit_message_text(
+            "❌ Tranzaksiya topilmadi" if lang == "uz" else "❌ Транзакция не найдена"
+        )
+        return
+    
+    old_category = transaction.get("category_key", "boshqa")
+    
+    # Yangi kategoriya nomini olish
+    if transaction["type"] == "income":
+        categories = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"])
+    else:
+        categories = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
+    
+    new_category_name = categories.get(new_category, "📦 Boshqa")
+    
+    # Database'da yangilash
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE transactions 
+                    SET category = $1, category_key = $2
+                    WHERE id = $3 AND user_id = $4
+                """, new_category_name, new_category, transaction_id, user["id"])
+        else:
+            await db._connection.execute("""
+                UPDATE transactions 
+                SET category = ?, category_key = ?
+                WHERE id = ? AND user_id = ?
+            """, (new_category_name, new_category, transaction_id, user["id"]))
+            await db._connection.commit()
+        
+        # AI ga o'rgatish - kategoriya tuzatilganda
+        original_text = transaction.get("description", "")
+        if original_text:
+            wrong_result = {
+                "type": transaction["type"],
+                "category": old_category,
+                "amount": transaction["amount"],
+                "description": original_text
+            }
+            correct_result = {
+                "type": transaction["type"],
+                "category": new_category,
+                "amount": transaction["amount"],
+                "description": original_text
+            }
+            await learn_from_correction(original_text, wrong_result, correct_result)
+        
+        if lang == "uz":
+            msg = (
+                "✅ *Kategoriya yangilandi!*\n\n"
+                f"📁 Yangi kategoriya: *{new_category_name}*\n\n"
+                "_🧠 AI bu so'zni keyingi safar to'g'ri taniydi._"
+            )
+        else:
+            msg = (
+                "✅ *Категория обновлена!*\n\n"
+                f"📁 Новая категория: *{new_category_name}*\n\n"
+                "_🧠 AI запомнит это для следующих разов._"
+            )
+        
+        await query.edit_message_text(msg, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error updating category: {e}")
+        await query.edit_message_text(
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
+        )
 
 
 async def ai_delete_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
