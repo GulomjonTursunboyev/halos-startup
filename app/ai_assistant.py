@@ -1,6 +1,7 @@
 """
 AI Yordamchi - Ovozli xabarlarni qayta ishlash va xarajat/daromad tracking
 Kotib.ai STT API integratsiyasi
+Google Gemini AI integratsiyasi (kategoriya va tahlil uchun)
 
 MULTI-TRANSACTION PARSING ENGINE v2.0
 =====================================
@@ -17,6 +18,14 @@ from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+
+# Gemini AI (agar mavjud bo'lsa)
+try:
+    from app.gemini_ai import analyze_with_gemini, smart_categorize, is_gemini_available
+    GEMINI_ENABLED = True
+except ImportError:
+    GEMINI_ENABLED = False
+    def is_gemini_available(): return False
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -812,11 +821,57 @@ def extract_description(text: str, amount: Optional[int]) -> str:
 async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
     """
     Matndan to'liq tranzaksiya ma'lumotlarini ajratib olish
+    
+    1. Avval Gemini AI bilan tahlil qilishga harakat qiladi
+    2. Agar Gemini ishlamasa, oddiy algoritm ishlatiladi
     """
+    
+    # ========== GEMINI AI BILAN TAHLIL ==========
+    if GEMINI_ENABLED and is_gemini_available():
+        try:
+            gemini_result = await analyze_with_gemini(text, lang)
+            if gemini_result:
+                transaction_type = gemini_result.get("type", "expense")
+                category = gemini_result.get("category", "boshqa")
+                amount = gemini_result.get("amount")
+                description = gemini_result.get("description", text[:50])
+                
+                # Kategoriya nomini olish
+                if transaction_type == "income":
+                    category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+                else:
+                    category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+                
+                logger.info(f"[AI] Gemini tahlili muvaffaqiyatli: {transaction_type} - {category} - {amount}")
+                
+                return {
+                    "type": transaction_type,
+                    "category": category,
+                    "category_name": category_name,
+                    "amount": amount,
+                    "description": description,
+                    "original_text": text,
+                    "timestamp": datetime.now().isoformat(),
+                    "ai_source": "gemini"
+                }
+        except Exception as e:
+            logger.warning(f"[AI] Gemini xatosi, oddiy algoritmga o'tilmoqda: {e}")
+    
+    # ========== ODDIY ALGORITM (FALLBACK) ==========
     transaction_type = detect_transaction_type(text)
     category = detect_category(text, transaction_type)
     amount = extract_amount(text)
     description = extract_description(text, amount)
+    
+    # Gemini bilan kategoriyani yangilash (tez so'rov)
+    if GEMINI_ENABLED and is_gemini_available():
+        try:
+            smart_cat = await smart_categorize(text, transaction_type)
+            if smart_cat:
+                category = smart_cat
+                logger.info(f"[AI] Gemini kategoriya: {category}")
+        except:
+            pass
     
     # Kategoriya nomini olish
     if transaction_type == "income":
@@ -831,7 +886,8 @@ async def parse_voice_transaction(text: str, lang: str = "uz") -> Dict:
         "amount": amount,
         "description": description,
         "original_text": text,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "ai_source": "local"
     }
 
 
@@ -1609,6 +1665,7 @@ async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]
     ASOSIY MULTI-TRANSACTION PARSING FUNKSIYASI v3.0
     
     Bir matndan BARCHA tranzaksiyalarni (daromad va xarajat) aniqlaydi.
+    GEMINI AI integratsiyasi bilan kuchaytirilgan!
     
     Misol: "bugun yuz ming ishlab topdim on minga non oldim yigirma ming yolkira qildim 5 minga suv ichdim"
     
@@ -1624,6 +1681,43 @@ async def parse_multiple_transactions(text: str, lang: str = "uz") -> List[Dict]
     print(f"[MULTI-PARSE v3.0] Matn: '{text}'")
     print(f"{'='*60}")
     
+    # ========== GEMINI AI BILAN MULTI-TRANSACTION TAHLIL ==========
+    if GEMINI_ENABLED and is_gemini_available():
+        try:
+            from app.gemini_ai import analyze_multiple_transactions
+            gemini_results = await analyze_multiple_transactions(text, lang)
+            
+            if gemini_results and len(gemini_results) > 0:
+                transactions = []
+                for item in gemini_results:
+                    tx_type = item.get("type", "expense")
+                    category = item.get("category", "boshqa")
+                    amount = item.get("amount", 0)
+                    description = item.get("description", "")
+                    
+                    # Kategoriya nomini olish
+                    if tx_type == "income":
+                        category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+                    else:
+                        category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+                    
+                    transactions.append({
+                        "type": tx_type,
+                        "category": category,
+                        "category_name": category_name,
+                        "amount": amount,
+                        "description": description,
+                        "original_text": text[:100],
+                        "timestamp": datetime.now().isoformat(),
+                        "ai_source": "gemini"
+                    })
+                
+                print(f"[MULTI-PARSE] Gemini: {len(transactions)} ta tranzaksiya topildi")
+                return transactions
+        except Exception as e:
+            logger.warning(f"[MULTI-PARSE] Gemini xatosi, oddiy algoritmga o'tilmoqda: {e}")
+    
+    # ========== ODDIY ALGORITM (FALLBACK) ==========
     # 1. Barcha summalarni va kontekstlarini topish
     amount_items = find_all_amounts_with_context(text)
     

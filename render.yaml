@@ -24,5 +24,7 @@ services:
         value: "333605228"
       - key: CLICK_SECRET_KEY
         value: "31ACF1A3C571667379481B13BEDCCA774AEBA199"
+      - key: GEMINI_API_KEY
+        sync: false
       - key: PYTHON_VERSION
         value: "3.11.4"
