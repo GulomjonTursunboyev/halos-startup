@@ -693,6 +693,25 @@ class Database:
                 logger.error(f"get_user error: {e}")
                 raise
     
+    async def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user by database ID"""
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire(timeout=15) as conn:
+                    row = await conn.fetchrow(
+                        "SELECT * FROM users WHERE id = $1", user_id
+                    )
+                    return dict(row) if row else None
+            else:
+                async with self._connection.execute(
+                    "SELECT * FROM users WHERE id = ?", (user_id,)
+                ) as cursor:
+                    row = await cursor.fetchone()
+                    return dict(row) if row else None
+        except Exception as e:
+            logger.error(f"get_user_by_id error: {e}")
+            return None
+    
     async def create_user(
         self,
         telegram_id: int,
