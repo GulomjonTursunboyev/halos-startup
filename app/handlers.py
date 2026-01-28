@@ -2685,14 +2685,29 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle errors"""
-    logger.error(f"Error: {context.error}")
+    error = context.error
+    
+    # Log error with full details
+    if error:
+        import traceback
+        error_traceback = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+        logger.error(f"Error occurred: {type(error).__name__}: {error}\n{error_traceback}")
+    else:
+        logger.error("Unknown error occurred (no error details)")
     
     if update and update.effective_message:
         lang = context.user_data.get("lang", "uz") if context.user_data else "uz"
         
-        await update.effective_message.reply_text(
-            get_message("error_generic", lang)
-        )
+        # Database timeout uchun maxsus xabar
+        if isinstance(error, (TimeoutError, asyncio.TimeoutError)):
+            await update.effective_message.reply_text(
+                "⏳ Server band. Iltimos, qayta urinib ko'ring." if lang == "uz" else 
+                "⏳ Сервер занят. Попробуйте ещё раз."
+            )
+        else:
+            await update.effective_message.reply_text(
+                get_message("error_generic", lang)
+            )
 
 
 # ==================== CONVERSATION HANDLER ====================

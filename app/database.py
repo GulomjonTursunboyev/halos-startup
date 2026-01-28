@@ -83,7 +83,8 @@ class Database:
                         dsn=db_url,
                         min_size=2,      # Minimal connections to avoid hitting limit
                         max_size=10,     # Max 10 concurrent (Supabase free tier limit ~15-20)
-                        command_timeout=30,  # Longer timeout for reliability
+                        command_timeout=60,  # Longer timeout for reliability
+                        timeout=30,      # Connection acquire timeout
                         ssl='require',
                         max_inactive_connection_lifetime=60  # Close idle connections faster
                     )
@@ -109,7 +110,8 @@ class Database:
                                 dsn=db_url,
                                 min_size=2,
                                 max_size=10,
-                                command_timeout=30,
+                                command_timeout=60,
+                                timeout=30,
                                 max_inactive_connection_lifetime=60
                             )
                             await self._create_tables_postgres()
@@ -656,19 +658,30 @@ class Database:
     # ==================== USER OPERATIONS ====================
     
     async def get_user(self, telegram_id: int) -> Optional[Dict[str, Any]]:
-        """Get user by Telegram ID"""
-        if self.is_postgres:
-            async with self._pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    "SELECT * FROM users WHERE telegram_id = $1", telegram_id
-                )
-                return dict(row) if row else None
-        else:
-            async with self._connection.execute(
-                "SELECT * FROM users WHERE telegram_id = ?", (telegram_id,)
-            ) as cursor:
-                row = await cursor.fetchone()
-                return dict(row) if row else None
+        """Get user by Telegram ID with retry logic"""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if self.is_postgres:
+                    async with self._pool.acquire(timeout=15) as conn:
+                        row = await conn.fetchrow(
+                            "SELECT * FROM users WHERE telegram_id = $1", telegram_id
+                        )
+                        return dict(row) if row else None
+                else:
+                    async with self._connection.execute(
+                        "SELECT * FROM users WHERE telegram_id = ?", (telegram_id,)
+                    ) as cursor:
+                        row = await cursor.fetchone()
+                        return dict(row) if row else None
+            except (asyncio.TimeoutError, TimeoutError) as e:
+                logger.warning(f"get_user timeout attempt {attempt + 1}/{max_retries}: {e}")
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"get_user error: {e}")
+                raise
     
     async def create_user(
         self,
