@@ -5745,7 +5745,12 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Skip menu buttons and commands
     menu_patterns = [
         "📊", "👤", "💎", "🌐", "❓", "/", "Hisobotlarim", "Мои отчёты",
-        "Profil", "Профиль", "PRO", "Til", "Язык", "Yordam", "Помощь"
+        "Profil", "Профиль", "PRO", "Til", "Язык", "Yordam", "Помощь",
+        # Menu tugmalari - yangi qo'shildi
+        "✍️", "Xarajat", "Расход", "💰", "Daromad", "Доход",
+        "📋", "Qarzlar", "Долги", "🔄", "Transfer", "Перевод",
+        "⚙️", "Sozlamalar", "Настройки", "📈", "Statistika", "Статистика",
+        "🏠", "Bosh sahifa", "Главная", "⬅️", "Orqaga", "Назад"
     ]
     for pattern in menu_patterns:
         if pattern in text:

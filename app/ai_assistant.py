@@ -3129,7 +3129,7 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
     if db.is_postgres:
         async with db._pool.acquire() as conn:
             row = await conn.fetchrow("""
-                SELECT id, user_id, type, category, amount, description, original_text, created_at
+                SELECT id, user_id, type, category, category_key, amount, description, original_text, created_at
                 FROM transactions WHERE id = $1
             """, transaction_id)
             
@@ -3139,6 +3139,7 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
                     "user_id": row["user_id"],
                     "type": row["type"],
                     "category": row["category"],
+                    "category_key": row["category_key"],
                     "amount": row["amount"],
                     "description": row["description"],
                     "original_text": row["original_text"],
@@ -3146,7 +3147,7 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
                 }
     else:
         cursor = await db._connection.execute("""
-            SELECT id, user_id, type, category, amount, description, original_text, created_at
+            SELECT id, user_id, type, category, category_key, amount, description, original_text, created_at
             FROM transactions WHERE id = ?
         """, (transaction_id,))
         row = await cursor.fetchone()
@@ -3157,10 +3158,11 @@ async def get_transaction_by_id(db, transaction_id: int) -> Optional[Dict]:
                 "user_id": row[1],
                 "type": row[2],
                 "category": row[3],
-                "amount": row[4],
-                "description": row[5],
-                "original_text": row[6],
-                "created_at": row[7]
+                "category_key": row[4],
+                "amount": row[5],
+                "description": row[6],
+                "original_text": row[7],
+                "created_at": row[8]
             }
     return None
 
