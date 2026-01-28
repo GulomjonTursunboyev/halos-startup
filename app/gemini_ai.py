@@ -352,6 +352,8 @@ JAVOB FORMATI (faqat JSON array, hech qanday izoh yo'q):
 
 MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
 
+    logger.info(f"[Gemini Multi] analyze_multiple_transactions boshlandi: '{text[:100]}...'")
+    
     try:
         async with aiohttp.ClientSession() as session:
             headers = {"Content-Type": "application/json"}
@@ -365,13 +367,17 @@ MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
             }
             
             url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+            logger.info(f"[Gemini Multi] API so'rov yuborilmoqda...")
             
             async with session.post(url, headers=headers, json=data, timeout=20) as response:
+                logger.info(f"[Gemini Multi] API javob: status={response.status}")
+                
                 if response.status == 200:
                     result = await response.json()
                     
                     if "candidates" in result and result["candidates"]:
                         text_response = result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        logger.info(f"[Gemini Multi] Raw response: {text_response[:500]}")
                         
                         # Clean up JSON
                         text_response = text_response.strip()
@@ -395,19 +401,24 @@ MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
                                         item["description"] = fix_spelling(item["description"])
                                     item["created_at"] = datetime.now().isoformat()
                                 
-                                logger.info(f"[Gemini] Multi-tranzaksiya: {len(parsed)} ta topildi")
+                                logger.info(f"[Gemini Multi] Muvaffaqiyat! {len(parsed)} ta tranzaksiya topildi")
                                 return parsed
                             else:
+                                logger.info(f"[Gemini Multi] Bitta dict qaytdi, arrayga o'girildi")
                                 return [parsed]
                         except json.JSONDecodeError as e:
-                            logger.error(f"[Gemini] JSON parse xato: {e}, response: {text_response[:300]}")
+                            logger.error(f"[Gemini Multi] JSON parse xato: {e}, response: {text_response[:300]}")
                             return None
+                    else:
+                        logger.error(f"[Gemini Multi] candidates topilmadi: {result}")
+                        return None
                             
                 elif response.status == 429:
-                    logger.warning("[Gemini] Rate limit")
+                    logger.warning("[Gemini Multi] Rate limit!")
                     return None
                 else:
                     error_text = await response.text()
+                    logger.error(f"[Gemini Multi] API xato {response.status}: {error_text[:300]}")
                     logger.error(f"[Gemini] API xato {response.status}: {error_text[:200]}")
                     return None
                     
@@ -415,10 +426,6 @@ MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
         logger.error(f"[Gemini] So'rov xatosi: {e}")
         import traceback
         traceback.print_exc()
-        return None
-                    
-    except Exception as e:
-        logger.error(f"[Gemini] So'rov xatosi: {e}")
         return None
 
 

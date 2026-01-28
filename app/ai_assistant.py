@@ -1737,15 +1737,20 @@ async def parse_multiple_transactions(text: str, lang: str = "uz", user_context:
          "needs_clarification": True, "clarification_type": "chicken_type"}
     ]
     """
+    logger.info(f"[MULTI-PARSE v4.0] Matn: '{text}'")
     print(f"\n{'='*60}")
     print(f"[MULTI-PARSE v4.0] Matn: '{text}'")
     print(f"{'='*60}")
     
     # ========== GEMINI AI BILAN MULTI-TRANSACTION TAHLIL ==========
+    logger.info(f"[MULTI-PARSE] GEMINI_ENABLED={GEMINI_ENABLED}, is_available={is_gemini_available()}")
+    
     if GEMINI_ENABLED and is_gemini_available():
         try:
             from app.gemini_ai import analyze_multiple_transactions
+            logger.info(f"[MULTI-PARSE] Gemini analyze_multiple_transactions chaqirilmoqda...")
             gemini_results = await analyze_multiple_transactions(text, lang, user_context)
+            logger.info(f"[MULTI-PARSE] Gemini natijasi: {gemini_results}")
             
             if gemini_results and len(gemini_results) > 0:
                 transactions = []
