@@ -1437,12 +1437,145 @@ async def katm_choice_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle PDF or HTML file upload for KATM"""
+    """Handle PDF, HTML or IMAGE file upload for KATM - with detailed analysis"""
     lang = context.user_data.get("lang", "uz")
     telegram_id = update.effective_user.id
     
     # Check if document exists
     document = update.message.document
+    photo = update.message.photo
+    
+    # Handle photo (screenshot of credit schedule) - AI bilan o'qish
+    if photo:
+        processing_msg = await update.message.reply_text(
+            "📷 Rasm tahlil qilinmoqda..." if lang == "uz" else "📷 Анализирую изображение..."
+        )
+        
+        try:
+            # Eng katta rasmni olish
+            photo_file = photo[-1]
+            file = await photo_file.get_file()
+            
+            # Rasmni saqlash
+            PDF_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            image_path = PDF_UPLOAD_DIR / f"{telegram_id}_credit_schedule.jpg"
+            await file.download_to_drive(str(image_path))
+            
+            # AI bilan rasmni tahlil qilish
+            from app.pdf_parser import parse_credit_image_with_ai, analyze_credit_details, calculate_interest_impact
+            import os
+            
+            api_key = os.getenv("GEMINI_API_KEY")
+            result = await parse_credit_image_with_ai(str(image_path), api_key)
+            
+            await processing_msg.delete()
+            
+            if result.success and result.loans:
+                # Ma'lumotlarni saqlash
+                context.user_data["loan_payment"] = result.total_monthly_payment
+                context.user_data["total_debt"] = result.total_remaining_debt
+                context.user_data["katm_loans"] = result.loans
+                context.user_data["credit_from_file"] = True
+                
+                # Tahlil
+                loan = result.loans[0]
+                analysis = {
+                    "months_remaining": loan.months_remaining,
+                    "interest_rate_estimated": loan.interest_rate if loan.interest_rate else 24,
+                    "monthly_interest": loan.interest_amount,
+                    "monthly_principal": loan.principal_amount,
+                    "interest_percentage": (loan.interest_amount / loan.monthly_payment * 100) if loan.monthly_payment > 0 else 0,
+                    "loan_type": loan.loan_type,
+                    "loan_type_name": "Annuitet" if loan.loan_type == "annuity" else "Differensial"
+                }
+                context.user_data["credit_analysis"] = analysis
+                
+                # Daromadga ta'sir
+                income_self = context.user_data.get("income_self", 0)
+                income_partner = context.user_data.get("income_partner", 0)
+                total_income = income_self + income_partner
+                
+                interest_impact = None
+                if total_income > 0:
+                    interest_impact = calculate_interest_impact(
+                        monthly_interest=loan.interest_amount,
+                        monthly_income=total_income
+                    )
+                    context.user_data["interest_impact"] = interest_impact
+                
+                # Xabar tuzish
+                loans_list = f"├ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
+                
+                interest_warning = ""
+                if interest_impact:
+                    ratio = interest_impact["interest_to_income_ratio"]
+                    if ratio < 5:
+                        interest_warning = get_message("credit_interest_warning_low", lang)
+                    elif ratio < 10:
+                        interest_warning = get_message("credit_interest_warning_moderate", lang)
+                    elif ratio < 20:
+                        interest_warning = get_message("credit_interest_warning_high", lang).format(
+                            amount=format_number(loan.interest_amount)
+                        )
+                    else:
+                        interest_warning = get_message("credit_interest_warning_critical", lang).format(
+                            ratio=round(ratio, 1)
+                        )
+                
+                detailed_msg = get_message("credit_detailed_analysis", lang).format(
+                    loans_list=loans_list,
+                    total_debt=format_number(loan.remaining_balance),
+                    monthly_payment=format_number(loan.monthly_payment),
+                    months_remaining=loan.months_remaining,
+                    interest_rate=loan.interest_rate if loan.interest_rate else "~24",
+                    impact_emoji=interest_impact["impact_emoji"] if interest_impact else "📊",
+                    monthly_interest=format_number(loan.interest_amount),
+                    monthly_principal=format_number(loan.principal_amount),
+                    interest_percentage=round(analysis["interest_percentage"], 1),
+                    yearly_interest=format_number(loan.interest_amount * 12),
+                    interest_warning=interest_warning
+                )
+                
+                detailed_msg += get_message("credit_confirm_data", lang)
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            get_message("katm_confirm_yes", lang), 
+                            callback_data="katm_confirm_yes"
+                        ),
+                        InlineKeyboardButton(
+                            get_message("katm_confirm_no", lang), 
+                            callback_data="katm_confirm_no"
+                        )
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    detailed_msg,
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup
+                )
+                
+                return States.KATM_UPLOAD
+            else:
+                # Rasmni o'qib bo'lmadi
+                await update.message.reply_text(
+                    "❌ Rasmdan ma'lumotni o'qib bo'lmadi. PDF yoki HTML faylni yuboring." if lang == "uz"
+                    else "❌ Не удалось прочитать данные с изображения. Отправьте PDF или HTML файл."
+                )
+                return States.KATM_UPLOAD
+                
+        except Exception as e:
+            logger.error(f"Image processing error: {e}")
+            await processing_msg.delete()
+            await update.message.reply_text(
+                "❌ Rasmni qayta ishlashda xatolik. PDF/HTML faylni yuboring." if lang == "uz"
+                else "❌ Ошибка обработки изображения. Отправьте PDF/HTML файл."
+            )
+            return States.KATM_UPLOAD
+    
     if not document:
         await update.message.reply_text(
             get_message("katm_not_pdf", lang)
@@ -1474,7 +1607,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await file.download_to_drive(str(file_path))
         
         # Parse file (auto-detect format)
-        from app.pdf_parser import parse_katm_file
+        from app.pdf_parser import parse_katm_file, analyze_credit_details, calculate_interest_impact
         result = parse_katm_file(str(file_path))
         
         # Delete processing message
@@ -1486,6 +1619,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             context.user_data["total_debt"] = result.total_remaining_debt
             context.user_data["katm_loans"] = result.loans
             context.user_data["katm_pdf"] = file_name
+            context.user_data["credit_from_file"] = True  # Fayldan o'qildi - umumiy summa so'ralmasin
             
             # Save to database
             db = await get_database()
@@ -1498,23 +1632,79 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     pdf_filename=file_name
                 )
             
-            # Format loans list
-            loans_list = "\n".join([
-                get_message("katm_loan_item", lang).format(
-                    bank=loan.bank_name,
-                    amount=format_number(loan.remaining_balance)
-                )
-                for loan in result.loans
-            ])
-            
-            # Show success message with parsed data
-            success_msg = get_message("katm_success", lang).format(
-                loans_list=loans_list,
-                total_debt=format_number(result.total_remaining_debt),
-                monthly_payment=format_number(result.total_monthly_payment)
+            # === DETAILED CREDIT ANALYSIS ===
+            analysis = analyze_credit_details(
+                total_debt=result.total_remaining_debt,
+                monthly_payment=result.total_monthly_payment
             )
             
-            # Add confirmation buttons
+            # Store analysis in context
+            context.user_data["credit_analysis"] = analysis
+            
+            # Get user income for impact calculation (if available from previous steps)
+            income_self = context.user_data.get("income_self", 0)
+            income_partner = context.user_data.get("income_partner", 0)
+            total_income = income_self + income_partner
+            
+            # Calculate interest impact if income is known
+            interest_impact = None
+            if total_income > 0:
+                interest_impact = calculate_interest_impact(
+                    monthly_interest=analysis["monthly_interest"],
+                    monthly_income=total_income
+                )
+                context.user_data["interest_impact"] = interest_impact
+            
+            # Format loans list with details
+            loans_list = ""
+            for loan in result.loans:
+                loans_list += f"├ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
+            
+            # Determine warning level
+            interest_warning = ""
+            if interest_impact:
+                ratio = interest_impact["interest_to_income_ratio"]
+                if ratio < 5:
+                    interest_warning = get_message("credit_interest_warning_low", lang)
+                elif ratio < 10:
+                    interest_warning = get_message("credit_interest_warning_moderate", lang)
+                elif ratio < 20:
+                    interest_warning = get_message("credit_interest_warning_high", lang).format(
+                        amount=format_number(analysis["monthly_interest"])
+                    )
+                else:
+                    interest_warning = get_message("credit_interest_warning_critical", lang).format(
+                        ratio=round(ratio, 1)
+                    )
+            
+            # Build detailed analysis message
+            detailed_msg = get_message("credit_detailed_analysis", lang).format(
+                loans_list=loans_list,
+                total_debt=format_number(result.total_remaining_debt),
+                monthly_payment=format_number(result.total_monthly_payment),
+                months_remaining=analysis["months_remaining"],
+                interest_rate=analysis["interest_rate_estimated"],
+                impact_emoji=interest_impact["impact_emoji"] if interest_impact else "📊",
+                monthly_interest=format_number(analysis["monthly_interest"]),
+                monthly_principal=format_number(analysis["monthly_principal"]),
+                interest_percentage=analysis["interest_percentage"],
+                yearly_interest=format_number(analysis["monthly_interest"] * 12),
+                interest_warning=interest_warning
+            )
+            
+            # Add income impact if available
+            if interest_impact and total_income > 0:
+                detailed_msg += "\n" + get_message("credit_income_impact", lang).format(
+                    income=format_number(total_income),
+                    interest=format_number(analysis["monthly_interest"]),
+                    ratio=interest_impact["interest_to_income_ratio"],
+                    yearly=format_number(interest_impact["yearly_interest_loss"])
+                )
+            
+            # Add confirmation prompt
+            detailed_msg += get_message("credit_confirm_data", lang)
+            
+            # Confirmation buttons
             keyboard = [
                 [
                     InlineKeyboardButton(
@@ -1525,12 +1715,18 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         get_message("katm_confirm_no", lang), 
                         callback_data="katm_confirm_no"
                     )
+                ],
+                [
+                    InlineKeyboardButton(
+                        get_message("btn_credit_show_schedule", lang),
+                        callback_data="reg_credit_show_schedule"
+                    )
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await update.message.reply_text(
-                success_msg + "\n\n" + get_message("katm_confirm", lang),
+                detailed_msg,
                 parse_mode="Markdown",
                 reply_markup=reply_markup
             )
@@ -1568,6 +1764,77 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         
         return States.LOAN_PAYMENT
+
+
+async def reg_credit_show_schedule_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Show payment schedule during registration flow"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    analysis = context.user_data.get("credit_analysis", {})
+    
+    if not analysis:
+        await query.edit_message_text("❌ Ma'lumot topilmadi")
+        return States.KATM_UPLOAD
+    
+    from app.pdf_parser import generate_payment_schedule
+    
+    total_debt = context.user_data.get("total_debt", 0)
+    monthly_payment = context.user_data.get("loan_payment", 0)
+    interest_rate = analysis.get("interest_rate_estimated", 24)
+    loan_type = analysis.get("loan_type", "annuity")
+    
+    # Generate 6-month schedule
+    schedule = generate_payment_schedule(
+        total_debt=total_debt,
+        monthly_payment=monthly_payment,
+        interest_rate=interest_rate,
+        loan_type=loan_type,
+        months=6
+    )
+    
+    # Format schedule
+    schedule_text = ""
+    for row in schedule:
+        schedule_text += get_message("credit_schedule_row", lang).format(
+            month=row["month"],
+            payment=format_number(row["payment"]),
+            interest=format_number(row["interest"]),
+            principal=format_number(row["principal"])
+        )
+    
+    loan_type_name = "Annuitet (bir xil to'lov)" if loan_type == "annuity" else "Differensial (kamayib boruvchi)"
+    if lang == "ru":
+        loan_type_name = "Аннуитет (равные платежи)" if loan_type == "annuity" else "Дифференцированный (убывающий)"
+    
+    schedule_msg = get_message("credit_payment_schedule", lang).format(
+        schedule=schedule_text,
+        loan_type=loan_type_name
+    )
+    
+    # Add back button
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                get_message("katm_confirm_yes", lang), 
+                callback_data="katm_confirm_yes"
+            ),
+            InlineKeyboardButton(
+                get_message("katm_confirm_no", lang), 
+                callback_data="katm_confirm_no"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        schedule_msg,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+    
+    return States.KATM_UPLOAD
 
 
 async def katm_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -2785,7 +3052,9 @@ def get_conversation_handler() -> ConversationHandler:
             States.KATM_UPLOAD: [
                 MessageHandler(filters.Document.PDF, katm_pdf_handler),
                 MessageHandler(filters.Document.ALL, katm_pdf_handler),  # Catch non-PDF
+                MessageHandler(filters.PHOTO, katm_pdf_handler),  # Photo support
                 CallbackQueryHandler(katm_confirm_callback, pattern="^katm_confirm_(yes|no)$"),
+                CallbackQueryHandler(reg_credit_show_schedule_callback, pattern="^reg_credit_show_schedule$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, katm_skip_handler),
             ],
             States.LOAN_PAYMENT: [

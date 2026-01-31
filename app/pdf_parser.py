@@ -836,3 +836,144 @@ def generate_payment_schedule(
     
     return schedule
 
+
+def detect_loan_type_from_payments(payments: List[float]) -> str:
+    """
+    To'lovlar ro'yxatidan kredit turini aniqlash
+    
+    Args:
+        payments: Oylik to'lovlar ro'yxati
+    
+    Returns:
+        "annuity" yoki "differentiated"
+    """
+    if len(payments) < 3:
+        return "annuity"  # Default
+    
+    # Birinchi va oxirgi 3 ta to'lovni solishtirish
+    first_payments = payments[:3]
+    last_payments = payments[-3:]
+    
+    avg_first = sum(first_payments) / len(first_payments)
+    avg_last = sum(last_payments) / len(last_payments)
+    
+    # Agar farq 5% dan kam bo'lsa - annuitet
+    # Agar kamayib borsa - differensial
+    if avg_first > 0:
+        diff_ratio = (avg_first - avg_last) / avg_first
+        if diff_ratio > 0.05:  # 5% dan ortiq farq
+            return "differentiated"
+    
+    return "annuity"
+
+
+async def parse_credit_image_with_ai(image_path: str, api_key: str = None) -> KATMParseResult:
+    """
+    Kredit jadvalini rasmdan AI yordamida o'qish
+    
+    Args:
+        image_path: Rasm fayli yo'li
+        api_key: Gemini API kaliti
+    
+    Returns:
+        KATMParseResult
+    """
+    try:
+        import google.generativeai as genai
+        from PIL import Image
+        import os
+        
+        # API kalitini olish
+        if not api_key:
+            api_key = os.getenv("GEMINI_API_KEY")
+        
+        if not api_key:
+            return KATMParseResult(
+                success=False,
+                loans=[],
+                error_message="Gemini API kaliti topilmadi"
+            )
+        
+        genai.configure(api_key=api_key)
+        
+        # Rasmni yuklash
+        image = Image.open(image_path)
+        
+        # Gemini model
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        prompt = """
+        Bu kredit to'lov jadvalining rasmi. Jadvaldan quyidagi ma'lumotlarni ajratib ber:
+        
+        1. Bank nomi (agar ko'rinsa)
+        2. Kredit summasi (boshlang'ich)
+        3. Jami qolgan qarz
+        4. Oylik to'lov summasi (o'rtacha yoki birinchi oy)
+        5. Foiz summasi (oylik, o'rtacha)
+        6. Asosiy qarz summasi (oylik, o'rtacha)
+        7. Qolgan oylar soni
+        8. Kredit turi: "annuity" (bir xil to'lov) yoki "differentiated" (kamayib boruvchi)
+        9. Yillik foiz stavkasi (agar ko'rinsa yoki hisoblash mumkin bo'lsa)
+        
+        Javobni JSON formatida ber:
+        {
+            "bank_name": "...",
+            "original_amount": 0,
+            "remaining_balance": 0,
+            "monthly_payment": 0,
+            "monthly_interest": 0,
+            "monthly_principal": 0,
+            "months_remaining": 0,
+            "loan_type": "annuity" or "differentiated",
+            "interest_rate": 0
+        }
+        
+        Faqat JSON qaytar, boshqa hech narsa yozma.
+        """
+        
+        response = model.generate_content([prompt, image])
+        
+        # JSON ni parse qilish
+        import json
+        response_text = response.text.strip()
+        
+        # JSON ni topish
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0]
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0]
+        
+        data = json.loads(response_text)
+        
+        # ParsedLoan yaratish
+        loan = ParsedLoan(
+            bank_name=data.get("bank_name", "Kredit"),
+            original_amount=float(data.get("original_amount", 0)),
+            remaining_balance=float(data.get("remaining_balance", 0)),
+            monthly_payment=float(data.get("monthly_payment", 0)),
+            interest_rate=float(data.get("interest_rate", 0)),
+            interest_amount=float(data.get("monthly_interest", 0)),
+            principal_amount=float(data.get("monthly_principal", 0)),
+            months_remaining=int(data.get("months_remaining", 0)),
+            loan_type=data.get("loan_type", "annuity"),
+            status="active"
+        )
+        
+        return KATMParseResult(
+            success=True,
+            loans=[loan],
+            total_remaining_debt=loan.remaining_balance,
+            total_monthly_payment=loan.monthly_payment,
+            total_interest_monthly=loan.interest_amount,
+            total_principal_monthly=loan.principal_amount,
+            average_interest_rate=loan.interest_rate
+        )
+        
+    except Exception as e:
+        logger.error(f"Image parsing error: {e}")
+        return KATMParseResult(
+            success=False,
+            loans=[],
+            error_message=f"Rasmni o'qishda xatolik: {str(e)}"
+        )
+
