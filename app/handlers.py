@@ -97,6 +97,8 @@ MENU_BUTTONS = {
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle /start command - check if registered, if not request phone number"""
+    # Always clear context for new session/chat
+    context.user_data.clear()
     user = update.effective_user
     telegram_id = user.id
     
