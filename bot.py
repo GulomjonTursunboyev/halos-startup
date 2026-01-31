@@ -10,11 +10,12 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
+    ConversationHandler,
     PreCheckoutQueryHandler,
     filters,
 )
 
-from app.config import BOT_TOKEN, ADMIN_IDS
+from app.config import BOT_TOKEN, ADMIN_IDS, States
 from app.database import get_database, close_database
 from app.scheduler import start_scheduler, stop_scheduler
 from app.handlers import (
@@ -108,6 +109,20 @@ from app.handlers import (
     admin_broadcast_message,
     admin_activate_pro,
     admin_payments,
+    # Admin user management
+    admin_delete_user_start,
+    admin_clear_user_tx_start,
+    admin_clear_all_tx_confirm,
+    admin_confirm_clear_all,
+    admin_handle_input,
+    admin_confirm_delete_user,
+    admin_confirm_clear_tx,
+    admin_stats,
+    admin_list_users,
+    admin_search_user_start,
+    admin_back,
+    admin_close,
+    admin_cancel,
 )
 from app.subscription_handlers import (
     subscription_command,
@@ -305,7 +320,28 @@ def main() -> None:
     application.add_handler(CommandHandler("activate", admin_activate_pro))
     application.add_handler(CommandHandler("payments", admin_payments))
     
-    # Admin callback handlers
+    # Admin user management ConversationHandler
+    admin_conv_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(admin_delete_user_start, pattern="^admin_delete_user$"),
+            CallbackQueryHandler(admin_clear_user_tx_start, pattern="^admin_clear_user_tx$"),
+            CallbackQueryHandler(admin_search_user_start, pattern="^admin_search_user$"),
+        ],
+        states={
+            States.ADMIN_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handle_input),
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", admin_cancel),
+            CallbackQueryHandler(admin_close, pattern="^admin_close$"),
+        ],
+        allow_reentry=True,
+        name="admin_conv",
+    )
+    application.add_handler(admin_conv_handler)
+    
+    # Admin callback handlers (for other admin actions)
     application.add_handler(
         CallbackQueryHandler(admin_callback, pattern="^admin_")
     )

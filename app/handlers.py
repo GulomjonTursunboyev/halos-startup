@@ -8905,6 +8905,15 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("🎁 TRIAL barchaga", callback_data="admin_trial_all"),
             InlineKeyboardButton("📤 Broadcast", callback_data="admin_broadcast")
         ],
+        # Yangi admin funksiyalar
+        [
+            InlineKeyboardButton("🗑️ User o'chirish", callback_data="admin_delete_user"),
+            InlineKeyboardButton("🧹 TX tozalash", callback_data="admin_clear_user_tx")
+        ],
+        [
+            InlineKeyboardButton("⚠️ BARCHA TX o'chirish", callback_data="admin_clear_all_tx"),
+            InlineKeyboardButton("👥 Userlar", callback_data="admin_list_users")
+        ],
         [
             InlineKeyboardButton("⚙️ Sozlamalar", callback_data="admin_settings")
         ]
@@ -9759,6 +9768,44 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
     
+    # ==================== YANGI ADMIN AMALLAR ====================
+    
+    # User o'chirish
+    if query.data == "admin_delete_user":
+        return await admin_delete_user_start(update, context)
+    
+    # User tranzaksiyalarini tozalash
+    if query.data == "admin_clear_user_tx":
+        return await admin_clear_user_tx_start(update, context)
+    
+    # Barcha tranzaksiyalarni o'chirish
+    if query.data == "admin_clear_all_tx":
+        return await admin_clear_all_tx_confirm(update, context)
+    
+    # Barcha tranzaksiyalarni o'chirishni tasdiqlash
+    if query.data == "admin_confirm_clear_all":
+        return await admin_confirm_clear_all(update, context)
+    
+    # Userlar ro'yxati
+    if query.data == "admin_list_users":
+        return await admin_list_users(update, context)
+    
+    # User o'chirishni tasdiqlash
+    if query.data.startswith("admin_confirm_delete:"):
+        return await admin_confirm_delete_user(update, context)
+    
+    # User tranzaksiyalarini tozalashni tasdiqlash
+    if query.data.startswith("admin_confirm_clear_tx:"):
+        return await admin_confirm_clear_tx(update, context)
+    
+    # Orqaga qaytish
+    if query.data == "admin_back":
+        return await admin_back(update, context)
+    
+    # Yopish
+    if query.data == "admin_close":
+        return await admin_close(update, context)
+    
     # Legacy support
     if query.data == "admin_refresh":
         # admin_stats ga yo'naltirish
@@ -10073,7 +10120,428 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
     )
 
 
+# ==================== ADMIN USER MANAGEMENT ====================
+
+async def admin_delete_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User o'chirish - telegram_id so'rash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    context.user_data["admin_action"] = "delete_user"
+    
+    await query.edit_message_text(
+        "🗑️ *USER O'CHIRISH*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "⚠️ Bu amal foydalanuvchini va uning BARCHA ma'lumotlarini o'chiradi!\n\n"
+        "📝 O'chirmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
+        "_Bekor qilish uchun /cancel_",
+        parse_mode="Markdown"
+    )
+    
+    return States.ADMIN_INPUT
+
+
+async def admin_clear_user_tx_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User tranzaksiyalarini tozalash - telegram_id so'rash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    context.user_data["admin_action"] = "clear_user_tx"
+    
+    await query.edit_message_text(
+        "🧹 *USER TRANZAKSIYALARINI TOZALASH*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "⚠️ Bu amal foydalanuvchining BARCHA kirim-chiqimlarini o'chiradi!\n"
+        "User o'zi o'chirilmaydi.\n\n"
+        "📝 Tozalamoqchi bo'lgan user telegram ID sini yuboring:\n\n"
+        "_Bekor qilish uchun /cancel_",
+        parse_mode="Markdown"
+    )
+    
+    return States.ADMIN_INPUT
+
+
+async def admin_clear_all_tx_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: BARCHA tranzaksiyalarni o'chirish - tasdiqlash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    context.user_data["admin_action"] = "clear_all_tx"
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ HA, BARCHASINI O'CHIR", callback_data="admin_confirm_clear_all")],
+        [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_close")],
+    ])
+    
+    await query.edit_message_text(
+        "⚠️ *OGOHLANTIRISH!*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🚨 Bu amal BARCHA foydalanuvchilarning\n"
+        "BARCHA kirim-chiqim ma'lumotlarini o'chiradi!\n\n"
+        "❗ Bu amalni qaytarib bo'lmaydi!\n\n"
+        "Davom etasizmi?",
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
+    
+    return ConversationHandler.END
+
+
+async def admin_confirm_clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: BARCHA tranzaksiyalarni o'chirishni tasdiqlash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    db = await get_database()
+    result = await db.admin_clear_all_transactions()
+    
+    if result["success"]:
+        await query.edit_message_text(
+            "✅ *BARCHA TRANZAKSIYALAR O'CHIRILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🗑️ O'chirilgan tranzaksiyalar: *{result['deleted_count']}* ta",
+            parse_mode="Markdown"
+        )
+    else:
+        await query.edit_message_text(
+            f"❌ Xatolik: {result.get('error', 'Noma\'lum xato')}",
+            parse_mode="Markdown"
+        )
+    
+    return ConversationHandler.END
+
+
+async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User input qabul qilish (telegram_id)"""
+    telegram_id = update.effective_user.id
+    
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    text = update.message.text.strip()
+    action = context.user_data.get("admin_action")
+    
+    # Telegram ID ni tekshirish
+    try:
+        target_id = int(text)
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Noto'g'ri format!\n\n"
+            "Faqat raqam kiriting (telegram_id).\n"
+            "Masalan: `1748575975`",
+            parse_mode="Markdown"
+        )
+        return States.ADMIN_INPUT
+    
+    db = await get_database()
+    
+    # User mavjudligini tekshirish
+    user_info = await db.admin_get_user_info(target_id)
+    
+    if not user_info:
+        await update.message.reply_text(
+            f"❌ User topilmadi: `{target_id}`\n\n"
+            "Telegram ID ni tekshiring.",
+            parse_mode="Markdown"
+        )
+        return ConversationHandler.END
+    
+    # User ma'lumotlarini ko'rsatish
+    username = user_info.get("username") or "Yo'q"
+    first_name = user_info.get("first_name") or "Yo'q"
+    phone = user_info.get("phone_number") or "Yo'q"
+    tx_count = user_info.get("transaction_count", 0)
+    debt_count = user_info.get("debt_count", 0)
+    total_income = user_info.get("total_income", 0)
+    total_expense = user_info.get("total_expense", 0)
+    sub_tier = user_info.get("subscription_tier", "free")
+    
+    user_summary = (
+        f"👤 *User ma'lumotlari:*\n"
+        f"├ ID: `{target_id}`\n"
+        f"├ Username: @{username}\n"
+        f"├ Ism: {first_name}\n"
+        f"├ Telefon: {phone}\n"
+        f"├ Tarif: {sub_tier}\n"
+        f"├ Tranzaksiyalar: {tx_count} ta\n"
+        f"├ Qarzlar: {debt_count} ta\n"
+        f"├ Jami kirim: {total_income:,.0f}\n"
+        f"└ Jami chiqim: {total_expense:,.0f}\n"
+    )
+    
+    if action == "delete_user":
+        context.user_data["target_user_id"] = target_id
+        context.user_data["target_user_info"] = user_info
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ HA, O'CHIR", callback_data=f"admin_confirm_delete:{target_id}")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_close")],
+        ])
+        
+        await update.message.reply_text(
+            f"🗑️ *USER O'CHIRILADI*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{user_summary}\n"
+            f"⚠️ Bu user va uning BARCHA ma'lumotlari o'chiriladi!\n"
+            f"Davom etasizmi?",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        
+    elif action == "clear_user_tx":
+        context.user_data["target_user_id"] = target_id
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ HA, TOZALA", callback_data=f"admin_confirm_clear_tx:{target_id}")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_close")],
+        ])
+        
+        await update.message.reply_text(
+            f"🧹 *TRANZAKSIYALAR TOZALANADI*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{user_summary}\n"
+            f"⚠️ Bu userning BARCHA kirim-chiqimlari o'chiriladi!\n"
+            f"Davom etasizmi?",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    
+    return ConversationHandler.END
+
+
+async def admin_confirm_delete_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User o'chirishni tasdiqlash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    # callback_data: admin_confirm_delete:1748575975
+    target_id = int(query.data.split(":")[1])
+    
+    db = await get_database()
+    result = await db.admin_delete_user(target_id)
+    
+    if result["success"]:
+        user_info = result.get("user_info", {})
+        await query.edit_message_text(
+            "✅ *USER O'CHIRILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 User: `{target_id}` (@{user_info.get('username', 'N/A')})\n\n"
+            f"📊 *O'chirilgan ma'lumotlar:*\n"
+            f"├ Tranzaksiyalar: {result['transactions_deleted']} ta\n"
+            f"├ Qarzlar: {result['debts_deleted']} ta\n"
+            f"├ Voice usage: {result['voice_usage_deleted']} ta\n"
+            f"├ Feature usage: {result['feature_usage_deleted']} ta\n"
+            f"└ Financial profile: {'✅' if result['financial_profile_deleted'] else '❌'}\n",
+            parse_mode="Markdown"
+        )
+    else:
+        await query.edit_message_text(
+            f"❌ *Xatolik:* {result.get('error', 'Noma\'lum xato')}",
+            parse_mode="Markdown"
+        )
+    
+    return ConversationHandler.END
+
+
+async def admin_confirm_clear_tx(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User tranzaksiyalarini tozalashni tasdiqlash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    # callback_data: admin_confirm_clear_tx:1748575975
+    target_id = int(query.data.split(":")[1])
+    
+    db = await get_database()
+    result = await db.admin_clear_all_transactions(target_id)
+    
+    if result["success"]:
+        await query.edit_message_text(
+            "✅ *TRANZAKSIYALAR TOZALANDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 User: `{target_id}`\n"
+            f"🗑️ O'chirilgan tranzaksiyalar: *{result['deleted_count']}* ta",
+            parse_mode="Markdown"
+        )
+    else:
+        await query.edit_message_text(
+            f"❌ *Xatolik:* {result.get('error', 'Noma\'lum xato')}",
+            parse_mode="Markdown"
+        )
+    
+    return ConversationHandler.END
+
+
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Statistika ko'rsatish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    db = await get_database()
+    stats = await db.get_admin_statistics()
+    
+    msg = (
+        "📊 *ADMIN STATISTIKA*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👥 *Foydalanuvchilar:*\n"
+        f"├ Jami: {stats.get('total_users', 0)}\n"
+        f"├ Bugun: +{stats.get('today_users', 0)}\n"
+        f"├ Hafta: +{stats.get('week_users', 0)}\n"
+        f"└ Oy: +{stats.get('month_users', 0)}\n\n"
+        f"💎 *PRO obunalar:*\n"
+        f"├ Aktiv PRO: {stats.get('active_pro', 0)}\n"
+        f"├ Haftalik: {stats.get('pro_weekly', 0)}\n"
+        f"├ Oylik: {stats.get('pro_monthly', 0)}\n"
+        f"├ Yillik: {stats.get('pro_yearly', 0)}\n"
+        f"├ Promo: {stats.get('pro_promo', 0)}\n"
+        f"├ Trial: {stats.get('pro_trial', 0)}\n"
+        f"└ Muddati tugagan: {stats.get('pro_expired', 0)}\n\n"
+        f"💰 *Tranzaksiyalar:*\n"
+        f"├ Jami: {stats.get('total_transactions', 0)}\n"
+        f"└ Bugun: +{stats.get('today_transactions', 0)}\n"
+    )
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_back")],
+    ])
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+    
+    return ConversationHandler.END
+
+
+async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Userlar ro'yxati"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    db = await get_database()
+    users = await db.admin_list_users(limit=20)
+    
+    msg = "👥 *SO'NGI 20 TA USER*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    for i, user in enumerate(users, 1):
+        username = user.get("username") or "N/A"
+        first_name = user.get("first_name") or "N/A"
+        tier = "💎" if user.get("subscription_tier") == "pro" else "🆓"
+        tx_count = user.get("tx_count", 0)
+        
+        msg += f"{i}. {tier} `{user['telegram_id']}` @{username} ({tx_count} tx)\n"
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_back")],
+    ])
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+    
+    return ConversationHandler.END
+
+
+async def admin_search_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User qidirish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    context.user_data["admin_action"] = "search_user"
+    
+    await query.edit_message_text(
+        "🔍 *USER QIDIRISH*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "📝 User telegram ID sini yuboring:\n\n"
+        "_Bekor qilish uchun /cancel_",
+        parse_mode="Markdown"
+    )
+    
+    return States.ADMIN_INPUT
+
+
+async def admin_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Orqaga qaytish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗑️ User o'chirish", callback_data="admin_delete_user")],
+        [InlineKeyboardButton("🧹 User tranzaksiyalarini tozalash", callback_data="admin_clear_user_tx")],
+        [InlineKeyboardButton("⚠️ BARCHA tranzaksiyalarni o'chirish", callback_data="admin_clear_all_tx")],
+        [InlineKeyboardButton("📊 Statistika", callback_data="admin_stats")],
+        [InlineKeyboardButton("👥 Userlar ro'yxati", callback_data="admin_list_users")],
+        [InlineKeyboardButton("🔍 User qidirish", callback_data="admin_search_user")],
+        [InlineKeyboardButton("❌ Yopish", callback_data="admin_close")],
+    ])
+    
+    await query.edit_message_text(
+        "🔧 *ADMIN PANEL*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "Quyidagi amallardan birini tanlang:",
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
+    
+    return ConversationHandler.END
+
+
+async def admin_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin panel yopish"""
+    query = update.callback_query
+    await query.answer()
+    
+    await query.edit_message_text("✅ Admin panel yopildi.")
+    
+    return ConversationHandler.END
+
+
+async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Bekor qilish"""
+    context.user_data.pop("admin_action", None)
+    context.user_data.pop("target_user_id", None)
+    
+    await update.message.reply_text("❌ Amal bekor qilindi.")
+    
+    return ConversationHandler.END
+
+
 # Keep old function for backwards compatibility
 def add_trial_handler_to_app(application):
     add_global_handlers_to_app(application)
+
 

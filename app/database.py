@@ -721,19 +721,20 @@ class Database:
         username: str = None,
         language: str = "uz"
     ) -> int:
-        """Create a new user and return user ID"""
+        """Create a new user and return user ID (id = telegram_id)"""
         if self.is_postgres:
             async with self._pool.acquire() as conn:
+                # id = telegram_id bo'lishi kerak (bizning DB strukturamiz)
                 return await conn.fetchval(
-                    """INSERT INTO users (telegram_id, phone_number, first_name, last_name, username, language)
-                       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
+                    """INSERT INTO users (id, telegram_id, phone_number, first_name, last_name, username, language)
+                       VALUES ($1, $1, $2, $3, $4, $5, $6) RETURNING id""",
                     telegram_id, phone_number, first_name, last_name, username, language
                 )
         else:
             cursor = await self._connection.execute(
-                """INSERT INTO users (telegram_id, phone_number, first_name, last_name, username, language)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (telegram_id, phone_number, first_name, last_name, username, language)
+                """INSERT INTO users (id, telegram_id, phone_number, first_name, last_name, username, language)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (telegram_id, telegram_id, phone_number, first_name, last_name, username, language)
             )
             await self._connection.commit()
             return cursor.lastrowid
@@ -1800,6 +1801,249 @@ class Database:
                     best_match = p
         
         return best_match
+
+    # ==================== ADMIN USER MANAGEMENT ====================
+    
+    async def admin_delete_user(self, telegram_id: int) -> dict:
+        """
+        Admin: Foydalanuvchini va uning barcha ma'lumotlarini o'chirish
+        
+        Returns:
+            {
+                "success": True/False,
+                "user_deleted": True/False,
+                "transactions_deleted": int,
+                "debts_deleted": int,
+                "voice_usage_deleted": int,
+                "feature_usage_deleted": int,
+                "error": str (agar xato bo'lsa)
+            }
+        """
+        result = {
+            "success": False,
+            "user_deleted": False,
+            "transactions_deleted": 0,
+            "debts_deleted": 0,
+            "voice_usage_deleted": 0,
+            "feature_usage_deleted": 0,
+            "financial_profile_deleted": False,
+            "ai_learning_deleted": 0,
+        }
+        
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    # Avval user mavjudligini tekshirish
+                    user = await conn.fetchrow(
+                        "SELECT id, telegram_id, username, first_name FROM users WHERE telegram_id = $1",
+                        telegram_id
+                    )
+                    if not user:
+                        result["error"] = f"User topilmadi: {telegram_id}"
+                        return result
+                    
+                    user_id = user["id"]  # id = telegram_id
+                    
+                    # 1. Transactions o'chirish
+                    deleted = await conn.execute(
+                        "DELETE FROM transactions WHERE user_id = $1", user_id
+                    )
+                    result["transactions_deleted"] = int(deleted.split()[-1]) if deleted else 0
+                    
+                    # 2. Personal debts o'chirish
+                    deleted = await conn.execute(
+                        "DELETE FROM personal_debts WHERE user_id = $1", user_id
+                    )
+                    result["debts_deleted"] = int(deleted.split()[-1]) if deleted else 0
+                    
+                    # 3. Voice usage o'chirish
+                    deleted = await conn.execute(
+                        "DELETE FROM voice_usage WHERE user_id = $1", user_id
+                    )
+                    result["voice_usage_deleted"] = int(deleted.split()[-1]) if deleted else 0
+                    
+                    # 4. Feature usage o'chirish
+                    deleted = await conn.execute(
+                        "DELETE FROM feature_usage WHERE user_id = $1", user_id
+                    )
+                    result["feature_usage_deleted"] = int(deleted.split()[-1]) if deleted else 0
+                    
+                    # 5. Financial profile o'chirish
+                    deleted = await conn.execute(
+                        "DELETE FROM financial_profiles WHERE user_id = $1", user_id
+                    )
+                    result["financial_profile_deleted"] = "DELETE 1" in str(deleted)
+                    
+                    # 6. AI learning data o'chirish (agar user_id bo'lsa)
+                    try:
+                        deleted = await conn.execute(
+                            "DELETE FROM ai_learning WHERE user_id = $1", user_id
+                        )
+                        result["ai_learning_deleted"] = int(deleted.split()[-1]) if deleted else 0
+                    except:
+                        pass  # ai_learning da user_id bo'lmasligi mumkin
+                    
+                    # 7. KATM loans o'chirish
+                    try:
+                        deleted = await conn.execute(
+                            "DELETE FROM katm_loans WHERE user_id = $1", user_id
+                        )
+                    except:
+                        pass
+                    
+                    # 8. Payments o'chirish
+                    try:
+                        deleted = await conn.execute(
+                            "DELETE FROM payments WHERE user_id = $1", user_id
+                        )
+                    except:
+                        pass
+                    
+                    # 9. Transaction history o'chirish
+                    try:
+                        deleted = await conn.execute(
+                            "DELETE FROM transaction_history WHERE user_id = $1", user_id
+                        )
+                    except:
+                        pass
+                    
+                    # 10. Calculations o'chirish
+                    try:
+                        deleted = await conn.execute(
+                            "DELETE FROM calculations WHERE user_id = $1", user_id
+                        )
+                    except:
+                        pass
+                    
+                    # OXIRIDA: User o'chirish
+                    deleted = await conn.execute(
+                        "DELETE FROM users WHERE telegram_id = $1", telegram_id
+                    )
+                    result["user_deleted"] = "DELETE 1" in str(deleted)
+                    result["success"] = result["user_deleted"]
+                    result["user_info"] = {
+                        "telegram_id": telegram_id,
+                        "username": user["username"],
+                        "first_name": user["first_name"]
+                    }
+                    
+            else:
+                # SQLite
+                async with aiosqlite.connect(self.db_path) as db:
+                    cursor = await db.execute(
+                        "SELECT id, telegram_id, username, first_name FROM users WHERE telegram_id = ?",
+                        (telegram_id,)
+                    )
+                    user = await cursor.fetchone()
+                    if not user:
+                        result["error"] = f"User topilmadi: {telegram_id}"
+                        return result
+                    
+                    user_id = user[0]
+                    
+                    # O'chirish
+                    await db.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))
+                    await db.execute("DELETE FROM personal_debts WHERE user_id = ?", (user_id,))
+                    await db.execute("DELETE FROM users WHERE telegram_id = ?", (telegram_id,))
+                    await db.commit()
+                    
+                    result["user_deleted"] = True
+                    result["success"] = True
+                    
+            logger.info(f"[Admin] User o'chirildi: {telegram_id}, natija: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"[Admin] User o'chirishda xato: {e}")
+            result["error"] = str(e)
+            return result
+
+    async def admin_clear_all_transactions(self, telegram_id: int = None) -> dict:
+        """
+        Admin: Barcha tranzaksiyalarni o'chirish
+        
+        Args:
+            telegram_id: Agar berilsa, faqat shu userni tranzaksiyalarini o'chiradi
+                        Agar None bo'lsa, BARCHA tranzaksiyalarni o'chiradi
+        
+        Returns:
+            {"success": True/False, "deleted_count": int, "error": str}
+        """
+        result = {"success": False, "deleted_count": 0}
+        
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    if telegram_id:
+                        # Faqat bitta user
+                        deleted = await conn.execute(
+                            "DELETE FROM transactions WHERE user_id = $1", telegram_id
+                        )
+                    else:
+                        # BARCHA tranzaksiyalar
+                        deleted = await conn.execute("DELETE FROM transactions")
+                    
+                    result["deleted_count"] = int(deleted.split()[-1]) if deleted else 0
+                    result["success"] = True
+            else:
+                async with aiosqlite.connect(self.db_path) as db:
+                    if telegram_id:
+                        cursor = await db.execute(
+                            "DELETE FROM transactions WHERE user_id = ?", (telegram_id,)
+                        )
+                    else:
+                        cursor = await db.execute("DELETE FROM transactions")
+                    result["deleted_count"] = cursor.rowcount
+                    await db.commit()
+                    result["success"] = True
+                    
+            logger.info(f"[Admin] Tranzaksiyalar o'chirildi: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"[Admin] Tranzaksiya o'chirishda xato: {e}")
+            result["error"] = str(e)
+            return result
+
+    async def admin_get_user_info(self, telegram_id: int) -> Optional[dict]:
+        """Admin: User haqida to'liq ma'lumot olish"""
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    user = await conn.fetchrow("""
+                        SELECT u.*, 
+                            (SELECT COUNT(*) FROM transactions WHERE user_id = u.id) as transaction_count,
+                            (SELECT COUNT(*) FROM personal_debts WHERE user_id = u.id) as debt_count,
+                            (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = u.id AND type = 'income') as total_income,
+                            (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = u.id AND type = 'expense') as total_expense
+                        FROM users u WHERE u.telegram_id = $1
+                    """, telegram_id)
+                    
+                    if user:
+                        return dict(user)
+            return None
+        except Exception as e:
+            logger.error(f"[Admin] User info olishda xato: {e}")
+            return None
+
+    async def admin_list_users(self, limit: int = 50, offset: int = 0) -> List[dict]:
+        """Admin: Userlar ro'yxatini olish"""
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    rows = await conn.fetch("""
+                        SELECT telegram_id, username, first_name, subscription_tier, 
+                               created_at, last_active,
+                               (SELECT COUNT(*) FROM transactions WHERE user_id = users.id) as tx_count
+                        FROM users 
+                        ORDER BY created_at DESC
+                        LIMIT $1 OFFSET $2
+                    """, limit, offset)
+                    return [dict(row) for row in rows]
+            return []
+        except Exception as e:
+            logger.error(f"[Admin] Userlar ro'yxati olishda xato: {e}")
+            return []
 
 
 # Singleton database instance

@@ -64,3 +64,4 @@ class States:
     CONFIRM = 14
     OTHER_DEBTS = 15         # Personal loans from friends/family
     MANDATORY_EXPENSES = 16  # Bills that must be paid
+    ADMIN_INPUT = 50         # Admin panel input state
