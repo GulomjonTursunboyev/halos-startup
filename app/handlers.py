@@ -3444,7 +3444,7 @@ async def menu_credit_choice_callback(update: Update, context: ContextTypes.DEFA
 
 
 async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle credit history file upload from menu flow"""
+    """Handle credit history file upload from menu flow - with detailed analysis"""
     if not context.user_data.get("awaiting_credit_file"):
         return
     
@@ -3452,6 +3452,17 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
     lang = context.user_data.get("lang", "uz")
     
     document = update.message.document
+    photo = update.message.photo
+    
+    # Check if it's a photo (screenshot of credit table)
+    if photo:
+        # Handle photo - coming soon with AI vision
+        await update.message.reply_text(
+            "📷 Rasm qabul qilindi. Hozircha PDF/HTML formatini yuboring." if lang == "uz" 
+            else "📷 Фото получено. Пока отправьте в формате PDF/HTML."
+        )
+        return
+    
     if not document:
         return
     
@@ -3480,7 +3491,7 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
         await file.download_to_drive(str(file_path))
         
         # Parse file
-        from app.pdf_parser import parse_katm_file
+        from app.pdf_parser import parse_katm_file, analyze_credit_details, calculate_interest_impact
         result = parse_katm_file(str(file_path))
         
         # Delete processing message
@@ -3492,6 +3503,7 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
             context.user_data["total_debt"] = result.total_remaining_debt
             context.user_data["katm_loans"] = result.loans
             context.user_data["awaiting_credit_file"] = False
+            context.user_data["credit_from_file"] = True  # Mark that data came from file
             
             # Save to database
             db = await get_database()
@@ -3504,23 +3516,79 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
                     pdf_filename=file_name
                 )
             
-            # Format loans list
-            loans_list = "\n".join([
-                get_message("katm_loan_item", lang).format(
-                    bank=loan.bank_name,
-                    amount=format_number(loan.remaining_balance)
-                )
-                for loan in result.loans
-            ])
-            
-            # Show success message with parsed data
-            success_msg = get_message("katm_success", lang).format(
-                loans_list=loans_list,
-                total_debt=format_number(result.total_remaining_debt),
-                monthly_payment=format_number(result.total_monthly_payment)
+            # === DETAILED CREDIT ANALYSIS ===
+            analysis = analyze_credit_details(
+                total_debt=result.total_remaining_debt,
+                monthly_payment=result.total_monthly_payment
             )
             
-            # Add confirmation buttons
+            # Store analysis in context
+            context.user_data["credit_analysis"] = analysis
+            
+            # Get user income for impact calculation
+            income_self = context.user_data.get("income_self", 0)
+            income_partner = context.user_data.get("income_partner", 0)
+            total_income = income_self + income_partner
+            
+            # Calculate interest impact if income is known
+            interest_impact = None
+            if total_income > 0:
+                interest_impact = calculate_interest_impact(
+                    monthly_interest=analysis["monthly_interest"],
+                    monthly_income=total_income
+                )
+                context.user_data["interest_impact"] = interest_impact
+            
+            # Format loans list with details
+            loans_list = ""
+            for loan in result.loans:
+                loans_list += f"├ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
+            
+            # Determine warning level
+            interest_warning = ""
+            if interest_impact:
+                ratio = interest_impact["interest_to_income_ratio"]
+                if ratio < 5:
+                    interest_warning = get_message("credit_interest_warning_low", lang)
+                elif ratio < 10:
+                    interest_warning = get_message("credit_interest_warning_moderate", lang)
+                elif ratio < 20:
+                    interest_warning = get_message("credit_interest_warning_high", lang).format(
+                        amount=format_number(analysis["monthly_interest"])
+                    )
+                else:
+                    interest_warning = get_message("credit_interest_warning_critical", lang).format(
+                        ratio=round(ratio, 1)
+                    )
+            
+            # Build detailed analysis message
+            detailed_msg = get_message("credit_detailed_analysis", lang).format(
+                loans_list=loans_list,
+                total_debt=format_number(result.total_remaining_debt),
+                monthly_payment=format_number(result.total_monthly_payment),
+                months_remaining=analysis["months_remaining"],
+                interest_rate=analysis["interest_rate_estimated"],
+                impact_emoji=interest_impact["impact_emoji"] if interest_impact else "📊",
+                monthly_interest=format_number(analysis["monthly_interest"]),
+                monthly_principal=format_number(analysis["monthly_principal"]),
+                interest_percentage=analysis["interest_percentage"],
+                yearly_interest=format_number(analysis["monthly_interest"] * 12),
+                interest_warning=interest_warning
+            )
+            
+            # Add income impact if available
+            if interest_impact and total_income > 0:
+                detailed_msg += "\n" + get_message("credit_income_impact", lang).format(
+                    income=format_number(total_income),
+                    interest=format_number(analysis["monthly_interest"]),
+                    ratio=interest_impact["interest_to_income_ratio"],
+                    yearly=format_number(interest_impact["yearly_interest_loss"])
+                )
+            
+            # Add confirmation prompt - NO need to ask for total sum again!
+            detailed_msg += get_message("credit_confirm_data", lang)
+            
+            # Confirmation buttons
             keyboard = [
                 [
                     InlineKeyboardButton(
@@ -3531,12 +3599,18 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
                         get_message("katm_confirm_no", lang), 
                         callback_data="menu_katm_confirm_no"
                     )
+                ],
+                [
+                    InlineKeyboardButton(
+                        get_message("btn_credit_show_schedule", lang),
+                        callback_data="credit_show_schedule"
+                    )
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await update.message.reply_text(
-                success_msg + "\n\n" + get_message("katm_confirm", lang),
+                detailed_msg,
                 parse_mode="Markdown",
                 reply_markup=reply_markup
             )
@@ -3544,7 +3618,8 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
         else:
             # Parsing failed - fallback to manual
             context.user_data["awaiting_credit_file"] = False
-            context.user_data["awaiting_loan_payment"] = True
+            context.user_data["awaiting_credit_input"] = True
+            context.user_data["credit_step"] = "monthly"
             
             await update.message.reply_text(
                 get_message("katm_failed", lang),
@@ -3561,7 +3636,8 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
         await processing_msg.delete()
         
         context.user_data["awaiting_credit_file"] = False
-        context.user_data["awaiting_loan_payment"] = True
+        context.user_data["awaiting_credit_input"] = True
+        context.user_data["credit_step"] = "monthly"
         
         await update.message.reply_text(
             get_message("katm_failed", lang),
@@ -3572,6 +3648,75 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
             get_message("input_loan_payment", lang),
             parse_mode="Markdown"
         )
+
+
+async def credit_show_schedule_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show payment schedule when user clicks the button"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    analysis = context.user_data.get("credit_analysis", {})
+    
+    if not analysis:
+        await query.edit_message_text("❌ Ma'lumot topilmadi")
+        return
+    
+    from app.pdf_parser import generate_payment_schedule
+    
+    total_debt = context.user_data.get("total_debt", 0)
+    monthly_payment = context.user_data.get("loan_payment", 0)
+    interest_rate = analysis.get("interest_rate_estimated", 24)
+    loan_type = analysis.get("loan_type", "annuity")
+    
+    # Generate 6-month schedule
+    schedule = generate_payment_schedule(
+        total_debt=total_debt,
+        monthly_payment=monthly_payment,
+        interest_rate=interest_rate,
+        loan_type=loan_type,
+        months=6
+    )
+    
+    # Format schedule
+    schedule_text = ""
+    for row in schedule:
+        schedule_text += get_message("credit_schedule_row", lang).format(
+            month=row["month"],
+            payment=format_number(row["payment"]),
+            interest=format_number(row["interest"]),
+            principal=format_number(row["principal"])
+        )
+    
+    loan_type_name = "Annuitet (bir xil to'lov)" if loan_type == "annuity" else "Differensial (kamayib boruvchi)"
+    if lang == "ru":
+        loan_type_name = "Аннуитет (равные платежи)" if loan_type == "annuity" else "Дифференцированный (убывающий)"
+    
+    schedule_msg = get_message("credit_payment_schedule", lang).format(
+        schedule=schedule_text,
+        loan_type=loan_type_name
+    )
+    
+    # Add back button
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                get_message("katm_confirm_yes", lang), 
+                callback_data="menu_katm_confirm_yes"
+            ),
+            InlineKeyboardButton(
+                get_message("katm_confirm_no", lang), 
+                callback_data="menu_katm_confirm_no"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        schedule_msg,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
 
 
 async def menu_katm_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

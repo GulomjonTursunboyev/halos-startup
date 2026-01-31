@@ -18,14 +18,25 @@ class ParsedLoan:
     """Represents a single parsed loan"""
     bank_name: str
     contract_number: str = ""
-    loan_type: str = ""
+    loan_type: str = ""  # "annuity" (bir xil) or "differentiated" (kamayib boruvchi)
     original_amount: float = 0
     remaining_balance: float = 0
     monthly_payment: float = 0
+    interest_rate: float = 0  # Yillik foiz stavkasi (%)
+    interest_amount: float = 0  # Oylik foiz summasi
+    principal_amount: float = 0  # Oylik asosiy qarz summasi
+    total_interest_paid: float = 0  # Jami to'langan foiz
+    total_interest_remaining: float = 0  # Qolgan foiz summasi
+    months_remaining: int = 0  # Qolgan oylar
     currency: str = "UZS"
     status: str = "active"
     start_date: str = ""
     end_date: str = ""
+    payment_schedule: List[Dict] = None  # Har oylik to'lov jadvali
+    
+    def __post_init__(self):
+        if self.payment_schedule is None:
+            self.payment_schedule = []
 
 
 @dataclass
@@ -35,6 +46,9 @@ class KATMParseResult:
     loans: List[ParsedLoan]
     total_remaining_debt: float = 0
     total_monthly_payment: float = 0
+    total_interest_monthly: float = 0  # Jami oylik foiz
+    total_principal_monthly: float = 0  # Jami oylik asosiy qarz
+    average_interest_rate: float = 0  # O'rtacha foiz stavkasi
     error_message: str = ""
     raw_text: str = ""
 
@@ -605,3 +619,220 @@ def parse_katm_file(file_path: str) -> KATMParseResult:
             loans=[],
             error_message=f"Unsupported file format: {file_ext}"
         )
+
+
+def analyze_credit_details(
+    total_debt: float,
+    monthly_payment: float,
+    interest_rate: float = None,
+    loan_type: str = "annuity"
+) -> Dict[str, Any]:
+    """
+    Kredit ma'lumotlarini chuqur tahlil qilish
+    
+    Args:
+        total_debt: Jami qolgan qarz
+        monthly_payment: Oylik to'lov
+        interest_rate: Yillik foiz stavkasi (agar ma'lum bo'lsa)
+        loan_type: "annuity" yoki "differentiated"
+    
+    Returns:
+        Dict with detailed credit analysis
+    """
+    if monthly_payment <= 0 or total_debt <= 0:
+        return {
+            "months_remaining": 0,
+            "interest_rate_estimated": 0,
+            "monthly_interest": 0,
+            "monthly_principal": monthly_payment,
+            "total_interest_remaining": 0,
+            "total_to_pay": total_debt,
+            "interest_percentage": 0,
+            "loan_type": loan_type
+        }
+    
+    # Qolgan oylarni hisoblash
+    months_remaining = int(total_debt / monthly_payment) if monthly_payment > 0 else 0
+    
+    # Agar foiz stavkasi berilmagan bo'lsa, taxmin qilish
+    if interest_rate is None or interest_rate == 0:
+        # Standart O'zbekiston bank kredit stavkalari: 18-36% yillik
+        # Taxminiy hisoblash: umumiy to'lov va qarzni taqqoslash
+        if months_remaining > 0:
+            total_to_pay = monthly_payment * months_remaining
+            total_interest = total_to_pay - total_debt
+            if total_interest > 0:
+                # Oddiy foiz formulasi orqali taxmin
+                interest_rate = (total_interest / total_debt) * (12 / months_remaining) * 100
+                interest_rate = min(max(interest_rate, 15), 50)  # 15-50% oralig'ida
+            else:
+                interest_rate = 24  # O'rtacha standart
+        else:
+            interest_rate = 24
+    
+    # Oylik foiz stavkasi
+    monthly_rate = interest_rate / 100 / 12
+    
+    # Annuitet kredit uchun foiz va asosiy qarz taqsimoti
+    if loan_type == "annuity":
+        # Birinchi oylik foiz
+        monthly_interest = total_debt * monthly_rate
+        monthly_principal = monthly_payment - monthly_interest
+        
+        # Jami qolgan foiz (taxminiy)
+        total_interest_remaining = 0
+        remaining = total_debt
+        for _ in range(months_remaining):
+            interest_this_month = remaining * monthly_rate
+            total_interest_remaining += interest_this_month
+            principal_this_month = monthly_payment - interest_this_month
+            remaining -= principal_this_month
+            if remaining <= 0:
+                break
+    else:
+        # Differensiallangan kredit
+        monthly_principal = total_debt / months_remaining if months_remaining > 0 else 0
+        monthly_interest = total_debt * monthly_rate
+        
+        # Jami qolgan foiz
+        total_interest_remaining = 0
+        remaining = total_debt
+        for i in range(months_remaining):
+            interest_this_month = remaining * monthly_rate
+            total_interest_remaining += interest_this_month
+            remaining -= monthly_principal
+            if remaining <= 0:
+                break
+    
+    # Jami to'lanadigan summa
+    total_to_pay = total_debt + total_interest_remaining
+    
+    # Foiz ulushi (to'lovdagi foiz %)
+    interest_percentage = (monthly_interest / monthly_payment * 100) if monthly_payment > 0 else 0
+    
+    return {
+        "months_remaining": months_remaining,
+        "interest_rate_estimated": round(interest_rate, 1),
+        "monthly_interest": round(monthly_interest),
+        "monthly_principal": round(monthly_principal),
+        "total_interest_remaining": round(total_interest_remaining),
+        "total_to_pay": round(total_to_pay),
+        "interest_percentage": round(interest_percentage, 1),
+        "loan_type": loan_type,
+        "loan_type_name": "Annuitet (bir xil)" if loan_type == "annuity" else "Differensial (kamayib boruvchi)"
+    }
+
+
+def calculate_interest_impact(
+    monthly_interest: float,
+    monthly_income: float
+) -> Dict[str, Any]:
+    """
+    Foizlarning daromadga ta'sirini hisoblash
+    
+    Args:
+        monthly_interest: Oylik foiz summasi
+        monthly_income: Oylik daromad
+    
+    Returns:
+        Dict with interest impact analysis
+    """
+    if monthly_income <= 0:
+        return {
+            "interest_to_income_ratio": 0,
+            "yearly_interest_loss": 0,
+            "impact_level": "unknown",
+            "recommendation": ""
+        }
+    
+    # Foiz/daromad nisbati
+    ratio = (monthly_interest / monthly_income) * 100
+    
+    # Yillik foiz yo'qotish
+    yearly_loss = monthly_interest * 12
+    
+    # Ta'sir darajasi
+    if ratio < 5:
+        impact_level = "low"
+        impact_emoji = "🟢"
+    elif ratio < 10:
+        impact_level = "moderate"
+        impact_emoji = "🟡"
+    elif ratio < 20:
+        impact_level = "high"
+        impact_emoji = "🟠"
+    else:
+        impact_level = "critical"
+        impact_emoji = "🔴"
+    
+    return {
+        "interest_to_income_ratio": round(ratio, 1),
+        "yearly_interest_loss": round(yearly_loss),
+        "impact_level": impact_level,
+        "impact_emoji": impact_emoji
+    }
+
+
+def generate_payment_schedule(
+    total_debt: float,
+    monthly_payment: float,
+    interest_rate: float,
+    loan_type: str = "annuity",
+    months: int = 12
+) -> List[Dict[str, Any]]:
+    """
+    To'lov jadvalini generatsiya qilish
+    
+    Args:
+        total_debt: Jami qarz
+        monthly_payment: Oylik to'lov
+        interest_rate: Yillik foiz
+        loan_type: Kredit turi
+        months: Necha oylik jadval
+    
+    Returns:
+        List of monthly payment breakdowns
+    """
+    schedule = []
+    monthly_rate = interest_rate / 100 / 12
+    remaining = total_debt
+    
+    if loan_type == "annuity":
+        for i in range(1, months + 1):
+            if remaining <= 0:
+                break
+            
+            interest = remaining * monthly_rate
+            principal = min(monthly_payment - interest, remaining)
+            remaining -= principal
+            
+            schedule.append({
+                "month": i,
+                "payment": round(monthly_payment),
+                "principal": round(principal),
+                "interest": round(interest),
+                "remaining": round(max(0, remaining))
+            })
+    else:
+        # Differentiated
+        base_principal = total_debt / max(int(total_debt / monthly_payment), 1)
+        
+        for i in range(1, months + 1):
+            if remaining <= 0:
+                break
+            
+            interest = remaining * monthly_rate
+            principal = min(base_principal, remaining)
+            payment = principal + interest
+            remaining -= principal
+            
+            schedule.append({
+                "month": i,
+                "payment": round(payment),
+                "principal": round(principal),
+                "interest": round(interest),
+                "remaining": round(max(0, remaining))
+            })
+    
+    return schedule
+

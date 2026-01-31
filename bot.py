@@ -62,6 +62,7 @@ from app.handlers import (
     menu_katm_confirm_callback,
     smart_credit_input_handler,
     credit_confirm_callback,
+    credit_show_schedule_callback,
     # AI Assistant handlers
     ai_assistant_callback,
     ai_voice_handler,
@@ -475,6 +476,11 @@ def main() -> None:
     # Menu KATM confirm callbacks
     application.add_handler(
         CallbackQueryHandler(menu_katm_confirm_callback, pattern="^menu_katm_confirm_(yes|no)$")
+    )
+    
+    # Credit schedule callback
+    application.add_handler(
+        CallbackQueryHandler(credit_show_schedule_callback, pattern="^credit_show_schedule$")
     )
     
     # Menu credit file upload handler

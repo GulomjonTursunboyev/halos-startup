@@ -825,6 +825,144 @@ MESSAGES = {
         )
     },
     
+    # ==================== ADVANCED CREDIT ANALYSIS ====================
+    "credit_detailed_analysis": {
+        "uz": (
+            "📊 *KREDIT TAHLILI*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏦 *Kreditlaringiz:*\n"
+            "{loans_list}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📈 *UMUMIY:*\n"
+            "├ 💰 Jami qarz: *{total_debt} so'm*\n"
+            "├ 💳 Oylik to'lov: *{monthly_payment} so'm*\n"
+            "├ 📅 Qolgan muddat: *{months_remaining} oy*\n"
+            "└ 📊 Taxminiy foiz: *{interest_rate}% yillik*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💸 *FOIZ TAHLILI:*\n"
+            "├ {impact_emoji} Oylik foiz: *{monthly_interest} so'm*\n"
+            "├ 📉 Asosiy qarz: *{monthly_principal} so'm*\n"
+            "├ 💔 Foiz ulushi: *{interest_percentage}%*\n"
+            "└ 📆 Yillik foiz: *{yearly_interest} so'm*\n\n"
+            "{interest_warning}"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "To'g'rimi? ✅"
+        ),
+        "ru": (
+            "📊 *АНАЛИЗ КРЕДИТОВ*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏦 *Ваши кредиты:*\n"
+            "{loans_list}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📈 *ИТОГО:*\n"
+            "├ 💰 Общий долг: *{total_debt} сум*\n"
+            "├ 💳 Ежемесячный платёж: *{monthly_payment} сум*\n"
+            "├ 📅 Осталось: *{months_remaining} мес*\n"
+            "└ 📊 Примерная ставка: *{interest_rate}% годовых*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💸 *АНАЛИЗ ПРОЦЕНТОВ:*\n"
+            "├ {impact_emoji} Ежемесячный %: *{monthly_interest} сум*\n"
+            "├ 📉 Основной долг: *{monthly_principal} сум*\n"
+            "├ 💔 Доля процентов: *{interest_percentage}%*\n"
+            "└ 📆 Годовые проценты: *{yearly_interest} сум*\n\n"
+            "{interest_warning}"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Верно? ✅"
+        )
+    },
+    
+    "credit_loan_item_detailed": {
+        "uz": "├ 🏦 *{bank}*: {amount} so'm ({rate}%)\n",
+        "ru": "├ 🏦 *{bank}*: {amount} сум ({rate}%)\n"
+    },
+    
+    "credit_interest_warning_low": {
+        "uz": "🟢 *Yaxshi!* Foiz yukingiz past darajada.\n\n",
+        "ru": "🟢 *Хорошо!* Процентная нагрузка низкая.\n\n"
+    },
+    
+    "credit_interest_warning_moderate": {
+        "uz": "🟡 *E'tibor!* Foiz yukingiz o'rtacha. HALOS bilan tezroq chiqing!\n\n",
+        "ru": "🟡 *Внимание!* Процентная нагрузка средняя. С HALOS выйдете быстрее!\n\n"
+    },
+    
+    "credit_interest_warning_high": {
+        "uz": "🟠 *Ogohlantirish!* Foiz yukingiz yuqori. Har oyda *{amount} so'm* foizga ketmoqda!\n\n",
+        "ru": "🟠 *Предупреждение!* Процентная нагрузка высокая. Каждый месяц *{amount} сум* уходит на проценты!\n\n"
+    },
+    
+    "credit_interest_warning_critical": {
+        "uz": "🔴 *XAVFLI!* Daromadingizning *{ratio}%* faqat foizga ketmoqda! Shoshilinch HALOS rejasiga o'ting!\n\n",
+        "ru": "🔴 *ОПАСНО!* *{ratio}%* вашего дохода уходит только на проценты! Срочно переходите на план HALOS!\n\n"
+    },
+    
+    "credit_income_impact": {
+        "uz": (
+            "💼 *DAROMADGA TA'SIR:*\n"
+            "├ 📊 Daromadingiz: *{income} so'm/oy*\n"
+            "├ 💸 Foizga ketadi: *{interest} so'm/oy*\n"
+            "├ 📉 Bu daromadning: *{ratio}%*\n"
+            "└ 📆 Yiliga yo'qotasiz: *{yearly} so'm*\n"
+        ),
+        "ru": (
+            "💼 *ВЛИЯНИЕ НА ДОХОД:*\n"
+            "├ 📊 Ваш доход: *{income} сум/мес*\n"
+            "├ 💸 Уходит на %: *{interest} сум/мес*\n"
+            "├ 📉 Это от дохода: *{ratio}%*\n"
+            "└ 📆 Теряете в год: *{yearly} сум*\n"
+        )
+    },
+    
+    "credit_confirm_data": {
+        "uz": "\n\n*Ma'lumotlar to'g'rimi?*\nTasdiqlasangiz, umumiy summa so'ralmasdan davom etamiz.",
+        "ru": "\n\n*Данные верны?*\nЕсли подтвердите, продолжим без запроса общей суммы."
+    },
+    
+    "credit_manual_after_file": {
+        "uz": (
+            "📝 *QO'LDA KIRITISH*\n\n"
+            "Oylik kredit to'lovingizni kiriting:\n"
+            "Masalan: `2500000` yoki `2.5 mln`"
+        ),
+        "ru": (
+            "📝 *РУЧНОЙ ВВОД*\n\n"
+            "Введите ежемесячный платёж по кредиту:\n"
+            "Например: `2500000` или `2.5 млн`"
+        )
+    },
+    
+    "credit_payment_schedule": {
+        "uz": (
+            "📅 *KEYINGI 6 OY JADVALI:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "{schedule}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _{loan_type}_"
+        ),
+        "ru": (
+            "📅 *ГРАФИК НА 6 МЕСЯЦЕВ:*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "{schedule}\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _{loan_type}_"
+        )
+    },
+    
+    "credit_schedule_row": {
+        "uz": "{month}-oy: {payment} so'm (foiz: {interest}, qarz: {principal})\n",
+        "ru": "{month}-мес: {payment} сум (проценты: {interest}, долг: {principal})\n"
+    },
+    
+    "btn_credit_show_schedule": {
+        "uz": "📅 To'lov jadvalini ko'rish",
+        "ru": "📅 Показать график платежей"
+    },
+    
+    "btn_credit_skip_schedule": {
+        "uz": "⏭ Davom etish",
+        "ru": "⏭ Продолжить"
+    },
+    
     "credit_confirm_yes": {
         "uz": "✅ To'g'ri",
         "ru": "✅ Верно"
