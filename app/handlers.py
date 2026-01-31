@@ -10219,8 +10219,9 @@ async def admin_confirm_clear_all(update: Update, context: ContextTypes.DEFAULT_
             parse_mode="Markdown"
         )
     else:
+        error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
-            f"❌ Xatolik: {result.get('error', 'Noma\'lum xato')}",
+            f"❌ Xatolik: {error_msg}",
             parse_mode="Markdown"
         )
     
@@ -10355,8 +10356,9 @@ async def admin_confirm_delete_user(update: Update, context: ContextTypes.DEFAUL
             parse_mode="Markdown"
         )
     else:
+        error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
-            f"❌ *Xatolik:* {result.get('error', 'Noma\'lum xato')}",
+            f"❌ *Xatolik:* {error_msg}",
             parse_mode="Markdown"
         )
     
@@ -10387,8 +10389,9 @@ async def admin_confirm_clear_tx(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="Markdown"
         )
     else:
+        error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
-            f"❌ *Xatolik:* {result.get('error', 'Noma\'lum xato')}",
+            f"❌ *Xatolik:* {error_msg}",
             parse_mode="Markdown"
         )
     
