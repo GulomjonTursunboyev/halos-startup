@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 _INPUT_WAIT_FLAGS = frozenset({
     "awaiting_income", "awaiting_partner_income", "awaiting_loan", 
     "awaiting_total_debt", "awaiting_promo", "awaiting_new_category",
-    "in_conversation", "in_onboarding_flow",
+    "in_conversation", "in_onboarding_flow", "in_admin_panel",
     "entering_income", "entering_rent", "entering_utilities",
     "entering_loan", "entering_debt", "entering_mandatory",
     "entering_kindergarten", "uploading_transaction", "uploading_katm",
@@ -11944,6 +11944,12 @@ async def admin_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     query = update.callback_query
     await query.answer()
     
+    # Admin panel flaglarini tozalash - AI qayta ishlashi uchun
+    context.user_data.pop("in_admin_panel", None)
+    context.user_data.pop("admin_action", None)
+    context.user_data.pop("admin_broadcast", None)
+    context.user_data.pop("admin_search_user", None)
+    
     await query.edit_message_text("✅ Admin panel yopildi.")
     
     return ConversationHandler.END
@@ -11953,6 +11959,9 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     """Admin: Bekor qilish"""
     context.user_data.pop("admin_action", None)
     context.user_data.pop("target_user_id", None)
+    context.user_data.pop("in_admin_panel", None)
+    context.user_data.pop("admin_broadcast", None)
+    context.user_data.pop("admin_search_user", None)
     
     await update.message.reply_text("❌ Amal bekor qilindi.")
     
