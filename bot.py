@@ -796,8 +796,11 @@ def main() -> None:
         asyncio.set_event_loop(loop)
         
         async def run_bot_with_webhook():
-            """Run bot with webhook server (no polling)"""
-            # Start webhook server
+            """Run bot with webhook server for Railway/Render deployment"""
+            import signal
+            from telegram.error import Conflict, NetworkError
+            
+            # Start webhook server for Click payments
             from webhook_server import start_webhook_server_async
             webhook_runner = await start_webhook_server_async()
             logger.info("Webhook server started successfully")
@@ -806,26 +809,48 @@ def main() -> None:
             await application.initialize()
             await application.start()
             
-            # Delete any existing webhook and wait for conflicts to clear
-            logger.info("Deleting existing webhook and clearing conflicts...")
-            await application.bot.delete_webhook(drop_pending_updates=True)
+            # ========== CONFLICT PREVENTION FOR RAILWAY/RENDER ==========
+            # Delete webhook and wait for old instance to die
+            logger.info("Clearing old connections...")
             
-            # Wait a bit for any existing polling to stop
-            await asyncio.sleep(2)
+            for attempt in range(5):
+                try:
+                    await application.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info(f"Webhook deleted, waiting for old instance to stop (attempt {attempt + 1}/5)...")
+                    
+                    # Longer wait on first deploy to let old instance die
+                    wait_time = 5 if attempt == 0 else 3
+                    await asyncio.sleep(wait_time)
+                    
+                    # Try to start polling
+                    logger.info("Starting polling...")
+                    await application.updater.start_polling(
+                        allowed_updates=["message", "callback_query", "pre_checkout_query"],
+                        drop_pending_updates=True,
+                        poll_interval=2.0,
+                        read_timeout=30,
+                        write_timeout=30,
+                    )
+                    logger.info("Polling started successfully!")
+                    break
+                    
+                except Conflict as e:
+                    logger.warning(f"Conflict detected (attempt {attempt + 1}/5): {e}")
+                    if attempt < 4:
+                        logger.info(f"Waiting 10 seconds before retry...")
+                        await asyncio.sleep(10)
+                    else:
+                        logger.error("Max retries reached. Old instance may still be running.")
+                        raise
+                        
+                except NetworkError as e:
+                    logger.warning(f"Network error (attempt {attempt + 1}/5): {e}")
+                    if attempt < 4:
+                        await asyncio.sleep(5)
+                    else:
+                        raise
             
-            # Note: We're NOT using Telegram webhooks for updates
-            # We use polling for Telegram updates + webhook server for Click payments
-            # This is intentional - webhook server is only for payment callbacks
-            logger.info("Starting polling...")
-            await application.updater.start_polling(
-                allowed_updates=["message", "callback_query", "pre_checkout_query"],
-                drop_pending_updates=True,
-                poll_interval=2.0,  # Increased to avoid rate limiting and conflicts
-                read_timeout=30,
-                write_timeout=30,
-            )
-            
-            # Start PRO Care Scheduler (debt reminders, notifications, etc.)
+            # Start PRO Care Scheduler
             try:
                 from app.scheduler import get_scheduler
                 scheduler = await get_scheduler(application.bot)
@@ -834,24 +859,47 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Failed to start scheduler: {e}")
             
-            logger.info("Bot is running with webhook server! Press Ctrl+C to stop.")
+            logger.info("="*50)
+            logger.info("✅ HALOS Bot is running on Railway/Render!")
+            logger.info("="*50)
             
-            # Keep running
+            # Graceful shutdown handler
+            shutdown_event = asyncio.Event()
+            
+            def handle_shutdown(signum, frame):
+                logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+                shutdown_event.set()
+            
+            # Register signal handlers for Railway/Render
             try:
-                while True:
-                    await asyncio.sleep(1)
+                signal.signal(signal.SIGTERM, handle_shutdown)
+                signal.signal(signal.SIGINT, handle_shutdown)
+            except Exception as e:
+                logger.warning(f"Could not set signal handlers: {e}")
+            
+            # Keep running until shutdown signal
+            try:
+                await shutdown_event.wait()
             except asyncio.CancelledError:
                 pass
             finally:
-                await application.updater.stop()
-                await application.stop()
-                await application.shutdown()
-                await webhook_runner.cleanup()
+                logger.info("Shutting down gracefully...")
+                try:
+                    await application.updater.stop()
+                    await application.stop()
+                    await application.shutdown()
+                    await webhook_runner.cleanup()
+                    logger.info("Shutdown complete!")
+                except Exception as e:
+                    logger.error(f"Error during shutdown: {e}")
         
         try:
             loop.run_until_complete(run_bot_with_webhook())
         except KeyboardInterrupt:
             logger.info("Shutting down...")
+        except Exception as e:
+            logger.error(f"Fatal error: {e}")
+            raise
     else:
         # No PORT - run without webhook server (local development)
         logger.info("Bot is running (no webhook server)! Press Ctrl+C to stop.")
