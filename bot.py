@@ -35,6 +35,9 @@ from app.handlers import (
     # Yangi soddalashtirilgan menyu handler'lari
     menu_today_handler,
     menu_debts_handler,
+    # NEW: Debt dashboard callbacks
+    show_katm_credits_callback,
+    back_to_debts_menu_callback,
     # Legacy
     menu_plan_handler,
     menu_profile_handler,
@@ -498,6 +501,14 @@ def main() -> None:
     # Credit schedule callback
     application.add_handler(
         CallbackQueryHandler(credit_show_schedule_callback, pattern="^credit_show_schedule$")
+    )
+    
+    # ========== DEBT DASHBOARD CALLBACKS ==========
+    application.add_handler(
+        CallbackQueryHandler(show_katm_credits_callback, pattern="^show_katm_credits$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(back_to_debts_menu_callback, pattern="^back_to_debts_menu$")
     )
     
     # Menu credit file upload handler

@@ -3330,7 +3330,16 @@ async def menu_today_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def menu_debts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 💰 Qarzlar button - QARZLAR RO'YXATI"""
+    """
+    Handle 💰 Qarzlar button - PROFESSIONAL QARZLAR DASHBOARD
+    
+    Senior PM & UX Designer approach:
+    1. Clear visual hierarchy with sections
+    2. Personal debts (lent/borrowed) - separate section
+    3. Bank credits/loans - separate section  
+    4. Quick summary at top
+    5. Actionable buttons for each section
+    """
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -3345,7 +3354,7 @@ async def menu_debts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     
-    # Qarzlar xulosasi
+    # ========== 1. SHAXSIY QARZLAR (Personal Debts) ==========
     from app.ai_assistant import get_debt_summary
     
     try:
@@ -3359,57 +3368,490 @@ async def menu_debts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lent_count = debt_summary.get("lent_count", 0)
     borrowed_count = debt_summary.get("borrowed_count", 0)
     
-    if lang == "uz":
-        msg = (
-            "💰 *QARZLAR*\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-        )
-        
-        if net_balance > 0:
-            msg += f"💚 Sizga qaytariladi: *+{net_balance:,}* so'm\n\n"
-        elif net_balance < 0:
-            msg += f"🔴 Siz qaytarasiz: *{net_balance:,}* so'm\n\n"
-        else:
-            msg += "⚪ Qarz yo'q\n\n"
-        
-        if total_lent > 0:
-            msg += f"📤 Berdingiz: {total_lent:,} so'm ({lent_count} ta)\n"
-        if total_borrowed > 0:
-            msg += f"📥 Oldingiz: {total_borrowed:,} so'm ({borrowed_count} ta)\n"
-        
-        msg += "\n_Qarz qo'shish: \"Ali 100k berdi\"_"
-    else:
-        msg = (
-            "💰 *ДОЛГИ*\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-        )
-        
-        if net_balance > 0:
-            msg += f"💚 Вам вернут: *+{net_balance:,}* сум\n\n"
-        elif net_balance < 0:
-            msg += f"🔴 Вы вернёте: *{net_balance:,}* сум\n\n"
-        else:
-            msg += "⚪ Долгов нет\n\n"
-        
-        if total_lent > 0:
-            msg += f"📤 Вы дали: {total_lent:,} сум ({lent_count} шт)\n"
-        if total_borrowed > 0:
-            msg += f"📥 Вы взяли: {total_borrowed:,} сум ({borrowed_count} шт)\n"
-        
-        msg += "\n_Добавить долг: \"Али 100к дал\"_"
+    # ========== 2. BANK KREDITLARI (KATM Loans) ==========
+    try:
+        katm_loans = await db.get_user_katm_loans(user["id"])
+    except:
+        katm_loans = []
     
-    keyboard = [
-        [InlineKeyboardButton(
-            "📋 Batafsil" if lang == "uz" else "📋 Подробнее",
-            callback_data="ai_debt_list"
-        )]
-    ]
+    total_credit_balance = sum(loan.get("remaining_balance", 0) or 0 for loan in katm_loans)
+    total_monthly_payment = sum(loan.get("monthly_payment", 0) or 0 for loan in katm_loans)
+    credit_count = len(katm_loans)
+    
+    # ========== 3. PROFILDA LOAN_PAYMENT (Legacy kredit to'lovi) ==========
+    try:
+        profile = await db.get_financial_profile(user["id"])
+        legacy_loan_payment = profile.get("loan_payment", 0) if profile else 0
+        legacy_total_debt = profile.get("total_debt", 0) if profile else 0
+    except:
+        legacy_loan_payment = 0
+        legacy_total_debt = 0
+    
+    # Agar KATM bo'lmasa, lekin profilda kredit bor
+    if not katm_loans and (legacy_loan_payment > 0 or legacy_total_debt > 0):
+        total_credit_balance = legacy_total_debt
+        total_monthly_payment = legacy_loan_payment
+        credit_count = 1 if legacy_total_debt > 0 else 0
+    
+    # ========== 4. UMUMIY HISOB ==========
+    # Jami qarz yuklamasi = bank krediti + shaxsiy qarz
+    total_debt_burden = total_credit_balance + total_borrowed
+    total_receivable = total_lent  # Sizga qaytarilishi kerak
+    
+    # ========== MESSAGE BUILDING ==========
+    if lang == "uz":
+        # HEADER - Quick Summary
+        msg = "💰 *QARZLAR DASHBOARD*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        # SUMMARY BLOCK
+        if total_receivable > 0 and total_debt_burden > 0:
+            diff = total_receivable - total_debt_burden
+            if diff > 0:
+                msg += f"📊 *Balans:* 💚 +{diff:,.0f} so'm\n\n"
+            else:
+                msg += f"📊 *Balans:* 🔴 {diff:,.0f} so'm\n\n"
+        elif total_receivable > 0:
+            msg += f"📊 *Balans:* 💚 +{total_receivable:,.0f} so'm\n\n"
+        elif total_debt_burden > 0:
+            msg += f"📊 *Balans:* 🔴 -{total_debt_burden:,.0f} so'm\n\n"
+        else:
+            msg += "📊 *Balans:* ⚪ Qarz yo'q\n\n"
+        
+        # ========== SECTION 1: SHAXSIY QARZLAR ==========
+        msg += "👥 *SHAXSIY QARZLAR*\n"
+        msg += "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        
+        if total_lent > 0 or total_borrowed > 0:
+            if total_lent > 0:
+                msg += f"📤 Berdingiz: *{total_lent:,.0f}* ({lent_count})\n"
+                msg += "    _↳ Sizga qaytariladi_\n"
+            if total_borrowed > 0:
+                msg += f"📥 Oldingiz: *{total_borrowed:,.0f}* ({borrowed_count})\n"
+                msg += "    _↳ Siz qaytarasiz_\n"
+        else:
+            msg += "✅ Shaxsiy qarz yo'q\n"
+        
+        msg += "\n"
+        
+        # ========== SECTION 2: BANK KREDITLARI ==========
+        msg += "🏦 *BANK KREDITLARI*\n"
+        msg += "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        
+        if credit_count > 0:
+            msg += f"💳 Kreditlar: *{credit_count}* ta\n"
+            msg += f"📉 Qoldiq: *{total_credit_balance:,.0f}* so'm\n"
+            msg += f"📆 Oylik to'lov: *{total_monthly_payment:,.0f}* so'm\n"
+            
+            # Har bir kredit detali (max 3 ta)
+            if katm_loans:
+                msg += "\n📋 *Kreditlar ro'yxati:*\n"
+                for i, loan in enumerate(katm_loans[:3], 1):
+                    bank = loan.get("bank_name", "Bank")
+                    balance = loan.get("remaining_balance", 0) or 0
+                    monthly = loan.get("monthly_payment", 0) or 0
+                    msg += f"  {i}. {bank}\n"
+                    msg += f"     💵 {balance:,.0f} | 📅 {monthly:,.0f}/oy\n"
+                
+                if len(katm_loans) > 3:
+                    msg += f"  _...va yana {len(katm_loans) - 3} ta_\n"
+        else:
+            msg += "✅ Bank krediti yo'q\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Qarz qo'shish: \"Ali 100k berdi\"_\n"
+        msg += "📄 _Kredit qo'shish: KATM PDF yuklang_"
+        
+    else:
+        # RUSSIAN VERSION
+        msg = "💰 *DASHBOARD ДОЛГОВ*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        # SUMMARY BLOCK
+        if total_receivable > 0 and total_debt_burden > 0:
+            diff = total_receivable - total_debt_burden
+            if diff > 0:
+                msg += f"📊 *Баланс:* 💚 +{diff:,.0f} сум\n\n"
+            else:
+                msg += f"📊 *Баланс:* 🔴 {diff:,.0f} сум\n\n"
+        elif total_receivable > 0:
+            msg += f"📊 *Баланс:* 💚 +{total_receivable:,.0f} сум\n\n"
+        elif total_debt_burden > 0:
+            msg += f"📊 *Баланс:* 🔴 -{total_debt_burden:,.0f} сум\n\n"
+        else:
+            msg += "📊 *Баланс:* ⚪ Долгов нет\n\n"
+        
+        # ========== SECTION 1: ЛИЧНЫЕ ДОЛГИ ==========
+        msg += "👥 *ЛИЧНЫЕ ДОЛГИ*\n"
+        msg += "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        
+        if total_lent > 0 or total_borrowed > 0:
+            if total_lent > 0:
+                msg += f"📤 Вы дали: *{total_lent:,.0f}* ({lent_count})\n"
+                msg += "    _↳ Вам вернут_\n"
+            if total_borrowed > 0:
+                msg += f"📥 Вы взяли: *{total_borrowed:,.0f}* ({borrowed_count})\n"
+                msg += "    _↳ Вы вернёте_\n"
+        else:
+            msg += "✅ Личных долгов нет\n"
+        
+        msg += "\n"
+        
+        # ========== SECTION 2: БАНКОВСКИЕ КРЕДИТЫ ==========
+        msg += "🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n"
+        msg += "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        
+        if credit_count > 0:
+            msg += f"💳 Кредитов: *{credit_count}* шт\n"
+            msg += f"📉 Остаток: *{total_credit_balance:,.0f}* сум\n"
+            msg += f"📆 Ежемесячно: *{total_monthly_payment:,.0f}* сум\n"
+            
+            if katm_loans:
+                msg += "\n📋 *Список кредитов:*\n"
+                for i, loan in enumerate(katm_loans[:3], 1):
+                    bank = loan.get("bank_name", "Банк")
+                    balance = loan.get("remaining_balance", 0) or 0
+                    monthly = loan.get("monthly_payment", 0) or 0
+                    msg += f"  {i}. {bank}\n"
+                    msg += f"     💵 {balance:,.0f} | 📅 {monthly:,.0f}/мес\n"
+                
+                if len(katm_loans) > 3:
+                    msg += f"  _...и ещё {len(katm_loans) - 3} шт_\n"
+        else:
+            msg += "✅ Банковских кредитов нет\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Добавить долг: \"Али 100к дал\"_\n"
+        msg += "📄 _Добавить кредит: загрузите KATM PDF_"
+    
+    # ========== KEYBOARD ==========
+    keyboard = []
+    
+    # Row 1: Detail buttons
+    if total_lent > 0 or total_borrowed > 0:
+        keyboard.append([
+            InlineKeyboardButton(
+                "👥 Shaxsiy qarzlar" if lang == "uz" else "👥 Личные долги",
+                callback_data="ai_debt_list"
+            )
+        ])
+    
+    if credit_count > 0:
+        keyboard.append([
+            InlineKeyboardButton(
+                "🏦 Kreditlar" if lang == "uz" else "🏦 Кредиты",
+                callback_data="show_katm_credits"
+            )
+        ])
+    
+    # Row 2: Add new
+    keyboard.append([
+        InlineKeyboardButton(
+            "➕ Qarz qo'shish" if lang == "uz" else "➕ Добавить долг",
+            callback_data="add_debt_manual"
+        ),
+        InlineKeyboardButton(
+            "📄 KATM yuklash" if lang == "uz" else "📄 Загрузить KATM",
+            callback_data="upload_katm_pdf"
+        )
+    ])
     
     await update.message.reply_text(
         msg, 
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+
+async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show detailed KATM credits list"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Get KATM loans
+    try:
+        katm_loans = await db.get_user_katm_loans(user["id"])
+    except:
+        katm_loans = []
+    
+    if not katm_loans:
+        # Check legacy profile
+        try:
+            profile = await db.get_financial_profile(user["id"])
+            legacy_loan_payment = profile.get("loan_payment", 0) if profile else 0
+            legacy_total_debt = profile.get("total_debt", 0) if profile else 0
+        except:
+            legacy_loan_payment = 0
+            legacy_total_debt = 0
+        
+        if legacy_total_debt > 0 or legacy_loan_payment > 0:
+            if lang == "uz":
+                msg = (
+                    "🏦 *BANK KREDITLARI*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"💳 Jami qarz: *{legacy_total_debt:,.0f}* so'm\n"
+                    f"📆 Oylik to'lov: *{legacy_loan_payment:,.0f}* so'm\n\n"
+                    "📄 _Batafsil ma'lumot uchun KATM PDF yuklang_"
+                )
+            else:
+                msg = (
+                    "🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"💳 Общий долг: *{legacy_total_debt:,.0f}* сум\n"
+                    f"📆 Ежемесячно: *{legacy_loan_payment:,.0f}* сум\n\n"
+                    "📄 _Для детальной информации загрузите KATM PDF_"
+                )
+        else:
+            if lang == "uz":
+                msg = "🏦 Bank kreditlari topilmadi.\n\n📄 _KATM PDF yuklang_"
+            else:
+                msg = "🏦 Банковских кредитов не найдено.\n\n📄 _Загрузите KATM PDF_"
+        
+        keyboard = [[InlineKeyboardButton(
+            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+            callback_data="back_to_debts_menu"
+        )]]
+        
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # Build detailed credits list
+    if lang == "uz":
+        msg = "🏦 *BANK KREDITLARI*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        total_balance = 0
+        total_monthly = 0
+        
+        for i, loan in enumerate(katm_loans, 1):
+            bank = loan.get("bank_name", "Noma'lum bank")
+            balance = loan.get("remaining_balance", 0) or 0
+            monthly = loan.get("monthly_payment", 0) or 0
+            original = loan.get("original_amount", 0) or 0
+            loan_type = loan.get("loan_type", "")
+            status = loan.get("status", "active")
+            
+            total_balance += balance
+            total_monthly += monthly
+            
+            # Progress bar
+            if original > 0:
+                paid_percent = int(((original - balance) / original) * 100)
+                progress = "█" * (paid_percent // 10) + "░" * (10 - paid_percent // 10)
+            else:
+                paid_percent = 0
+                progress = "░" * 10
+            
+            msg += f"*{i}. {bank}*\n"
+            if loan_type:
+                msg += f"   📋 {loan_type}\n"
+            msg += f"   💵 Qoldiq: *{balance:,.0f}* so'm\n"
+            msg += f"   📆 Oylik: *{monthly:,.0f}* so'm\n"
+            if original > 0:
+                msg += f"   📊 To'landi: {progress} {paid_percent}%\n"
+            msg += "\n"
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"📊 *JAMI:*\n"
+        msg += f"   💰 Qoldiq: *{total_balance:,.0f}* so'm\n"
+        msg += f"   📆 Oylik: *{total_monthly:,.0f}* so'm"
+        
+    else:
+        msg = "🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        total_balance = 0
+        total_monthly = 0
+        
+        for i, loan in enumerate(katm_loans, 1):
+            bank = loan.get("bank_name", "Неизвестный банк")
+            balance = loan.get("remaining_balance", 0) or 0
+            monthly = loan.get("monthly_payment", 0) or 0
+            original = loan.get("original_amount", 0) or 0
+            loan_type = loan.get("loan_type", "")
+            
+            total_balance += balance
+            total_monthly += monthly
+            
+            if original > 0:
+                paid_percent = int(((original - balance) / original) * 100)
+                progress = "█" * (paid_percent // 10) + "░" * (10 - paid_percent // 10)
+            else:
+                paid_percent = 0
+                progress = "░" * 10
+            
+            msg += f"*{i}. {bank}*\n"
+            if loan_type:
+                msg += f"   📋 {loan_type}\n"
+            msg += f"   💵 Остаток: *{balance:,.0f}* сум\n"
+            msg += f"   📆 Ежемесячно: *{monthly:,.0f}* сум\n"
+            if original > 0:
+                msg += f"   📊 Выплачено: {progress} {paid_percent}%\n"
+            msg += "\n"
+        
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"📊 *ИТОГО:*\n"
+        msg += f"   💰 Остаток: *{total_balance:,.0f}* сум\n"
+        msg += f"   📆 Ежемесячно: *{total_monthly:,.0f}* сум"
+    
+    keyboard = [[InlineKeyboardButton(
+        "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+        callback_data="back_to_debts_menu"
+    )]]
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Return to main debts menu via callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Create a fake message update to reuse menu_debts_handler logic
+    telegram_id = update.effective_user.id
+    lang = context.user_data.get("lang", "uz")
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user:
+        return
+    
+    # Rebuild the debts dashboard
+    from app.ai_assistant import get_debt_summary
+    
+    try:
+        debt_summary = await get_debt_summary(db, user["id"])
+    except:
+        debt_summary = {"total_lent": 0, "total_borrowed": 0, "net_balance": 0, "lent_count": 0, "borrowed_count": 0}
+    
+    total_lent = debt_summary.get("total_lent", 0)
+    total_borrowed = debt_summary.get("total_borrowed", 0)
+    lent_count = debt_summary.get("lent_count", 0)
+    borrowed_count = debt_summary.get("borrowed_count", 0)
+    
+    try:
+        katm_loans = await db.get_user_katm_loans(user["id"])
+    except:
+        katm_loans = []
+    
+    total_credit_balance = sum(loan.get("remaining_balance", 0) or 0 for loan in katm_loans)
+    total_monthly_payment = sum(loan.get("monthly_payment", 0) or 0 for loan in katm_loans)
+    credit_count = len(katm_loans)
+    
+    try:
+        profile = await db.get_financial_profile(user["id"])
+        legacy_loan_payment = profile.get("loan_payment", 0) if profile else 0
+        legacy_total_debt = profile.get("total_debt", 0) if profile else 0
+    except:
+        legacy_loan_payment = 0
+        legacy_total_debt = 0
+    
+    if not katm_loans and (legacy_loan_payment > 0 or legacy_total_debt > 0):
+        total_credit_balance = legacy_total_debt
+        total_monthly_payment = legacy_loan_payment
+        credit_count = 1 if legacy_total_debt > 0 else 0
+    
+    total_debt_burden = total_credit_balance + total_borrowed
+    total_receivable = total_lent
+    
+    if lang == "uz":
+        msg = "💰 *QARZLAR DASHBOARD*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        if total_receivable > 0 and total_debt_burden > 0:
+            diff = total_receivable - total_debt_burden
+            if diff > 0:
+                msg += f"📊 *Balans:* 💚 +{diff:,.0f} so'm\n\n"
+            else:
+                msg += f"📊 *Balans:* 🔴 {diff:,.0f} so'm\n\n"
+        elif total_receivable > 0:
+            msg += f"📊 *Balans:* 💚 +{total_receivable:,.0f} so'm\n\n"
+        elif total_debt_burden > 0:
+            msg += f"📊 *Balans:* 🔴 -{total_debt_burden:,.0f} so'm\n\n"
+        else:
+            msg += "📊 *Balans:* ⚪ Qarz yo'q\n\n"
+        
+        msg += "👥 *SHAXSIY QARZLAR*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        if total_lent > 0 or total_borrowed > 0:
+            if total_lent > 0:
+                msg += f"📤 Berdingiz: *{total_lent:,.0f}* ({lent_count})\n"
+            if total_borrowed > 0:
+                msg += f"📥 Oldingiz: *{total_borrowed:,.0f}* ({borrowed_count})\n"
+        else:
+            msg += "✅ Shaxsiy qarz yo'q\n"
+        
+        msg += "\n🏦 *BANK KREDITLARI*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        if credit_count > 0:
+            msg += f"💳 Kreditlar: *{credit_count}* ta\n"
+            msg += f"📉 Qoldiq: *{total_credit_balance:,.0f}* so'm\n"
+            msg += f"📆 Oylik: *{total_monthly_payment:,.0f}* so'm\n"
+        else:
+            msg += "✅ Bank krediti yo'q\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Qarz: \"Ali 100k berdi\"_"
+    else:
+        msg = "💰 *DASHBOARD ДОЛГОВ*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        if total_receivable > 0 and total_debt_burden > 0:
+            diff = total_receivable - total_debt_burden
+            if diff > 0:
+                msg += f"📊 *Баланс:* 💚 +{diff:,.0f} сум\n\n"
+            else:
+                msg += f"📊 *Баланс:* 🔴 {diff:,.0f} сум\n\n"
+        elif total_receivable > 0:
+            msg += f"📊 *Баланс:* 💚 +{total_receivable:,.0f} сум\n\n"
+        elif total_debt_burden > 0:
+            msg += f"📊 *Баланс:* 🔴 -{total_debt_burden:,.0f} сум\n\n"
+        else:
+            msg += "📊 *Баланс:* ⚪ Долгов нет\n\n"
+        
+        msg += "👥 *ЛИЧНЫЕ ДОЛГИ*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        if total_lent > 0 or total_borrowed > 0:
+            if total_lent > 0:
+                msg += f"📤 Вы дали: *{total_lent:,.0f}* ({lent_count})\n"
+            if total_borrowed > 0:
+                msg += f"📥 Вы взяли: *{total_borrowed:,.0f}* ({borrowed_count})\n"
+        else:
+            msg += "✅ Личных долгов нет\n"
+        
+        msg += "\n🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
+        if credit_count > 0:
+            msg += f"💳 Кредитов: *{credit_count}* шт\n"
+            msg += f"📉 Остаток: *{total_credit_balance:,.0f}* сум\n"
+            msg += f"📆 Ежемесячно: *{total_monthly_payment:,.0f}* сум\n"
+        else:
+            msg += "✅ Банковских кредитов нет\n"
+        
+        msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Долг: \"Али 100к дал\"_"
+    
+    keyboard = []
+    if total_lent > 0 or total_borrowed > 0:
+        keyboard.append([InlineKeyboardButton(
+            "👥 Shaxsiy qarzlar" if lang == "uz" else "👥 Личные долги",
+            callback_data="ai_debt_list"
+        )])
+    if credit_count > 0:
+        keyboard.append([InlineKeyboardButton(
+            "🏦 Kreditlar" if lang == "uz" else "🏦 Кредиты",
+            callback_data="show_katm_credits"
+        )])
+    keyboard.append([
+        InlineKeyboardButton("➕ Qarz" if lang == "uz" else "➕ Долг", callback_data="add_debt_manual"),
+        InlineKeyboardButton("📄 KATM" if lang == "uz" else "📄 KATM", callback_data="upload_katm_pdf")
+    ])
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 # ==================== LEGACY MAIN MENU HANDLERS ====================
@@ -9687,6 +10129,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     logger.info(f"User {telegram_id} is admin, showing panel...")
     
+    # AI ni o'chirish - admin panelda AI tranzaksiya deb qabul qilmasin
+    context.user_data["in_admin_panel"] = True
+    
     await update.message.reply_text("⏳ Admin panel yuklanmoqda...")
     
     # Admin panel asosiy menyusini ko'rsatish
@@ -11078,6 +11523,7 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     telegram_id = update.effective_user.id
     
     if telegram_id not in ADMIN_IDS:
+        context.user_data.pop("admin_action", None)
         return ConversationHandler.END
     
     text = update.message.text.strip()
@@ -11101,12 +11547,21 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_info = await db.admin_get_user_info(target_id)
     
     if not user_info:
+        # User topilmadi - qayta kiritish imkoniyati
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Qayta kiritish", callback_data="admin_manage_user")],
+            [InlineKeyboardButton("◀️ Admin panelga", callback_data="admin_main")],
+        ])
         await update.message.reply_text(
-            f"❌ User topilmadi: `{target_id}`\n\n"
-            "Telegram ID ni tekshiring.",
-            parse_mode="Markdown"
+            f"❌ *User topilmadi!*\n\n"
+            f"Telegram ID: `{target_id}`\n\n"
+            f"Bu ID bilan hech qanday user bazada yo'q.\n"
+            f"Telegram ID ni tekshiring va qayta urinib ko'ring.",
+            parse_mode="Markdown",
+            reply_markup=keyboard
         )
-        return ConversationHandler.END
+        # admin_action ni saqlab qolamiz, conversation davom etadi
+        return States.ADMIN_INPUT
     
     # User ma'lumotlarini ko'rsatish
     username = user_info.get("username") or "Yo'q"
@@ -11190,6 +11645,8 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=keyboard
         )
     
+    # Admin action ni tozalash - AI ishlamasligi uchun
+    context.user_data.pop("admin_action", None)
     return ConversationHandler.END
 
 
