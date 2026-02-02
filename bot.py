@@ -806,16 +806,21 @@ def main() -> None:
             await application.initialize()
             await application.start()
             
-            # Delete any existing webhook first
+            # Delete any existing webhook and wait for conflicts to clear
+            logger.info("Deleting existing webhook and clearing conflicts...")
             await application.bot.delete_webhook(drop_pending_updates=True)
+            
+            # Wait a bit for any existing polling to stop
+            await asyncio.sleep(2)
             
             # Note: We're NOT using Telegram webhooks for updates
             # We use polling for Telegram updates + webhook server for Click payments
             # This is intentional - webhook server is only for payment callbacks
+            logger.info("Starting polling...")
             await application.updater.start_polling(
                 allowed_updates=["message", "callback_query", "pre_checkout_query"],
                 drop_pending_updates=True,
-                poll_interval=1.0,  # Increased to avoid rate limiting
+                poll_interval=2.0,  # Increased to avoid rate limiting and conflicts
                 read_timeout=30,
                 write_timeout=30,
             )
