@@ -3222,11 +3222,7 @@ def get_conversation_handler() -> ConversationHandler:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, mandatory_expenses_handler),
                 CallbackQueryHandler(quick_mandatory_callback, pattern="^quick_mandatory_0$"),
             ],
-            # ========== ADMIN STATES ==========
-            States.ADMIN_INPUT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handle_input),
-                CommandHandler("cancel", admin_cancel),
-            ],
+            # NOTE: ADMIN_INPUT state is handled by admin_conv_handler in bot.py
         },
         fallbacks=[
             CommandHandler("cancel", cancel_command),
@@ -7686,11 +7682,22 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not update.message or not update.message.text:
         return
     
-    # ========== ADMIN ACTION FAOL BO'LSA - AI ISHLAMASIN ==========
+    # ========== ADMIN YOKI BROADCAST FAOL BO'LSA - AI ISHLAMASIN ==========
+    # Check multiple admin-related flags
     if context.user_data.get("admin_action"):
-        return  # Admin input kutilmoqda - AI javob bermasin
+        return  # Admin input kutilmoqda
+    if context.user_data.get("admin_broadcast"):
+        return  # Broadcast kutilmoqda
+    if context.user_data.get("awaiting_admin_input"):
+        return  # Admin input kutilmoqda (alternative flag)
     
+    # Check if user is admin and text looks like a telegram ID (numeric only)
+    telegram_id = update.effective_user.id
     text = update.message.text.strip()
+    
+    # If admin sends a pure number, skip AI processing (likely user ID input)
+    if telegram_id in ADMIN_IDS and text.isdigit() and len(text) >= 6:
+        return  # Admin sending user ID - don't process as expense
     
     # Skip menu buttons and commands
     menu_patterns = [
@@ -11400,6 +11407,7 @@ async def admin_manage_user_start(update: Update, context: ContextTypes.DEFAULT_
         return ConversationHandler.END
     
     context.user_data["admin_action"] = "manage_user"
+    context.user_data["awaiting_admin_input"] = True  # AI ni bloklash uchun
     
     await query.edit_message_text(
         "👤 *USER BOSHQARUVI*\n"
@@ -11422,6 +11430,7 @@ async def admin_delete_user_start(update: Update, context: ContextTypes.DEFAULT_
         return ConversationHandler.END
     
     context.user_data["admin_action"] = "delete_user"
+    context.user_data["awaiting_admin_input"] = True
     
     await query.edit_message_text(
         "🗑️ *USER O'CHIRISH*\n"
@@ -11445,6 +11454,7 @@ async def admin_clear_user_tx_start(update: Update, context: ContextTypes.DEFAUL
         return ConversationHandler.END
     
     context.user_data["admin_action"] = "clear_user_tx"
+    context.user_data["awaiting_admin_input"] = True
     
     await query.edit_message_text(
         "🧹 *USER TRANZAKSIYALARINI TOZALASH*\n"
@@ -11645,8 +11655,9 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=keyboard
         )
     
-    # Admin action ni tozalash - AI ishlamasligi uchun
+    # Admin flaglarini tozalash - AI ishlamasligi uchun
     context.user_data.pop("admin_action", None)
+    context.user_data.pop("awaiting_admin_input", None)
     return ConversationHandler.END
 
 
@@ -11912,6 +11923,7 @@ async def admin_search_user_start(update: Update, context: ContextTypes.DEFAULT_
         return ConversationHandler.END
     
     context.user_data["admin_action"] = "search_user"
+    context.user_data["awaiting_admin_input"] = True
     
     await query.edit_message_text(
         "🔍 *USER QIDIRISH*\n"
@@ -11962,6 +11974,7 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     context.user_data.pop("in_admin_panel", None)
     context.user_data.pop("admin_broadcast", None)
     context.user_data.pop("admin_search_user", None)
+    context.user_data.pop("awaiting_admin_input", None)
     
     await update.message.reply_text("❌ Amal bekor qilindi.")
     
