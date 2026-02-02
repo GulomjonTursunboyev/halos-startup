@@ -32,6 +32,10 @@ from app.handlers import (
     handle_profile_edit_input,
     profile_mode_callback,
     get_main_menu_keyboard,
+    # Yangi soddalashtirilgan menyu handler'lari
+    menu_today_handler,
+    menu_debts_handler,
+    # Legacy
     menu_plan_handler,
     menu_profile_handler,
     menu_subscription_handler,
@@ -111,6 +115,7 @@ from app.handlers import (
     admin_activate_pro,
     admin_payments,
     # Admin user management
+    admin_manage_user_start,
     admin_delete_user_start,
     admin_clear_user_tx_start,
     admin_clear_all_tx_confirm,
@@ -118,6 +123,8 @@ from app.handlers import (
     admin_handle_input,
     admin_confirm_delete_user,
     admin_confirm_clear_tx,
+    admin_give_pro_to_user,
+    admin_remove_pro_from_user,
     admin_stats,
     admin_list_users,
     admin_search_user_start,
@@ -324,6 +331,7 @@ def main() -> None:
     # Admin user management ConversationHandler
     admin_conv_handler = ConversationHandler(
         entry_points=[
+            CallbackQueryHandler(admin_manage_user_start, pattern="^admin_manage_user$"),
             CallbackQueryHandler(admin_delete_user_start, pattern="^admin_delete_user$"),
             CallbackQueryHandler(admin_clear_user_tx_start, pattern="^admin_clear_user_tx$"),
             CallbackQueryHandler(admin_search_user_start, pattern="^admin_search_user$"),
@@ -398,7 +406,16 @@ def main() -> None:
         group=1
     )
     
-    # Main menu button handlers
+    # Main menu button handlers - YANGI SODDALASHTIRILGAN MENYU
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Bugun|📊 Сегодня)$"), menu_today_handler),
+        group=2
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💰 Qarzlar|💰 Долги)$"), menu_debts_handler),
+        group=2
+    )
+    # Legacy support
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlarim|📊 Мои отчёты)$"), menu_plan_handler),
         group=2

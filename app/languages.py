@@ -11,36 +11,92 @@ MESSAGES = {
     # ==================== WELCOME & REGISTRATION ====================
     "welcome": {
         "uz": (
-            "Assalomu alaykum! Siz HALOS botidasiz.\n\n"
-            "HALOS kredit to'lovlarini hisoblash va rejalashga yordam beradi.\n"
-            "Shuningdek, kundalik xarajatlar hamda kirim-chiqimlarni yozib borish imkonini beradi.\n\n"
-            "Botdan foydalanish uchun qisqa ro'yxatdan o'tish talab qilinadi.\n"
-            "Telefon raqamingiz hisobingizni saqlash va keyinchalik davom ettirish uchun ishlatiladi.\n\n"
-            "Davom etish uchun telefon raqamingizni ulashing."
+            "👋 *Assalomu alaykum!*\n\n"
+            "Men HALOS — moliyaviy yordamchingiz.\n\n"
+            "✅ Kirim-chiqimlarni oson yozib boring\n"
+            "✅ Qarzlarni nazorat qiling\n"
+            "✅ Pulni to'g'ri taqsimlang\n\n"
+            "📱 *Boshlash uchun tugmani bosing*"
         ),
         "ru": (
-            "Здравствуйте! Вы в боте HALOS.\n\n"
-            "HALOS помогает рассчитать и спланировать кредитные платежи.\n"
-            "А также вести учёт ежедневных расходов и доходов.\n\n"
-            "Для использования бота требуется короткая регистрация.\n"
-            "Ваш номер телефона используется для сохранения аккаунта и продолжения в будущем.\n\n"
-            "Для продолжения поделитесь номером телефона."
+            "👋 *Здравствуйте!*\n\n"
+            "Я HALOS — ваш финансовый помощник.\n\n"
+            "✅ Легко записывайте доходы и расходы\n"
+            "✅ Контролируйте долги\n"
+            "✅ Правильно распределяйте деньги\n\n"
+            "📱 *Нажмите кнопку чтобы начать*"
         )
     },
     
     "share_contact_button": {
-        "uz": "📱 Ro'yxatdan o'tish",
-        "ru": "📱 Зарегистрироваться"
+        "uz": "📱 Boshlash",
+        "ru": "📱 Начать"
     },
     
     "contact_received": {
-        "uz": "✅ Rahmat! Ro'yxatdan muvaffaqiyatli o'tdingiz.",
-        "ru": "✅ Спасибо! Вы успешно зарегистрированы."
+        "uz": "✅ Ajoyib! Keling, tilni tanlaymiz.",
+        "ru": "✅ Отлично! Давайте выберем язык."
     },
     
     "contact_required": {
-        "uz": "📱 Iltimos, davom etish uchun ro'yxatdan o'ting.",
-        "ru": "📱 Пожалуйста, зарегистрируйтесь для продолжения."
+        "uz": "📱 Iltimos, davom etish uchun tugmani bosing.",
+        "ru": "📱 Пожалуйста, нажмите кнопку для продолжения."
+    },
+    
+    # ==================== NEW SIMPLE ONBOARDING ====================
+    "onboarding_credit_question": {
+        "uz": (
+            "💳 *Kredit to'lovingiz bormi?*\n\n"
+            "Har oyda bank/kreditga to'lanadigan summa.\n"
+            "(Ipoteka, avtokredit, iste'mol krediti)"
+        ),
+        "ru": (
+            "💳 *У вас есть кредитные платежи?*\n\n"
+            "Сумма ежемесячных платежей по кредитам.\n"
+            "(Ипотека, автокредит, потребительский)"
+        )
+    },
+    
+    "onboarding_credit_yes": {
+        "uz": "💳 Ha, bor",
+        "ru": "💳 Да, есть"
+    },
+    
+    "onboarding_credit_no": {
+        "uz": "✅ Yo'q",
+        "ru": "✅ Нет"
+    },
+    
+    "onboarding_credit_amount": {
+        "uz": (
+            "💳 *Oylik kredit to'lov summasini kiriting*\n\n"
+            "Masalan: `500000` yoki `2 mln`"
+        ),
+        "ru": (
+            "💳 *Введите сумму ежемесячного платежа*\n\n"
+            "Например: `500000` или `2 млн`"
+        )
+    },
+    
+    "onboarding_complete": {
+        "uz": (
+            "🎉 *Tayyor!*\n\n"
+            "Endi menga xarajatlaringizni yozing:\n\n"
+            "📝 *Masalan:*\n"
+            "• `choy 5000`\n"
+            "• `taksi 15 ming`\n"
+            "• `maosh 3 mln` (kirim)\n\n"
+            "Yoki 🎤 ovozli xabar yuboring!"
+        ),
+        "ru": (
+            "🎉 *Готово!*\n\n"
+            "Теперь пишите мне свои расходы:\n\n"
+            "📝 *Например:*\n"
+            "• `чай 5000`\n"
+            "• `такси 15 тыс`\n"
+            "• `зарплата 3 млн` (доход)\n\n"
+            "Или отправьте 🎤 голосовое!"
+        )
     },
     
     # ==================== LANGUAGE SELECTION ====================

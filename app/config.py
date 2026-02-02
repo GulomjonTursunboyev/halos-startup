@@ -65,3 +65,6 @@ class States:
     OTHER_DEBTS = 15         # Personal loans from friends/family
     MANDATORY_EXPENSES = 16  # Bills that must be paid
     ADMIN_INPUT = 50         # Admin panel input state
+    # NEW SIMPLIFIED ONBOARDING STATES
+    ONBOARDING_CREDIT = 60       # Simple credit question
+    ONBOARDING_CREDIT_AMOUNT = 61  # Credit amount input

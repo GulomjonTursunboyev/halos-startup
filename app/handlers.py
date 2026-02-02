@@ -46,6 +46,58 @@ logger = logging.getLogger(__name__)
 
 # ==================== HELPER FUNCTIONS ====================
 
+# O(1) lookup uchun Set - har safar list yaratmaslik uchun modul darajasida
+_INPUT_WAIT_FLAGS = frozenset({
+    "awaiting_income", "awaiting_partner_income", "awaiting_loan", 
+    "awaiting_total_debt", "awaiting_promo", "awaiting_new_category",
+    "in_conversation", "in_onboarding_flow",
+    "entering_income", "entering_rent", "entering_utilities",
+    "entering_loan", "entering_debt", "entering_mandatory",
+    "entering_kindergarten", "uploading_transaction", "uploading_katm",
+    "editing_profile", "editing_income_self", "editing_income_partner", 
+    "editing_rent", "editing_utilities", "editing_loan", "editing_mandatory",
+    "editing_kindergarten", "editing_total_debt", "editing_tx_index",
+    "adding_recurring", "adding_credit", "adding_fixed_income",
+    "editing_recurring", "editing_credit", "editing_fixed_income",
+    "awaiting_text_input", "awaiting_number_input",
+    "awaiting_phone", "awaiting_contact", "awaiting_language",
+    "ai_correcting", "ai_amount_editing", "ai_editing_amount",
+    "awaiting_credit_input", "awaiting_credit_file", "awaiting_loan_payment",
+    "awaiting_voice", "awaiting_receipt",
+    "admin_broadcast", "admin_search_user", "admin_action",
+    "admin_trial_broadcast_editing",
+    "awaiting_any_input", "waiting_for_input", "expecting_input",
+    "awaiting_user_input", "awaiting_response", "editing_field"
+})
+
+_INPUT_PREFIXES = ("awaiting_", "entering_", "editing_", "adding_", "admin_", "in_")
+
+
+def is_user_awaiting_input(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Foydalanuvchi input kutayotganini tekshirish - O(1) tezlikda.
+    
+    Yangi feature uchun: context.user_data["awaiting_xxx"] = True qiling
+    """
+    user_data = context.user_data
+    
+    # 1. Tez tekshiruv: ma'lum flaglar bilan kesishma
+    if user_data.keys() & _INPUT_WAIT_FLAGS:
+        for key in user_data.keys() & _INPUT_WAIT_FLAGS:
+            if user_data[key]:
+                return True
+    
+    # 2. Dinamik prefiks tekshiruvi (yangi flaglar uchun)
+    for key in user_data:
+        if isinstance(key, str) and key.startswith(_INPUT_PREFIXES) and user_data[key]:
+            return True
+        # ConversationHandler state (tuple key)
+        if isinstance(key, tuple) and len(key) >= 2:
+            return True
+    
+    return False
+
+
 async def get_user_language(telegram_id: int) -> str:
     """Get user's language preference"""
     db = await get_database()
@@ -67,30 +119,35 @@ def parse_number(text: str) -> float:
 
 
 def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
-    """Get persistent main menu keyboard"""
+    """Get persistent main menu keyboard - YANGI SODDALASHTIRILGAN MENYU"""
     if lang == "ru":
         keyboard = [
-            ["📊 Мои отчёты"],
-            ["👤 Профиль", "💎 PRO"],
-            ["🌐 Язык", "❓ Помощь"]
+            ["📊 Сегодня", "💰 Долги"],
+            ["👤 Профиль", "💎 PRO"]
         ]
     else:
         keyboard = [
-            ["📊 Hisobotlarim"],
-            ["👤 Profil", "💎 PRO"],
-            ["🌐 Til", "❓ Yordam"]
+            ["📊 Bugun", "💰 Qarzlar"],
+            ["👤 Profil", "💎 PRO"]
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 # Main menu button texts for matching
 MENU_BUTTONS = {
-    "plan": ["📊 Hisobotlarim", "📊 Мои отчёты"],
+    "today": ["📊 Bugun", "📊 Сегодня"],
+    "debts": ["💰 Qarzlar", "💰 Долги"],
+    "plan": ["📊 Hisobotlarim", "📊 Мои отчёты"],  # legacy
     "profile": ["👤 Profil", "👤 Профиль"],
     "subscription": ["💎 PRO", "💎 PRO"],
     "language": ["🌐 Til", "🌐 Язык"],
     "help": ["❓ Yordam", "❓ Помощь"],
 }
+
+# Pre-computed frozenset for O(1) menu button lookup
+MENU_BUTTONS_SET = frozenset(
+    btn for buttons in MENU_BUTTONS.values() for btn in buttons
+)
 
 
 # ==================== START COMMAND ====================
@@ -259,60 +316,139 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except:
         pass
     
-    # Registration complete - NOW ASK FOR MODE SELECTION
-    welcome_msg = (
-        "✅ *Ro'yxatdan muvaffaqiyatli o'tdingiz!*\n\n"
-        "Keling, sizning moliyaviy holatgizni bilib olaylik.\n"
-        "Bu sizga kreditlaringizni tezroq to'lab tugatishga yordam beradi! 💪"
-    ) if lang == "uz" else (
-        "✅ *Вы успешно зарегистрированы!*\n\n"
-        "Давайте узнаем вашу финансовую ситуацию.\n"
-        "Это поможет вам быстрее погасить кредиты! 💪"
-    )
-    
+    # ==================== YANGI SODDALASHTIRILGAN ONBOARDING ====================
+    # Mode savolini o'tkazib yuboramiz - to'g'ridan-to'g'ri kredit savoliga
     chat_id = update.effective_chat.id
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=welcome_msg,
-        parse_mode="Markdown"
-    )
     
-    # Ask for mode selection
+    # Default mode = solo
+    context.user_data["mode"] = "solo"
+    await db.update_user(telegram_id, mode="solo")
+    
+    # Kredit bormi savoli
     keyboard = [
         [
             InlineKeyboardButton(
-                "👤 Yolg'iz" if lang == "uz" else "👤 Один",
-                callback_data="mode_solo"
+                get_message("onboarding_credit_yes", lang),
+                callback_data="onboard_credit_yes"
             ),
             InlineKeyboardButton(
-                "👨‍👩‍👧 Oila" if lang == "uz" else "👨‍👩‍👧 Семья",
-                callback_data="mode_family"
+                get_message("onboarding_credit_no", lang),
+                callback_data="onboard_credit_no"
             )
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    mode_msg = (
-        "📊 *Qanday rejalashtirmoqchisiz?*\n\n"
-        "👤 *Yolg'iz* - faqat o'zingizning moliyangiz\n"
-        "👨‍👩‍👧 *Oila* - oila a'zolari bilan birgalikda"
-    ) if lang == "uz" else (
-        "📊 *Как вы планируете?*\n\n"
-        "👤 *Один* - только ваши финансы\n"
-        "👨‍👩‍👧 *Семья* - вместе с семьей"
-    )
-    
     await context.bot.send_message(
         chat_id=chat_id,
-        text=mode_msg,
+        text=get_message("onboarding_credit_question", lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
     
-    return States.MODE
+    return States.ONBOARDING_CREDIT
 
 
-# ==================== MODE SELECTION ====================
+# ==================== YANGI ONBOARDING HANDLERS ====================
+
+async def onboarding_credit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle onboarding credit question - simplified flow"""
+    query = update.callback_query
+    await query.answer()
+    
+    lang = context.user_data.get("lang", "uz")
+    choice = query.data
+    chat_id = update.effective_chat.id
+    telegram_id = update.effective_user.id
+    
+    if choice == "onboard_credit_yes":
+        # Kredit summasini so'rash
+        await query.edit_message_text(
+            get_message("onboarding_credit_amount", lang),
+            parse_mode="Markdown"
+        )
+        context.user_data["onboarding_has_credit"] = True
+        return States.ONBOARDING_CREDIT_AMOUNT
+    
+    else:  # onboard_credit_no
+        # Kredit yo'q - to'g'ridan-to'g'ri asosiy ekranga
+        await query.edit_message_text("✅")
+        
+        # Minimal profil yaratish
+        db = await get_database()
+        user = await db.get_user(telegram_id)
+        if user:
+            await db.save_financial_profile(
+                user_id=user["id"],
+                mode="solo",
+                loan_payment=0,
+                total_debt=0,
+                income_self=0,
+                income_partner=0,
+                rent=0,
+                kindergarten=0,
+                utilities=0
+            )
+        
+        # Asosiy menyuni ko'rsatish
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=get_message("onboarding_complete", lang),
+            parse_mode="Markdown",
+            reply_markup=get_main_menu_keyboard(lang)
+        )
+        
+        context.user_data["in_conversation"] = False
+        return ConversationHandler.END
+
+
+async def onboarding_credit_amount_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle credit amount input in simplified onboarding"""
+    lang = context.user_data.get("lang", "uz")
+    text = update.message.text.strip()
+    telegram_id = update.effective_user.id
+    
+    amount = parse_number(text)
+    
+    if amount < 0:
+        await update.message.reply_text(
+            "❌ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "❌ Неверный формат. Введите число.",
+            parse_mode="Markdown"
+        )
+        return States.ONBOARDING_CREDIT_AMOUNT
+    
+    # Profilni saqlash
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    if user:
+        await db.save_financial_profile(
+            user_id=user["id"],
+            mode="solo",
+            loan_payment=amount,
+            total_debt=amount * 12,  # Taxminiy qarz
+            income_self=0,
+            income_partner=0,
+            rent=0,
+            kindergarten=0,
+            utilities=0
+        )
+    
+    # Muvaffaqiyat va asosiy menyu
+    saved_msg = f"✅ Kredit to'lov: *{format_number(amount)}* so'm/oy" if lang == "uz" else f"✅ Платёж по кредиту: *{format_number(amount)}* сум/мес"
+    
+    await update.message.reply_text(saved_msg, parse_mode="Markdown")
+    
+    await update.message.reply_text(
+        get_message("onboarding_complete", lang),
+        parse_mode="Markdown",
+        reply_markup=get_main_menu_keyboard(lang)
+    )
+    
+    context.user_data["in_conversation"] = False
+    return ConversationHandler.END
+
+
+# ==================== MODE SELECTION (Legacy support) ====================
 
 async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle mode selection (solo/family) - NEW 7-STEP UX FLOW"""
@@ -2708,6 +2844,9 @@ async def show_profile_callback(update: Update, context: ContextTypes.DEFAULT_TY
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
     
+    # Clear editing state when returning to profile
+    context.user_data["editing_field"] = None
+    
     db = await get_database()
     user = await db.get_user(telegram_id)
     
@@ -2795,6 +2934,12 @@ async def handle_profile_edit_input(update: Update, context: ContextTypes.DEFAUL
     
     if not editing_field:
         return  # Not editing anything
+    
+    # O(1) menu button check - if menu button pressed, clear state and skip
+    user_text = update.message.text.strip()
+    if user_text in MENU_BUTTONS_SET:
+        context.user_data["editing_field"] = None
+        return
     
     lang = context.user_data.get("lang", "uz")
     telegram_id = update.effective_user.id
@@ -3008,6 +3153,14 @@ def get_conversation_handler() -> ConversationHandler:
                 MessageHandler(filters.CONTACT, contact_handler),
                 CallbackQueryHandler(language_callback, pattern="^lang_"),
             ],
+            # ========== YANGI SODDALASHTIRILGAN ONBOARDING ==========
+            States.ONBOARDING_CREDIT: [
+                CallbackQueryHandler(onboarding_credit_callback, pattern="^onboard_credit_(yes|no)$"),
+            ],
+            States.ONBOARDING_CREDIT_AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, onboarding_credit_amount_handler),
+            ],
+            # ========== LEGACY STATES (for existing users) ==========
             States.MODE: [
                 CallbackQueryHandler(mode_callback, pattern="^mode_"),
                 CallbackQueryHandler(recalc_saved_callback, pattern="^recalc_saved$"),
@@ -3090,10 +3243,179 @@ def add_trial_handler_to_app(application):
     add_global_handlers_to_app(application)
 
 
-# ==================== MAIN MENU HANDLERS ====================
+# ==================== YANGI SODDALASHTIRILGAN MENYU HANDLERS ====================
+
+async def menu_today_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle 📊 Bugun button - YANGI QISQA KUNLIK HISOBOT"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Bugungi tranzaksiyalar
+    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES
+    
+    try:
+        today_summary = await get_transaction_summary(db, user["id"], days=1)
+    except:
+        today_summary = {"total_income": 0, "total_expense": 0, "income_by_category": {}, "expense_by_category": {}}
+    
+    today_income = today_summary.get("total_income", 0)
+    today_expense = today_summary.get("total_expense", 0)
+    today_balance = today_income - today_expense
+    
+    from datetime import datetime
+    today_date = datetime.now().strftime("%d.%m.%Y")
+    
+    # QISQA VA ANIQ HISOBOT
+    if lang == "uz":
+        if today_balance >= 0:
+            balance_line = f"💚 *+{today_balance:,}* so'm"
+        else:
+            balance_line = f"🔴 *{today_balance:,}* so'm"
+        
+        msg = (
+            f"📊 *BUGUN* • {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            f"{balance_line}\n"
+            f"📥 +{today_income:,} | 📤 -{today_expense:,}\n"
+        )
+        
+        # Xarajatlar bo'yicha (top 3)
+        if today_summary.get("expense_by_category"):
+            msg += "\n💸 *Xarajatlar:*\n"
+            sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses[:3]:
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📦 Boshqa")
+                msg += f"  {cat_name} {amount:,}\n"
+        
+        msg += "\n_Kirim/chiqim qo'shish uchun yozing_"
+    else:
+        if today_balance >= 0:
+            balance_line = f"💚 *+{today_balance:,}* сум"
+        else:
+            balance_line = f"🔴 *{today_balance:,}* сум"
+        
+        msg = (
+            f"📊 *СЕГОДНЯ* • {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            f"{balance_line}\n"
+            f"📥 +{today_income:,} | 📤 -{today_expense:,}\n"
+        )
+        
+        if today_summary.get("expense_by_category"):
+            msg += "\n💸 *Расходы:*\n"
+            sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
+            for cat, amount in sorted_expenses[:3]:
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📦 Прочее")
+                msg += f"  {cat_name} {amount:,}\n"
+        
+        msg += "\n_Пишите чтобы добавить расход/доход_"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def menu_debts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle 💰 Qarzlar button - QARZLAR RO'YXATI"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+    
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Qarzlar xulosasi
+    from app.ai_assistant import get_debt_summary
+    
+    try:
+        debt_summary = await get_debt_summary(db, user["id"])
+    except:
+        debt_summary = {"total_lent": 0, "total_borrowed": 0, "net_balance": 0, "lent_count": 0, "borrowed_count": 0}
+    
+    total_lent = debt_summary.get("total_lent", 0)
+    total_borrowed = debt_summary.get("total_borrowed", 0)
+    net_balance = debt_summary.get("net_balance", 0)
+    lent_count = debt_summary.get("lent_count", 0)
+    borrowed_count = debt_summary.get("borrowed_count", 0)
+    
+    if lang == "uz":
+        msg = (
+            "💰 *QARZLAR*\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        if net_balance > 0:
+            msg += f"💚 Sizga qaytariladi: *+{net_balance:,}* so'm\n\n"
+        elif net_balance < 0:
+            msg += f"🔴 Siz qaytarasiz: *{net_balance:,}* so'm\n\n"
+        else:
+            msg += "⚪ Qarz yo'q\n\n"
+        
+        if total_lent > 0:
+            msg += f"📤 Berdingiz: {total_lent:,} so'm ({lent_count} ta)\n"
+        if total_borrowed > 0:
+            msg += f"📥 Oldingiz: {total_borrowed:,} so'm ({borrowed_count} ta)\n"
+        
+        msg += "\n_Qarz qo'shish: \"Ali 100k berdi\"_"
+    else:
+        msg = (
+            "💰 *ДОЛГИ*\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        if net_balance > 0:
+            msg += f"💚 Вам вернут: *+{net_balance:,}* сум\n\n"
+        elif net_balance < 0:
+            msg += f"🔴 Вы вернёте: *{net_balance:,}* сум\n\n"
+        else:
+            msg += "⚪ Долгов нет\n\n"
+        
+        if total_lent > 0:
+            msg += f"📤 Вы дали: {total_lent:,} сум ({lent_count} шт)\n"
+        if total_borrowed > 0:
+            msg += f"📥 Вы взяли: {total_borrowed:,} сум ({borrowed_count} шт)\n"
+        
+        msg += "\n_Добавить долг: \"Али 100к дал\"_"
+    
+    keyboard = [
+        [InlineKeyboardButton(
+            "📋 Batafsil" if lang == "uz" else "📋 Подробнее",
+            callback_data="ai_debt_list"
+        )]
+    ]
+    
+    await update.message.reply_text(
+        msg, 
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+# ==================== LEGACY MAIN MENU HANDLERS ====================
 
 async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 📊 Hisobotlarim button - show comprehensive financial report"""
+    """Handle 📊 Hisobotlarim button - show comprehensive financial report (LEGACY)"""
+    # Endi bu menu_today_handler'ga yo'naltiriladi
+    await menu_today_handler(update, context)
+    return
+    
+    # Quyidagi kod legacy uchun saqlanmoqda
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -4353,6 +4675,9 @@ async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     
+    # Clear editing state when opening profile
+    context.user_data["editing_field"] = None
+    
     db = await get_database()
     user = await db.get_user(telegram_id)
     
@@ -4375,6 +4700,9 @@ async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAUL
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
+    
+    # Clear editing state when pressing PRO button
+    context.user_data["editing_field"] = None
     
     db = await get_database()
     user = await db.get_user(telegram_id)
@@ -6831,6 +7159,77 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
 
 
+# ==================== BEPUL USERLAR UCHUN ODDIY PARSING ====================
+
+async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
+    """
+    Oddiy regex bilan tranzaksiyani parse qilish - bepul userlar uchun
+    Format: "choy 5000" yoki "50000 taksi" yoki "maosh 3 mln"
+    """
+    import re
+    
+    text = text.lower().strip()
+    
+    # Summa patterns
+    amount_patterns = [
+        r'(\d+)\s*mln',           # 5 mln, 5mln
+        r'(\d+)\s*млн',           # 5 млн (rus)
+        r'(\d+)\s*ming',          # 50 ming
+        r'(\d+)\s*тыс',           # 50 тыс (rus)
+        r'(\d+)\s*k\b',           # 50k
+        r'(\d[\d\s]*\d)',         # 50 000, 50000
+        r'(\d+)',                 # oddiy raqam
+    ]
+    
+    amount = 0
+    amount_text = ""
+    
+    for pattern in amount_patterns:
+        match = re.search(pattern, text)
+        if match:
+            amount_text = match.group(0)
+            amount_str = match.group(1).replace(" ", "")
+            amount = int(amount_str)
+            
+            # Multiplier
+            if 'mln' in amount_text or 'млн' in amount_text:
+                amount *= 1_000_000
+            elif 'ming' in amount_text or 'тыс' in amount_text or 'k' in amount_text.lower():
+                amount *= 1_000
+            break
+    
+    if amount <= 0:
+        return None
+    
+    # Description - summani olib tashlash
+    description = text.replace(amount_text, "").strip()
+    description = re.sub(r'^\s*[-:]\s*', '', description)  # - yoki : olib tashlash
+    description = description.strip()
+    
+    if not description:
+        description = "Boshqa" if lang == "uz" else "Прочее"
+    
+    # Type aniqlash - kirim so'zlari
+    income_words = [
+        'maosh', 'oylik', 'daromad', 'kirim', 'pul keldi', 'oldi', 'ishdan',
+        'зарплата', 'доход', 'приход', 'получил', 'заработал'
+    ]
+    
+    tx_type = "expense"  # default
+    for word in income_words:
+        if word in text:
+            tx_type = "income"
+            break
+    
+    return {
+        "type": tx_type,
+        "amount": amount,
+        "description": description.capitalize(),
+        "category": "📦 Boshqa" if lang == "uz" else "📦 Прочее",
+        "category_key": "boshqa"
+    }
+
+
 async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle text messages for AI assistant - auto-detect expenses/income/debts from text
@@ -6942,44 +7341,11 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             context.user_data["new_category_transaction_id"] = None
             return
     
-    # Skip if user is editing a profile field
-    if context.user_data.get("editing_field"):
-        return
-    
-    # Skip if user is in some editing mode or ConversationHandler state
-    editing_modes = [
-        # Old modes
-        "awaiting_income", "awaiting_partner_income", "awaiting_loan", 
-        "awaiting_total_debt", "editing_profile", "awaiting_promo",
-        "ai_correcting", "awaiting_new_category",
-        # ConversationHandler related states
-        "in_conversation",  # General conversation flag
-        "entering_income", "entering_rent", "entering_utilities",
-        "entering_loan", "entering_debt", "entering_mandatory",
-        "entering_kindergarten", "uploading_transaction", "uploading_katm",
-        # Profile editing states
-        "editing_income_self", "editing_income_partner", "editing_rent",
-        "editing_utilities", "editing_loan", "editing_mandatory",
-        "editing_kindergarten", "editing_total_debt",
-        # Recurring/credit entry states  
-        "adding_recurring", "adding_credit", "adding_fixed_income",
-        "editing_recurring", "editing_credit", "editing_fixed_income",
-        # Other input states
-        "awaiting_text_input", "awaiting_number_input",
-        # Registration states
-        "awaiting_phone", "awaiting_contact", "awaiting_language",
-        # AI correction states
-        "ai_amount_editing", "ai_editing_amount"
-    ]
-    for mode in editing_modes:
-        if context.user_data.get(mode):
-            return
-    
-    # Check if currently in active ConversationHandler state
-    # ConversationHandler stores its state in user_data with special keys
-    conv_keys = [k for k in context.user_data.keys() if isinstance(k, tuple) and len(k) >= 2]
-    if conv_keys:
-        # User is in active conversation
+    # ==================== ASOSIY TEKSHIRUV ====================
+    # Agar foydalanuvchi biror tugma bosib, keyin javob yoki malumot jo'natishi kerak bo'lsa
+    # AI bu xabarni tranzaksiya deb qabul qilmasligi kerak
+    # is_user_awaiting_input() funksiyasi barcha bunday holatlarni tekshiradi
+    if is_user_awaiting_input(context):
         return
     
     telegram_id = update.effective_user.id
@@ -7000,8 +7366,8 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     from app.subscription_handlers import is_user_pro
     is_pro = await is_user_pro(telegram_id)
     
-    if not is_pro:
-        return  # Silently ignore for non-PRO users
+    # ==================== BEPUL USERLAR UCHUN ODDIY KIRIM/CHIQIM ====================
+    # PRO bo'lmasa ham oddiy tranzaksiyani qabul qilish
     
     try:
         # ==================== QARZ TEKSHIRISH ====================
@@ -7015,43 +7381,45 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             format_multiple_transactions_message
         )
         
-        # Avval qarz ekanligini tekshirish
-        debt_info = await parse_debt_transaction(text, lang)
-        
-        if debt_info:
-            # Bu qarz tranzaksiyasi
-            debt_id = await save_personal_debt(db, user["id"], debt_info)
+        # Qarz tranzaksiyasi - faqat PRO uchun
+        if is_pro:
+            # Avval qarz ekanligini tekshirish
+            debt_info = await parse_debt_transaction(text, lang)
             
-            # Qarz xulosasini olish
-            debt_summary = await get_debt_summary(db, user["id"])
-            
-            # Xabarni formatlash
-            msg = format_debt_saved_message(debt_info, lang)
-            msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                        callback_data="ai_confirm_ok"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
-                        callback_data=f"ai_debt_correct_{debt_id}"
-                    )
-                ],
-                [InlineKeyboardButton(
-                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
-                    callback_data="ai_debt_list"
-                )]
-            ]
-            
-            await update.message.reply_text(
-                msg,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
+            if debt_info:
+                # Bu qarz tranzaksiyasi
+                debt_id = await save_personal_debt(db, user["id"], debt_info)
+                
+                # Qarz xulosasini olish
+                debt_summary = await get_debt_summary(db, user["id"])
+                
+                # Xabarni formatlash
+                msg = format_debt_saved_message(debt_info, lang)
+                msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                            callback_data="ai_confirm_ok"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                            callback_data=f"ai_debt_correct_{debt_id}"
+                        )
+                    ],
+                    [InlineKeyboardButton(
+                        "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
+                        callback_data="ai_debt_list"
+                    )]
+                ]
+                
+                await update.message.reply_text(
+                    msg,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                return
         
         # ==================== MULTI-TRANSACTION PARSING ====================
         # Bir matnda bir nechta tranzaksiyalarni aniqlash
@@ -7060,6 +7428,30 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         # If no transactions found, this is probably not a transaction message
         if not transactions:
+            # ==================== BEPUL USERLAR UCHUN ODDIY PARSING ====================
+            if not is_pro:
+                # Oddiy regex bilan parse qilish
+                simple_tx = await simple_parse_transaction(text, lang)
+                if simple_tx:
+                    transaction_id = await save_transaction(db, user["id"], simple_tx)
+                    
+                    # Qisqa xabar
+                    emoji = "📤" if simple_tx["type"] == "expense" else "📥"
+                    amount = simple_tx["amount"]
+                    desc = simple_tx.get("description", "")
+                    
+                    # Bugungi balansni hisoblash
+                    from app.ai_assistant import get_transaction_summary
+                    today_summary = await get_transaction_summary(db, user["id"], days=1)
+                    today_balance = today_summary.get("total_income", 0) - today_summary.get("total_expense", 0)
+                    
+                    if lang == "uz":
+                        msg = f"{emoji} *{desc}* — {amount:,} so'm\n📊 Bugun: {today_balance:+,}"
+                    else:
+                        msg = f"{emoji} *{desc}* — {amount:,} сум\n📊 Сегодня: {today_balance:+,}"
+                    
+                    await update.message.reply_text(msg, parse_mode="Markdown")
+                    return
             return
         
         # Get budget status
@@ -9319,13 +9711,9 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("🎁 TRIAL barchaga", callback_data="admin_trial_all"),
             InlineKeyboardButton("📤 Broadcast", callback_data="admin_broadcast")
         ],
-        # Yangi admin funksiyalar
+        # User boshqaruvi
         [
-            InlineKeyboardButton("🗑️ User o'chirish", callback_data="admin_delete_user"),
-            InlineKeyboardButton("🧹 TX tozalash", callback_data="admin_clear_user_tx")
-        ],
-        [
-            InlineKeyboardButton("⚠️ BARCHA TX o'chirish", callback_data="admin_clear_all_tx"),
+            InlineKeyboardButton("👤 User boshqaruvi", callback_data="admin_manage_user"),
             InlineKeyboardButton("👥 Userlar", callback_data="admin_list_users")
         ],
         [
@@ -10184,6 +10572,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # ==================== YANGI ADMIN AMALLAR ====================
     
+    # User boshqaruvi
+    if query.data == "admin_manage_user":
+        return await admin_manage_user_start(update, context)
+    
     # User o'chirish
     if query.data == "admin_delete_user":
         return await admin_delete_user_start(update, context)
@@ -10211,6 +10603,14 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # User tranzaksiyalarini tozalashni tasdiqlash
     if query.data.startswith("admin_confirm_clear_tx:"):
         return await admin_confirm_clear_tx(update, context)
+    
+    # PRO berish
+    if query.data.startswith("admin_give_pro:"):
+        return await admin_give_pro_to_user(update, context)
+    
+    # PRO olib qo'yish
+    if query.data.startswith("admin_remove_pro:"):
+        return await admin_remove_pro_from_user(update, context)
     
     # Orqaga qaytish
     if query.data == "admin_back":
@@ -10536,6 +10936,28 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
 
 # ==================== ADMIN USER MANAGEMENT ====================
 
+async def admin_manage_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: User boshqaruvi - telegram_id so'rash"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    context.user_data["admin_action"] = "manage_user"
+    
+    await query.edit_message_text(
+        "👤 *USER BOSHQARUVI*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "📝 Boshqarmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
+        "_Bekor qilish uchun /cancel_",
+        parse_mode="Markdown"
+    )
+    
+    return States.ADMIN_INPUT
+
+
 async def admin_delete_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Admin: User o'chirish - telegram_id so'rash"""
     query = update.callback_query
@@ -10737,6 +11159,28 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=keyboard
         )
     
+    elif action == "manage_user":
+        # User boshqaruvi - amallar menyusi
+        context.user_data["target_user_id"] = target_id
+        context.user_data["target_user_info"] = user_info
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🗑️ Userni o'chirish", callback_data=f"admin_confirm_delete:{target_id}")],
+            [InlineKeyboardButton("🧹 TX larini o'chirish", callback_data=f"admin_confirm_clear_tx:{target_id}")],
+            [InlineKeyboardButton("💎 PRO berish", callback_data=f"admin_give_pro:{target_id}")],
+            [InlineKeyboardButton("🚫 PRO olib qo'yish", callback_data=f"admin_remove_pro:{target_id}")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")],
+        ])
+        
+        await update.message.reply_text(
+            f"👤 *USER BOSHQARUVI*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{user_summary}\n"
+            f"Quyidagi amallardan birini tanlang:",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    
     return ConversationHandler.END
 
 
@@ -10806,6 +11250,113 @@ async def admin_confirm_clear_tx(update: Update, context: ContextTypes.DEFAULT_T
         error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
             f"❌ *Xatolik:* {error_msg}",
+            parse_mode="Markdown"
+        )
+    
+    return ConversationHandler.END
+
+
+async def admin_give_pro_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Userga PRO berish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    # callback_data: admin_give_pro:1748575975
+    target_id = int(query.data.split(":")[1])
+    
+    db = await get_database()
+    
+    # 30 kunlik PRO berish
+    from datetime import timedelta
+    expires_at = now_uz() + timedelta(days=30)
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET subscription_tier = 'pro',
+                        subscription_expires = $1
+                    WHERE telegram_id = $2
+                """, expires_at, target_id)
+        else:
+            import aiosqlite
+            async with aiosqlite.connect(db.db_path) as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET subscription_tier = 'pro',
+                        subscription_expires = ?
+                    WHERE telegram_id = ?
+                """, (expires_at.isoformat(), target_id))
+                await conn.commit()
+        
+        await query.edit_message_text(
+            "✅ *PRO BERILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 User: `{target_id}`\n"
+            f"💎 PRO muddati: 30 kun\n"
+            f"📅 Tugash sanasi: {expires_at.strftime('%Y-%m-%d')}",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"[Admin] PRO berishda xato: {e}")
+        await query.edit_message_text(
+            f"❌ *Xatolik:* {str(e)}",
+            parse_mode="Markdown"
+        )
+    
+    return ConversationHandler.END
+
+
+async def admin_remove_pro_from_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Userdan PRO olib qo'yish"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    # callback_data: admin_remove_pro:1748575975
+    target_id = int(query.data.split(":")[1])
+    
+    db = await get_database()
+    
+    try:
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET subscription_tier = 'free',
+                        subscription_expires = NULL
+                    WHERE telegram_id = $1
+                """, target_id)
+        else:
+            import aiosqlite
+            async with aiosqlite.connect(db.db_path) as conn:
+                await conn.execute("""
+                    UPDATE users 
+                    SET subscription_tier = 'free',
+                        subscription_expires = NULL
+                    WHERE telegram_id = ?
+                """, (target_id,))
+                await conn.commit()
+        
+        await query.edit_message_text(
+            "✅ *PRO OLIB QO'YILDI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 User: `{target_id}`\n"
+            f"📦 Tarif: Free",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"[Admin] PRO olib qo'yishda xato: {e}")
+        await query.edit_message_text(
+            f"❌ *Xatolik:* {str(e)}",
             parse_mode="Markdown"
         )
     
@@ -10916,23 +11467,8 @@ async def admin_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if telegram_id not in ADMIN_IDS:
         return ConversationHandler.END
     
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🗑️ User o'chirish", callback_data="admin_delete_user")],
-        [InlineKeyboardButton("🧹 User tranzaksiyalarini tozalash", callback_data="admin_clear_user_tx")],
-        [InlineKeyboardButton("⚠️ BARCHA tranzaksiyalarni o'chirish", callback_data="admin_clear_all_tx")],
-        [InlineKeyboardButton("📊 Statistika", callback_data="admin_stats")],
-        [InlineKeyboardButton("👥 Userlar ro'yxati", callback_data="admin_list_users")],
-        [InlineKeyboardButton("🔍 User qidirish", callback_data="admin_search_user")],
-        [InlineKeyboardButton("❌ Yopish", callback_data="admin_close")],
-    ])
-    
-    await query.edit_message_text(
-        "🔧 *ADMIN PANEL*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Quyidagi amallardan birini tanlang:",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
+    # Asosiy admin menyusiga qaytish
+    await show_admin_main_menu(update, context, edit=True)
     
     return ConversationHandler.END
 
