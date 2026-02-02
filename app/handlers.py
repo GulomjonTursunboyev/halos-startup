@@ -3222,6 +3222,11 @@ def get_conversation_handler() -> ConversationHandler:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, mandatory_expenses_handler),
                 CallbackQueryHandler(quick_mandatory_callback, pattern="^quick_mandatory_0$"),
             ],
+            # ========== ADMIN STATES ==========
+            States.ADMIN_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handle_input),
+                CommandHandler("cancel", admin_cancel),
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", cancel_command),
@@ -7238,6 +7243,10 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Skip if message is a command or from conversation handler
     if not update.message or not update.message.text:
         return
+    
+    # ========== ADMIN ACTION FAOL BO'LSA - AI ISHLAMASIN ==========
+    if context.user_data.get("admin_action"):
+        return  # Admin input kutilmoqda - AI javob bermasin
     
     text = update.message.text.strip()
     
