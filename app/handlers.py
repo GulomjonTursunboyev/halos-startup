@@ -197,6 +197,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     context.user_data["last_name"] = user.last_name
     context.user_data["username"] = user.username
     context.user_data["lang"] = lang
+    context.user_data["in_conversation"] = True  # AI ni bloklash
     
     # Request phone number
     keyboard = [
@@ -320,6 +321,9 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Mode savolini o'tkazib yuboramiz - to'g'ridan-to'g'ri kredit savoliga
     chat_id = update.effective_chat.id
     
+    # Set conversation flag - AI should not process text
+    context.user_data["in_conversation"] = True
+    
     # Default mode = solo
     context.user_data["mode"] = "solo"
     await db.update_user(telegram_id, mode="solo")
@@ -363,6 +367,7 @@ async def onboarding_credit_callback(update: Update, context: ContextTypes.DEFAU
     
     if choice == "onboard_credit_yes":
         # Kredit summasini so'rash
+        context.user_data["in_conversation"] = True  # AI ni bloklash
         await query.edit_message_text(
             get_message("onboarding_credit_amount", lang),
             parse_mode="Markdown"
@@ -7681,6 +7686,11 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Skip if message is a command or from conversation handler
     if not update.message or not update.message.text:
         return
+    
+    # ========== CONVERSATION ICHIDA BO'LSA - AI ISHLAMASIN ==========
+    # Onboarding, profil kiritish va boshqa conversation handlerlar uchun
+    if context.user_data.get("in_conversation"):
+        return  # Conversation davom etmoqda - AI javob bermasin
     
     # ========== ADMIN YOKI BROADCAST FAOL BO'LSA - AI ISHLAMASIN ==========
     # Check multiple admin-related flags
