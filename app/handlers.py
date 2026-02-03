@@ -1,4 +1,4 @@
-﻿"""
+"""
 HALOS Bot Handlers
 All conversation handlers and command handlers
 """
@@ -128,29 +128,44 @@ def parse_number(text: str) -> float:
 
 
 def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
-    """Get persistent main menu keyboard - YANGI SODDALASHTIRILGAN MENYU"""
+    """Get persistent main menu keyboard - YANGI PROFESSIONAL UX MENYU
+    
+    Structure:
+    - Row 1: 💰 Balans (full width - PRIMARY ACTION)
+    - Row 2: 📊 Hisobotlar (full width - all reports)
+    - Row 3: 💳 Qarzlar | 👤 Profil
+    - Row 4: 💎 PRO | ❓ Yordam
+    """
     if lang == "ru":
         keyboard = [
-            ["рџ“Љ РЎРµРіРѕРґРЅСЏ", "рџ’° Р”РѕР»РіРё"],
-            ["рџ‘¤ РџСЂРѕС„РёР»СЊ", "рџ’Ћ PRO"]
+            ["💰 Баланс"],  # Full width - primary
+            ["📊 Отчёты"],  # Full width - reports hub
+            ["💳 Долги", "👤 Профиль"],
+            ["💎 PRO", "❓ Помощь"]
         ]
     else:
         keyboard = [
-            ["рџ“Љ Bugun", "рџ’° Qarzlar"],
-            ["рџ‘¤ Profil", "рџ’Ћ PRO"]
+            ["💰 Balans"],  # Full width - primary
+            ["📊 Hisobotlar"],  # Full width - reports hub
+            ["💳 Qarzlar", "👤 Profil"],
+            ["💎 PRO", "❓ Yordam"]
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 # Main menu button texts for matching
+# Main menu button texts for matching
 MENU_BUTTONS = {
-    "today": ["рџ“Љ Bugun", "рџ“Љ РЎРµРіРѕРґРЅСЏ"],
-    "debts": ["рџ’° Qarzlar", "рџ’° Р”РѕР»РіРё"],
-    "plan": ["рџ“Љ Hisobotlarim", "рџ“Љ РњРѕРё РѕС‚С‡С‘С‚С‹"],  # legacy
-    "profile": ["рџ‘¤ Profil", "рџ‘¤ РџСЂРѕС„РёР»СЊ"],
-    "subscription": ["рџ’Ћ PRO", "рџ’Ћ PRO"],
-    "language": ["рџЊђ Til", "рџЊђ РЇР·С‹Рє"],
-    "help": ["вќ“ Yordam", "вќ“ РџРѕРјРѕС‰СЊ"],
+    "balance": ["💰 Balans", "💰 Баланс"],  # NEW: Primary balance dashboard
+    "reports": ["📊 Hisobotlar", "📊 Отчёты"],  # NEW: All reports hub
+    "debts": ["💳 Qarzlar", "💳 Долги", "💰 Qarzlar", "💰 Долги"],
+    "profile": ["👤 Profil", "👤 Профиль"],
+    "subscription": ["💎 PRO"],
+    "help": ["❓ Yordam", "❓ Помощь"],
+    # Legacy buttons for backward compatibility
+    "today": ["📊 Bugun", "📊 Сегодня"],
+    "plan": ["📊 Hisobotlarim", "📊 Мои отчёты"],
+    "language": ["🌐 Til", "🌐 Язык"],
 }
 
 # Pre-computed frozenset for O(1) menu button lookup

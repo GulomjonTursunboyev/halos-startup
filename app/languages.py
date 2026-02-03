@@ -2275,6 +2275,113 @@ MESSAGES = {
             "🌟 Готовы к новому этапу?"
         )
     },
+    
+    # ==================== BALANCE DASHBOARD (NEW UX) ====================
+    "balance_dashboard_header": {
+        "uz": "💰 *BALANS DASHBOARD*",
+        "ru": "💰 *БАЛАНС ПАНЕЛЬ*"
+    },
+    
+    "balance_current": {
+        "uz": "💵 Joriy balans",
+        "ru": "💵 Текущий баланс"
+    },
+    
+    "balance_available": {
+        "uz": "✅ Ishlatish mumkin",
+        "ru": "✅ Доступно"
+    },
+    
+    "balance_reserved": {
+        "uz": "🔒 Zaxirada",
+        "ru": "🔒 В резерве"
+    },
+    
+    "balance_this_month": {
+        "uz": "📅 Bu oyda",
+        "ru": "📅 В этом месяце"
+    },
+    
+    "balance_income_label": {
+        "uz": "📈 Kirim",
+        "ru": "📈 Доход"
+    },
+    
+    "balance_expense_label": {
+        "uz": "📉 Chiqim",
+        "ru": "📉 Расход"
+    },
+    
+    "balance_economy_label": {
+        "uz": "💰 Tejaldi",
+        "ru": "💰 Экономия"
+    },
+    
+    "balance_add_income": {
+        "uz": "➕ Kirim qo'shish",
+        "ru": "➕ Добавить доход"
+    },
+    
+    "balance_add_expense": {
+        "uz": "➖ Chiqim qo'shish",
+        "ru": "➖ Добавить расход"
+    },
+    
+    "balance_quick_actions": {
+        "uz": "⚡ Tezkor amallar",
+        "ru": "⚡ Быстрые действия"
+    },
+    
+    "balance_no_transactions": {
+        "uz": "📭 Hali tranzaksiyalar yo'q. Birinchi kirim yoki chiqim qo'shing!",
+        "ru": "📭 Пока нет транзакций. Добавьте первый доход или расход!"
+    },
+    
+    # ==================== REPORTS HUB (NEW UX) ====================
+    "reports_hub_header": {
+        "uz": "📊 *HISOBOTLAR MARKAZI*",
+        "ru": "📊 *ЦЕНТР ОТЧЁТОВ*"
+    },
+    
+    "reports_daily": {
+        "uz": "📅 Bugungi hisobot",
+        "ru": "📅 Сегодняшний отчёт"
+    },
+    
+    "reports_weekly": {
+        "uz": "📊 Haftalik hisobot",
+        "ru": "📊 Недельный отчёт"
+    },
+    
+    "reports_monthly": {
+        "uz": "📈 Oylik hisobot",
+        "ru": "📈 Месячный отчёт"
+    },
+    
+    "reports_categories": {
+        "uz": "🏷️ Kategoriyalar bo'yicha",
+        "ru": "🏷️ По категориям"
+    },
+    
+    "reports_trends": {
+        "uz": "📉 Tendensiyalar",
+        "ru": "📉 Тенденции"
+    },
+    
+    "reports_export": {
+        "uz": "📥 Excel yuklab olish",
+        "ru": "📥 Скачать Excel"
+    },
+    
+    "reports_halos_status": {
+        "uz": "🎯 HALOS holati",
+        "ru": "🎯 Статус HALOS"
+    },
+    
+    "reports_select_type": {
+        "uz": "📊 Qaysi hisobotni ko'rmoqchisiz?",
+        "ru": "📊 Какой отчёт хотите посмотреть?"
+    },
 }
 
 
