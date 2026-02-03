@@ -32,6 +32,9 @@ from app.handlers import (
     handle_profile_edit_input,
     profile_mode_callback,
     get_main_menu_keyboard,
+    # YANGI PROFESSIONAL UX MENYU HANDLERS
+    menu_balance_handler,
+    menu_reports_handler,
     # Yangi soddalashtirilgan menyu handler'lari
     menu_today_handler,
     menu_debts_handler,
@@ -189,32 +192,32 @@ logger = logging.getLogger(__name__)
 # ========== SCHEDULED REPORT JOBS ==========
 async def daily_report_job(context) -> None:
     """Kunlik hisobot yuborish job"""
-    logger.info("🔔 Running daily report job...")
+    logger.info("рџ”” Running daily report job...")
     try:
         count = await send_daily_reports(context)
-        logger.info(f"✅ Daily reports sent to {count} users")
+        logger.info(f"вњ… Daily reports sent to {count} users")
     except Exception as e:
-        logger.error(f"❌ Daily report job error: {e}")
+        logger.error(f"вќЊ Daily report job error: {e}")
 
 
 async def weekly_report_job(context) -> None:
     """Haftalik hisobot yuborish job"""
-    logger.info("🔔 Running weekly report job...")
+    logger.info("рџ”” Running weekly report job...")
     try:
         count = await send_weekly_reports(context)
-        logger.info(f"✅ Weekly reports sent to {count} users")
+        logger.info(f"вњ… Weekly reports sent to {count} users")
     except Exception as e:
-        logger.error(f"❌ Weekly report job error: {e}")
+        logger.error(f"вќЊ Weekly report job error: {e}")
 
 
 async def monthly_report_job(context) -> None:
     """Oylik hisobot yuborish job"""
-    logger.info("🔔 Running monthly report job...")
+    logger.info("рџ”” Running monthly report job...")
     try:
         count = await send_monthly_reports(context)
-        logger.info(f"✅ Monthly reports sent to {count} users")
+        logger.info(f"вњ… Monthly reports sent to {count} users")
     except Exception as e:
-        logger.error(f"❌ Monthly report job error: {e}")
+        logger.error(f"вќЊ Monthly report job error: {e}")
 
 
 async def post_init(application: Application) -> None:
@@ -242,7 +245,7 @@ async def post_init(application: Application) -> None:
     job_queue = application.job_queue
     
     if job_queue is None:
-        logger.warning("⚠️ JobQueue is not available. Scheduled reports will not work.")
+        logger.warning("вљ пёЏ JobQueue is not available. Scheduled reports will not work.")
         logger.warning("Install with: pip install python-telegram-bot[job-queue]")
     else:
         from datetime import time as dt_time
@@ -257,7 +260,7 @@ async def post_init(application: Application) -> None:
             time=dt_time(hour=21, minute=0, tzinfo=tz),
             name="daily_report"
         )
-        logger.info("📊 Daily report job scheduled at 21:00 Tashkent time")
+        logger.info("рџ“Љ Daily report job scheduled at 21:00 Tashkent time")
         
         # Haftalik hisobot - har yakshanba soat 20:00 da
         job_queue.run_daily(
@@ -266,7 +269,7 @@ async def post_init(application: Application) -> None:
             days=(6,),  # 6 = Sunday
             name="weekly_report"
         )
-        logger.info("📊 Weekly report job scheduled on Sundays at 20:00")
+        logger.info("рџ“Љ Weekly report job scheduled on Sundays at 20:00")
         
         # Oylik hisobot - har oyning 1-sanasi soat 19:00 da
         job_queue.run_monthly(
@@ -275,7 +278,7 @@ async def post_init(application: Application) -> None:
             day=1,  # Har oyning 1-sanasi
             name="monthly_report"
         )
-        logger.info("📊 Monthly report job scheduled on 1st of each month at 19:00")
+        logger.info("рџ“Љ Monthly report job scheduled on 1st of each month at 19:00")
 
 
 async def post_shutdown(application: Application) -> None:
@@ -387,6 +390,14 @@ def main() -> None:
         group=0
     )
     
+    # App Login callbacks for mobile app authentication
+    application.add_handler(
+        CallbackQueryHandler(app_login_confirm_callback, pattern=r"^app_login_confirm:")
+    )
+    application.add_handler(
+        CallbackQueryHandler(app_login_cancel_callback, pattern=r"^app_login_cancel$")
+    )
+    
     # Add callback handlers for language change
     application.add_handler(
         CallbackQueryHandler(change_language_callback, pattern="^change_lang_")
@@ -409,37 +420,51 @@ def main() -> None:
         group=1
     )
     
-    # Main menu button handlers - YANGI SODDALASHTIRILGAN MENYU
+    # Main menu button handlers - YANGI PROFESSIONAL UX MENYU
+    # 💰 Balans - Primary Action (full width)
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💰 Balans|💰 Баланс)$"), menu_balance_handler),
+        group=2
+    )
+    # 📊 Hisobotlar - All reports centralized
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlar|📊 Отчёты)$"), menu_reports_handler),
+        group=2
+    )
+    # 💳 Qarzlar - Debts dashboard
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💳 Qarzlar|💳 Долги|💰 Qarzlar|💰 Долги)$"), menu_debts_handler),
+        group=2
+    )
+    # 👤 Profil
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"), menu_profile_handler),
+        group=2
+    )
+    # 💎 PRO
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💎 PRO)$"), menu_subscription_handler),
+        group=2
+    )
+    # ❓ Yordam
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
+        group=2
+    )
+    # Legacy support for old menu buttons
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(📊 Bugun|📊 Сегодня)$"), menu_today_handler),
         group=2
     )
     application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(💰 Qarzlar|💰 Долги)$"), menu_debts_handler),
-        group=2
-    )
-    # Legacy support
-    application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlarim|📊 Мои отчёты)$"), menu_plan_handler),
-        group=2
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"), menu_profile_handler),
-        group=2
-    )
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(💎 PRO)$"), menu_subscription_handler),
         group=2
     )
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(🌐 Til|🌐 Язык)$"), menu_language_handler),
         group=2
     )
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
-        group=2
-    )
-    
+
     # Text expense handler (for expense_text_mode)
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, text_expense_handler),
@@ -860,7 +885,7 @@ def main() -> None:
                 logger.error(f"Failed to start scheduler: {e}")
             
             logger.info("="*50)
-            logger.info("✅ HALOS Bot is running on Railway/Render!")
+            logger.info("вњ… HALOS Bot is running on Railway/Render!")
             logger.info("="*50)
             
             # Graceful shutdown handler
