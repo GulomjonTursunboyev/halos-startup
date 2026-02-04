@@ -1,4 +1,4 @@
-﻿"""
+"""
 App Login Handler for HALOS Bot
 Handles mobile app authentication via Telegram
 """
@@ -12,7 +12,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # API Base URL for mobile app backend
-API_URL = os.getenv("API_BASE_URL", "https://api.halos.uz/api/v1")
+API_URL = os.getenv("AUTH_API_URL", "https://halos-auth-api-production.up.railway.app/api/auth")
 
 
 async def handle_app_login(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str):
@@ -57,13 +57,12 @@ async def app_login_confirm_callback(update: Update, context: ContextTypes.DEFAU
         # Call API to confirm login session
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{API_URL}/auth/telegram/session/{session_id}/confirm",
-                params={
+                f"{API_URL}/telegram/session/{session_id}/confirm",
+                json={
                     "telegram_id": user.id,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
-                    "username": user.username,
-                    "photo_url": user.photo_url if hasattr(user, 'photo_url') else None
+                    "telegram_username": user.username
                 }
             )
             
@@ -126,3 +125,8 @@ async def app_login_cancel_callback(update: Update, context: ContextTypes.DEFAUL
         "Istalgan vaqt /start buyrug'i bilan qaytadan urinishingiz mumkin.",
         parse_mode="Markdown"
     )
+
+
+
+
+
