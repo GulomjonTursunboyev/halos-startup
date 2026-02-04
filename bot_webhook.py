@@ -32,6 +32,15 @@ from app.handlers import (
     handle_profile_edit_input,
     profile_mode_callback,
     get_main_menu_keyboard,
+    # YANGI PROFESSIONAL UX MENYU HANDLERS
+    menu_balance_handler,
+    menu_reports_handler,
+    menu_today_handler,
+    menu_debts_handler,
+    # Debt dashboard callbacks
+    show_katm_credits_callback,
+    back_to_debts_menu_callback,
+    # Legacy handlers
     menu_plan_handler,
     menu_profile_handler,
     menu_subscription_handler,
@@ -62,6 +71,7 @@ from app.handlers import (
     menu_katm_confirm_callback,
     smart_credit_input_handler,
     credit_confirm_callback,
+    credit_show_schedule_callback,
     # AI Assistant handlers
     ai_assistant_callback,
     ai_voice_handler,
@@ -69,6 +79,7 @@ from app.handlers import (
     ai_report_callback,
     ai_recent_callback,
     ai_budget_callback,
+    ai_real_balance_callback,
     # AI Correction handlers
     ai_confirm_ok_callback,
     ai_confirm_learn_callback,
@@ -218,7 +229,66 @@ def setup_handlers(app: Application) -> None:
         CallbackQueryHandler(profile_mode_callback, pattern="^profile_mode_")
     )
     
-    # Menu handlers
+    # Profile edit text input handler (must be before other message handlers)
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_profile_edit_input),
+        group=1
+    )
+    
+    # ==================== YANGI PROFESSIONAL UX MENYU ====================
+    # 💰 Balans - Primary Action (full width)
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💰 Balans|💰 Баланс)$"), menu_balance_handler),
+        group=2
+    )
+    # 📊 Hisobotlar - All reports centralized
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlar|📊 Отчёты)$"), menu_reports_handler),
+        group=2
+    )
+    # 💳 Qarzlar - Debts dashboard
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💳 Qarzlar|💳 Долги|💰 Qarzlar|💰 Долги)$"), menu_debts_handler),
+        group=2
+    )
+    # 👤 Profil
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"), menu_profile_handler),
+        group=2
+    )
+    # 💎 PRO
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💎 PRO)$"), menu_subscription_handler),
+        group=2
+    )
+    # ❓ Yordam
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
+        group=2
+    )
+    # Legacy support for old menu buttons
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Bugun|📊 Сегодня)$"), menu_today_handler),
+        group=2
+    )
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlarim|📊 Мои отчёты)$"), menu_plan_handler),
+        group=2
+    )
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(🌐 Til|🌐 Язык)$"), menu_language_handler),
+        group=2
+    )
+    
+    # Debt dashboard callbacks
+    app.add_handler(
+        CallbackQueryHandler(show_katm_credits_callback, pattern="^show_katm_credits$")
+    )
+    app.add_handler(
+        CallbackQueryHandler(back_to_debts_menu_callback, pattern="^back_to_debts_menu$")
+    )
+    
+    # Menu callback handlers (legacy)
     app.add_handler(
         CallbackQueryHandler(menu_plan_handler, pattern="^menu_plan$")
     )
@@ -425,10 +495,26 @@ def setup_handlers(app: Application) -> None:
         CallbackQueryHandler(debt_reminder_snooze_callback, pattern="^debt_reminder_snooze:")
     )
     
+    # AI Real Balance handler
+    app.add_handler(
+        CallbackQueryHandler(ai_real_balance_callback, pattern="^ai_real_balance$")
+    )
+    
+    # Credit schedule callback
+    app.add_handler(
+        CallbackQueryHandler(credit_show_schedule_callback, pattern="^credit_show_schedule$")
+    )
+    
     # PROMO CODE INPUT HANDLER - HIGHEST PRIORITY
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_promo_code_input),
         group=-1  # Highest priority - runs first
+    )
+    
+    # Text expense handler (for expense_text_mode)
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, text_expense_handler),
+        group=4  # Lower priority than menu handlers
     )
     
     # Smart credit input handler - MUST be before other text handlers
