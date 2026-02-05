@@ -118,8 +118,8 @@ def parse_number(text: str) -> float:
     """Parse number from user input"""
     # Remove spaces, commas, and common text
     cleaned = text.strip().replace(" ", "").replace(",", "").replace(".", "")
-    cleaned = cleaned.replace("so'm", "").replace("sum", "").replace("СЃСѓРј", "")
-    cleaned = cleaned.replace("mln", "000000").replace("РјР»РЅ", "000000")
+    cleaned = cleaned.replace("so'm", "").replace("sum", "").replace("сум", "")
+    cleaned = cleaned.replace("mln", "000000").replace("млн", "000000")
     
     try:
         return float(cleaned)
@@ -209,7 +209,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data["lang"] = lang
         
         # Show main menu for registered users
-        welcome_back = "рџ‘‹ Xush kelibsiz!\n\nQuyidagi menyudan foydalaning:" if lang == "uz" else "рџ‘‹ Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ!\n\nРСЃРїРѕР»СЊР·СѓР№С‚Рµ РјРµРЅСЋ РЅРёР¶Рµ:"
+        welcome_back = "👋 Xush kelibsiz!\n\nQuyidagi menyudan foydalaning:" if lang == "uz" else "👋 Добро пожаЛоватъ!\n\nИспоЛъзуЙте менСЋ ниже:"
         
         await update.message.reply_text(
             welcome_back,
@@ -409,7 +409,7 @@ async def onboarding_credit_callback(update: Update, context: ContextTypes.DEFAU
     
     else:  # onboard_credit_no
         # Kredit yo'q - to'g'ridan-to'g'ri asosiy ekranga
-        await query.edit_message_text("вњ…")
+        await query.edit_message_text("✅")
         
         # Minimal profil yaratish
         db = await get_database()
@@ -449,7 +449,7 @@ async def onboarding_credit_amount_handler(update: Update, context: ContextTypes
     
     if amount < 0:
         await update.message.reply_text(
-            "вќЊ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "вќЊ РќРµРІРµСЂРЅС‹Р№ С„РѕСЂРјР°С‚. Р’РІРµРґРёС‚Рµ С‡РёСЃР»Рѕ.",
+            "вќЊ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "вќЊ МеверныЙ С„ормат. Введите цисЛо.",
             parse_mode="Markdown"
         )
         return States.ONBOARDING_CREDIT_AMOUNT
@@ -471,7 +471,7 @@ async def onboarding_credit_amount_handler(update: Update, context: ContextTypes
         )
     
     # Muvaffaqiyat va asosiy menyu
-    saved_msg = f"вњ… Kredit to'lov: *{format_number(amount)}* so'm/oy" if lang == "uz" else f"вњ… РџР»Р°С‚С‘Р¶ РїРѕ РєСЂРµРґРёС‚Сѓ: *{format_number(amount)}* СЃСѓРј/РјРµСЃ"
+    saved_msg = f"✅ Kredit to'lov: *{format_number(amount)}* so'm/oy" if lang == "uz" else f"✅ Платёж по кредиту: *{format_number(amount)}* сум/мес"
     
     await update.message.reply_text(saved_msg, parse_mode="Markdown")
     
@@ -861,18 +861,18 @@ async def show_transaction_summary(query, context) -> int:
     month_lines = []
     sorted_months = sorted(all_monthly.keys(), reverse=True)[:3]
     month_names = {
-        "01": "Yanvar" if lang == "uz" else "РЇРЅРІР°СЂСЊ",
-        "02": "Fevral" if lang == "uz" else "Р¤РµРІСЂР°Р»СЊ",
-        "03": "Mart" if lang == "uz" else "РњР°СЂС‚",
-        "04": "Aprel" if lang == "uz" else "РђРїСЂРµР»СЊ",
-        "05": "May" if lang == "uz" else "РњР°Р№",
-        "06": "Iyun" if lang == "uz" else "РСЋРЅСЊ",
-        "07": "Iyul" if lang == "uz" else "РСЋР»СЊ",
-        "08": "Avgust" if lang == "uz" else "РђРІРіСѓСЃС‚",
-        "09": "Sentyabr" if lang == "uz" else "РЎРµРЅС‚СЏР±СЂСЊ",
-        "10": "Oktyabr" if lang == "uz" else "РћРєС‚СЏР±СЂСЊ",
-        "11": "Noyabr" if lang == "uz" else "РќРѕСЏР±СЂСЊ",
-        "12": "Dekabr" if lang == "uz" else "Р”РµРєР°Р±СЂСЊ",
+        "01": "Yanvar" if lang == "uz" else "РЇнваръ",
+        "02": "Fevral" if lang == "uz" else "Р¤евраЛъ",
+        "03": "Mart" if lang == "uz" else "Рњарт",
+        "04": "Aprel" if lang == "uz" else "АпреЛъ",
+        "05": "May" if lang == "uz" else "РњаЙ",
+        "06": "Iyun" if lang == "uz" else "ИСЋнъ",
+        "07": "Iyul" if lang == "uz" else "ИСЋЛъ",
+        "08": "Avgust" if lang == "uz" else "Август",
+        "09": "Sentyabr" if lang == "uz" else "Сентябръ",
+        "10": "Oktyabr" if lang == "uz" else "Октябръ",
+        "11": "Noyabr" if lang == "uz" else "Моябръ",
+        "12": "Dekabr" if lang == "uz" else "Декабръ",
     }
     
     for month_key in sorted_months:
@@ -1120,7 +1120,7 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     context.user_data["income_self"] = result.monthly_income
                     
                     await update.message.reply_text(
-                        f"вњ… *Fayl o'qildi!*\n\n"
+                        f"✅ *Fayl o'qildi!*\n\n"
                         f"💰 Oylik daromad: *{format_number(result.monthly_income)}* so'm\n"
                         f"📉 {result.income_count} ta kirim topildi",
                         parse_mode="Markdown"
@@ -1621,7 +1621,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Handle photo (screenshot of credit schedule) - AI bilan o'qish
     if photo:
         processing_msg = await update.message.reply_text(
-            "рџ“· Rasm tahlil qilinmoqda..." if lang == "uz" else "рџ“· РђРЅР°Р»РёР·РёСЂСѓСЋ РёР·РѕР±СЂР°Р¶РµРЅРёРµ..."
+            "📷 Rasm tahlil qilinmoqda..." if lang == "uz" else "📷 АнаЛизируСЋ изображение..."
         )
         
         try:
@@ -1677,7 +1677,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     context.user_data["interest_impact"] = interest_impact
                 
                 # Xabar tuzish
-                loans_list = f"в”њ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
+                loans_list = f"┃ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
                 
                 interest_warning = ""
                 if interest_impact:
@@ -1736,7 +1736,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 # Rasmni o'qib bo'lmadi
                 await update.message.reply_text(
                     "вќЊ Rasmdan ma'lumotni o'qib bo'lmadi. PDF yoki HTML faylni yuboring." if lang == "uz"
-                    else "вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РґР°РЅРЅС‹Рµ СЃ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ. РћС‚РїСЂР°РІСЊС‚Рµ PDF РёР»Рё HTML С„Р°Р№Р»."
+                    else "вќЊ Ме удаЛосъ процитатъ данные с изображения. Отправъте PDF иЛи HTML С„аЙЛ."
                 )
                 return States.KATM_UPLOAD
                 
@@ -1745,7 +1745,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await processing_msg.delete()
             await update.message.reply_text(
                 "вќЊ Rasmni qayta ishlashda xatolik. PDF/HTML faylni yuboring." if lang == "uz"
-                else "вќЊ РћС€РёР±РєР° РѕР±СЂР°Р±РѕС‚РєРё РёР·РѕР±СЂР°Р¶РµРЅРёСЏ. РћС‚РїСЂР°РІСЊС‚Рµ PDF/HTML С„Р°Р№Р»."
+                else "вќЊ Ошибка обработки изображения. Отправъте PDF/HTML С„аЙЛ."
             )
             return States.KATM_UPLOAD
     
@@ -1831,7 +1831,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             # Format loans list with details
             loans_list = ""
             for loan in result.loans:
-                loans_list += f"в”њ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
+                loans_list += f"┃ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
             
             # Determine warning level
             interest_warning = ""
@@ -1979,7 +1979,7 @@ async def reg_credit_show_schedule_callback(update: Update, context: ContextType
     
     loan_type_name = "Annuitet (bir xil to'lov)" if loan_type == "annuity" else "Differensial (kamayib boruvchi)"
     if lang == "ru":
-        loan_type_name = "РђРЅРЅСѓРёС‚РµС‚ (СЂР°РІРЅС‹Рµ РїР»Р°С‚РµР¶Рё)" if loan_type == "annuity" else "Р”РёС„С„РµСЂРµРЅС†РёСЂРѕРІР°РЅРЅС‹Р№ (СѓР±С‹РІР°СЋС‰РёР№)"
+        loan_type_name = "Аннуитет (равные пЛатежи)" if loan_type == "annuity" else "ДиС„С„еренфированныЙ (убываСЋщиЙ)"
     
     schedule_msg = get_message("credit_payment_schedule", lang).format(
         schedule=schedule_text,
@@ -2382,7 +2382,7 @@ async def calculate_and_show_results(update: Update, context: ContextTypes.DEFAU
         # Show PRO upgrade button for free users
         keyboard = [
             [InlineKeyboardButton(
-                "рџ’Ћ PRO" if lang == "uz" else "рџ’Ћ PRO",
+                "💎 PRO" if lang == "uz" else "💎 PRO",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
@@ -2519,7 +2519,7 @@ async def calculate_and_show_results_from_callback(query, context: ContextTypes.
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "рџ’Ћ PRO" if lang == "uz" else "рџ’Ћ PRO",
+                "💎 PRO" if lang == "uz" else "💎 PRO",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")]
@@ -2627,7 +2627,7 @@ async def recalc_saved_callback(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "рџ’Ћ PRO ga o'tish" if lang == "uz" else "рџ’Ћ РџРµСЂРµР№С‚Рё РЅР° PRO",
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 ПереЙти на PRO",
                 callback_data="show_pricing"
             )],
             [InlineKeyboardButton(get_message("btn_recalculate", lang), callback_data="recalculate")],
@@ -2705,7 +2705,7 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     first_name = user.get("first_name") or ""
     # Clean up - remove None and empty strings
     first_name = first_name if first_name and first_name != "None" else ""
-    display_name = first_name.strip() or ("Foydalanuvchi" if lang == "uz" else "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ")
+    display_name = first_name.strip() or ("Foydalanuvchi" if lang == "uz" else "ПоЛъзоватеЛъ")
     phone = user.get("phone_number", "")
     mode = user.get("mode", "solo")
     
@@ -2720,15 +2720,15 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
                 expires_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
                 days_left = (expires_dt - datetime.now()).days
                 if lang == "uz":
-                    sub_status = f"рџ’Ћ PRO ({days_left} kun qoldi)"
+                    sub_status = f"💎 PRO ({days_left} kun qoldi)"
                 else:
-                    sub_status = f"рџ’Ћ PRO ({days_left} РґРЅРµР№ РѕСЃС‚Р°Р»РѕСЃСЊ)"
+                    sub_status = f"💎 PRO ({days_left} днеЙ остаЛосъ)"
             except:
-                sub_status = "рџ’Ћ PRO" if lang == "uz" else "рџ’Ћ PRO"
+                sub_status = "💎 PRO" if lang == "uz" else "💎 PRO"
         else:
-            sub_status = "рџ’Ћ PRO" if lang == "uz" else "рџ’Ћ PRO"
+            sub_status = "💎 PRO" if lang == "uz" else "💎 PRO"
     else:
-        sub_status = "рџ†“ Bepul" if lang == "uz" else "рџ†“ Р‘РµСЃРїР»Р°С‚РЅС‹Р№"
+        sub_status = "🆓 Bepul" if lang == "uz" else "🆓 БеспЛатныЙ"
     
     # Get financial data from profile
     income_self = profile.get("income_self", 0) if profile else 0
@@ -2743,66 +2743,66 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
     if lang == "uz":
         mode_text = "👤 Yolg'iz" if mode == "solo" else "👥 Oila"
     else:
-        mode_text = "👤 РћРґРёРЅ" if mode == "solo" else "👥 РЎРµРјСЊСЏ"
+        mode_text = "👤 Один" if mode == "solo" else "👥 Семья"
     
     # Build profile with all financial data
     if lang == "uz":
         profile_text = (
             f"👤 *{display_name}*\n"
-            f"рџ“± {phone}\n"
+            f"📱 {phone}\n"
             f"📉 Obuna: {sub_status}\n"
             f"🏠 Rejim: {mode_text}\n\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"💰 *DAROMADLAR:*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Mening daromadim: *{format_number(income_self)} so'm*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Mening daromadim: *{format_number(income_self)} so'm*\n"
         )
         if mode == "family" or income_partner > 0:
-            profile_text += f"в”” Sherik daromadi: *{format_number(income_partner)} so'm*\n"
+            profile_text += f"┃ Sherik daromadi: *{format_number(income_partner)} so'm*\n"
         else:
-            profile_text = profile_text.replace("в”њ Mening", "в”” Mening")
+            profile_text = profile_text.replace("┃ Mening", "┃ Mening")
         
         profile_text += (
-            f"\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"рџ“‹ *XARAJATLAR:*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Ijara: *{format_number(rent)} so'm*\n"
-            f"в”њ Majburiy to'lovlar: *{format_number(kindergarten)} so'm*\n"
-            f"в”” Kommunal: *{format_number(utilities)} so'm*\n"
-            f"\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            f"\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"📋 *XARAJATLAR:*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Ijara: *{format_number(rent)} so'm*\n"
+            f"┃ Majburiy to'lovlar: *{format_number(kindergarten)} so'm*\n"
+            f"┃ Kommunal: *{format_number(utilities)} so'm*\n"
+            f"\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"🏦 *KREDIT:*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Oylik to'lov: *{format_number(loan_payment)} so'm*\n"
-            f"в”” Umumiy qarz: *{format_number(total_debt)} so'm*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Oylik to'lov: *{format_number(loan_payment)} so'm*\n"
+            f"┃ Umumiy qarz: *{format_number(total_debt)} so'm*\n"
         )
     else:
         profile_text = (
             f"👤 *{display_name}*\n"
-            f"рџ“± {phone}\n"
-            f"📉 РџРѕРґРїРёСЃРєР°: {sub_status}\n"
-            f"🏠 Р РµР¶РёРј: {mode_text}\n\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"💰 *Р”РћРҐРћР”Р«:*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ РњРѕР№ РґРѕС…РѕРґ: *{format_number(income_self)} СЃСѓРј*\n"
+            f"📱 {phone}\n"
+            f"📉 Подписка: {sub_status}\n"
+            f"🏠 Режим: {mode_text}\n\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"💰 *ДОРҐОДЫ:*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ РњоЙ доход: *{format_number(income_self)} сум*\n"
         )
         if mode == "family" or income_partner > 0:
-            profile_text += f"в”” Р”РѕС…РѕРґ РїР°СЂС‚РЅС‘СЂР°: *{format_number(income_partner)} СЃСѓРј*\n"
+            profile_text += f"┃ Доход партнС‘ра: *{format_number(income_partner)} сум*\n"
         else:
-            profile_text = profile_text.replace("в”њ РњРѕР№", "в”” РњРѕР№")
+            profile_text = profile_text.replace("┃ РњоЙ", "┃ РњоЙ")
         
         profile_text += (
-            f"\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"рџ“‹ *Р РђРЎРҐРћР”Р«:*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ РђСЂРµРЅРґР°: *{format_number(rent)} СЃСѓРј*\n"
-            f"в”њ РћР±СЏР·Р°С‚. РїР»Р°С‚РµР¶Рё: *{format_number(kindergarten)} СЃСѓРј*\n"
-            f"в”” РљРѕРјРјСѓРЅР°Р»СЊРЅС‹Рµ: *{format_number(utilities)} СЃСѓРј*\n"
-            f"\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"🏦 *РљР Р•Р”РРў:*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Р•Р¶РµРјРµСЃ. РїР»Р°С‚С‘Р¶: *{format_number(loan_payment)} СЃСѓРј*\n"
-            f"в”” РћР±С‰РёР№ РґРѕР»Рі: *{format_number(total_debt)} СЃСѓРј*\n"
+            f"\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"📋 *РАСРҐОДЫ:*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Аренда: *{format_number(rent)} сум*\n"
+            f"┃ Обязат. пЛатежи: *{format_number(kindergarten)} сум*\n"
+            f"┃ КоммунаЛъные: *{format_number(utilities)} сум*\n"
+            f"\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"🏦 *КРЕДИТ:*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Ежемес. пЛатС‘ж: *{format_number(loan_payment)} сум*\n"
+            f"┃ ОбщиЙ доЛг: *{format_number(total_debt)} сум*\n"
         )
     
     # Create keyboard - edit buttons for financial data
@@ -2831,10 +2831,10 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
         trial_available = user and not user.get("trial_used", 0)
         if trial_available:
             keyboard.append([
-                InlineKeyboardButton("🋃 3 kun BEPUL sinash" if lang == "uz" else "🋃 3 РґРЅСЏ Р‘Р•РЎРџР›РђРўРќРћ", callback_data="activate_trial")
+                InlineKeyboardButton("🋃 3 kun BEPUL sinash" if lang == "uz" else "🋃 3 дня БЕСПР›АТМО", callback_data="activate_trial")
             ])
         keyboard.append([
-            InlineKeyboardButton("рџ’Ћ PRO olish" if lang == "uz" else "рџ’Ћ РџРѕР»СѓС‡РёС‚СЊ PRO", callback_data="show_pricing")
+            InlineKeyboardButton("💎 PRO olish" if lang == "uz" else "💎 ПоЛуцитъ PRO", callback_data="show_pricing")
         ])
     
     full_text = get_message("profile_header", lang) + "\n\n" + profile_text
@@ -2914,13 +2914,13 @@ async def show_profile_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 # Field name mappings
 PROFILE_FIELDS = {
-    "income_self": {"uz": "Daromadim", "ru": "РњРѕР№ РґРѕС…РѕРґ"},
-    "income_partner": {"uz": "Sherik daromadi", "ru": "Р”РѕС…РѕРґ РїР°СЂС‚РЅС‘СЂР°"},
-    "rent": {"uz": "Ijara", "ru": "РђСЂРµРЅРґР°"},
-    "kindergarten": {"uz": "Majburiy to'lovlar", "ru": "РћР±СЏР·Р°С‚. РїР»Р°С‚РµР¶Рё"},
-    "utilities": {"uz": "Kommunal", "ru": "РљРѕРјРјСѓРЅР°Р»СЊРЅС‹Рµ"},
-    "loan_payment": {"uz": "Oylik to'lov", "ru": "Р•Р¶РµРјРµСЃ. РїР»Р°С‚С‘Р¶"},
-    "total_debt": {"uz": "Umumiy qarz", "ru": "РћР±С‰РёР№ РґРѕР»Рі"},
+    "income_self": {"uz": "Daromadim", "ru": "РњоЙ доход"},
+    "income_partner": {"uz": "Sherik daromadi", "ru": "Доход партнС‘ра"},
+    "rent": {"uz": "Ijara", "ru": "Аренда"},
+    "kindergarten": {"uz": "Majburiy to'lovlar", "ru": "Обязат. пЛатежи"},
+    "utilities": {"uz": "Kommunal", "ru": "КоммунаЛъные"},
+    "loan_payment": {"uz": "Oylik to'lov", "ru": "Ежемес. пЛатС‘ж"},
+    "total_debt": {"uz": "Umumiy qarz", "ru": "ОбщиЙ доЛг"},
 }
 
 
@@ -3125,7 +3125,7 @@ async def change_language_callback(update: Update, context: ContextTypes.DEFAULT
     
     # Update main menu with new language
     await query.message.reply_text(
-        "вњ…",
+        "✅",
         reply_markup=get_main_menu_keyboard(lang)
     )
 
@@ -3163,7 +3163,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if isinstance(error, (TimeoutError, asyncio.TimeoutError)):
             await update.effective_message.reply_text(
                 "вЏі Server band. Iltimos, qayta urinib ko'ring." if lang == "uz" else 
-                "вЏі РЎРµСЂРІРµСЂ Р·Р°РЅСЏС‚. РџРѕРїСЂРѕР±СѓР№С‚Рµ РµС‰С‘ СЂР°Р·."
+                "вЏі Сервер занят. ПопробуЙте ещС‘ раз."
             )
         else:
             await update.effective_message.reply_text(
@@ -3702,47 +3702,47 @@ async def menu_today_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # QISQA VA ANIQ HISOBOT
     if lang == "uz":
         if today_balance >= 0:
-            balance_line = f"рџ’љ *+{today_balance:,}* so'm"
+            balance_line = f"💸 *+{today_balance:,}* so'm"
         else:
-            balance_line = f"рџ”ґ *{today_balance:,}* so'm"
+            balance_line = f"💰 *{today_balance:,}* so'm"
         
         msg = (
-            f"📉 *BUGUN* вЂў {today_date}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📉 *BUGUN* ↳ {today_date}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{balance_line}\n"
-            f"рџ“Ґ +{today_income:,} | рџ“¤ -{today_expense:,}\n"
+            f"📈 +{today_income:,} | 📉 -{today_expense:,}\n"
         )
         
         # Xarajatlar bo'yicha (top 3)
         if today_summary.get("expense_by_category"):
-            msg += "\nрџ’ё *Xarajatlar:*\n"
+            msg += "\n💳 *Xarajatlar:*\n"
             sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:3]:
-                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "рџ“¦ Boshqa")
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 msg += f"  {cat_name} {amount:,}\n"
         
         msg += "\n_Kirim/chiqim qo'shish uchun yozing_"
     else:
         if today_balance >= 0:
-            balance_line = f"рџ’љ *+{today_balance:,}* СЃСѓРј"
+            balance_line = f"💸 *+{today_balance:,}* сум"
         else:
-            balance_line = f"рџ”ґ *{today_balance:,}* СЃСѓРј"
+            balance_line = f"💰 *{today_balance:,}* сум"
         
         msg = (
-            f"📉 *РЎР•Р“РћР”РќРЇ* вЂў {today_date}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📉 *СЕГОДМРЇ* ↳ {today_date}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{balance_line}\n"
-            f"рџ“Ґ +{today_income:,} | рџ“¤ -{today_expense:,}\n"
+            f"📈 +{today_income:,} | 📉 -{today_expense:,}\n"
         )
         
         if today_summary.get("expense_by_category"):
-            msg += "\nрџ’ё *Р Р°СЃС…РѕРґС‹:*\n"
+            msg += "\n💳 *Расходы:*\n"
             sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:3]:
-                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "рџ“¦ РџСЂРѕС‡РµРµ")
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 msg += f"  {cat_name} {amount:,}\n"
         
-        msg += "\n_РџРёС€РёС‚Рµ С‡С‚РѕР±С‹ РґРѕР±Р°РІРёС‚СЊ СЂР°СЃС…РѕРґ/РґРѕС…РѕРґ_"
+        msg += "\n_Пишите чтобы добавить расход/доход_"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -4015,27 +4015,27 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
             if lang == "uz":
                 msg = (
                     "🏦 *BANK KREDITLARI*\n"
-                    "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"рџ’і Jami qarz: *{legacy_total_debt:,.0f}* so'm\n"
-                    f"рџ“† Oylik to'lov: *{legacy_loan_payment:,.0f}* so'm\n\n"
+                    "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"💵 Jami qarz: *{legacy_total_debt:,.0f}* so'm\n"
+                    f"📊 Oylik to'lov: *{legacy_loan_payment:,.0f}* so'm\n\n"
                     "📄 _Batafsil ma'lumot uchun KATM PDF yuklang_"
                 )
             else:
                 msg = (
-                    "🏦 *Р‘РђРќРљРћР’РЎРљРР• РљР Р•Р”РРўР«*\n"
-                    "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"рџ’і РћР±С‰РёР№ РґРѕР»Рі: *{legacy_total_debt:,.0f}* СЃСѓРј\n"
-                    f"рџ“† Р•Р¶РµРјРµСЃСЏС‡РЅРѕ: *{legacy_loan_payment:,.0f}* СЃСѓРј\n\n"
-                    "📄 _Р”Р»СЏ РґРµС‚Р°Р»СЊРЅРѕР№ РёРЅС„РѕСЂРјР°С†РёРё Р·Р°РіСЂСѓР·РёС‚Рµ KATM PDF_"
+                    "🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n"
+                    "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"💵 ОбщиЙ доЛг: *{legacy_total_debt:,.0f}* сум\n"
+                    f"📊 Ежемесяцно: *{legacy_loan_payment:,.0f}* сум\n\n"
+                    "📄 _ДЛя детаЛъноЙ инС„ормафии загрузите KATM PDF_"
                 )
         else:
             if lang == "uz":
                 msg = "🏦 Bank kreditlari topilmadi.\n\n📄 _KATM PDF yuklang_"
             else:
-                msg = "🏦 Р‘Р°РЅРєРѕРІСЃРєРёС… РєСЂРµРґРёС‚РѕРІ РЅРµ РЅР°Р№РґРµРЅРѕ.\n\n📄 _Р—Р°РіСЂСѓР·РёС‚Рµ KATM PDF_"
+                msg = "🏦 Банковских кредитов не найдено.\n\n📄 _Р—агрузите KATM PDF_"
         
         keyboard = [[InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_debts_menu"
         )]]
         
@@ -4045,7 +4045,7 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
     # Build detailed credits list
     if lang == "uz":
         msg = "🏦 *BANK KREDITLARI*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_balance = 0
         total_monthly = 0
@@ -4071,27 +4071,27 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
             
             msg += f"*{i}. {bank}*\n"
             if loan_type:
-                msg += f"   рџ“‹ {loan_type}\n"
+                msg += f"   📋 {loan_type}\n"
             msg += f"   💵 Qoldiq: *{balance:,.0f}* so'm\n"
-            msg += f"   рџ“† Oylik: *{monthly:,.0f}* so'm\n"
+            msg += f"   📊 Oylik: *{monthly:,.0f}* so'm\n"
             if original > 0:
                 msg += f"   📉 To'landi: {progress} {paid_percent}%\n"
             msg += "\n"
         
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         msg += f"📉 *JAMI:*\n"
         msg += f"   💰 Qoldiq: *{total_balance:,.0f}* so'm\n"
-        msg += f"   рџ“† Oylik: *{total_monthly:,.0f}* so'm"
+        msg += f"   📊 Oylik: *{total_monthly:,.0f}* so'm"
         
     else:
-        msg = "🏦 *Р‘РђРќРљРћР’РЎРљРР• РљР Р•Р”РРўР«*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_balance = 0
         total_monthly = 0
         
         for i, loan in enumerate(katm_loans, 1):
-            bank = loan.get("bank_name", "РќРµРёР·РІРµСЃС‚РЅС‹Р№ Р±Р°РЅРє")
+            bank = loan.get("bank_name", "МеизвестныЙ банк")
             balance = loan.get("remaining_balance", 0) or 0
             monthly = loan.get("monthly_payment", 0) or 0
             original = loan.get("original_amount", 0) or 0
@@ -4109,20 +4109,20 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
             
             msg += f"*{i}. {bank}*\n"
             if loan_type:
-                msg += f"   рџ“‹ {loan_type}\n"
-            msg += f"   💵 РћСЃС‚Р°С‚РѕРє: *{balance:,.0f}* СЃСѓРј\n"
-            msg += f"   рџ“† Р•Р¶РµРјРµСЃСЏС‡РЅРѕ: *{monthly:,.0f}* СЃСѓРј\n"
+                msg += f"   📋 {loan_type}\n"
+            msg += f"   💵 Остаток: *{balance:,.0f}* сум\n"
+            msg += f"   📊 Ежемесяцно: *{monthly:,.0f}* сум\n"
             if original > 0:
-                msg += f"   📉 Р’С‹РїР»Р°С‡РµРЅРѕ: {progress} {paid_percent}%\n"
+                msg += f"   📉 ВыпЛацено: {progress} {paid_percent}%\n"
             msg += "\n"
         
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-        msg += f"📉 *РРўРћР“Рћ:*\n"
-        msg += f"   💰 РћСЃС‚Р°С‚РѕРє: *{total_balance:,.0f}* СЃСѓРј\n"
-        msg += f"   рџ“† Р•Р¶РµРјРµСЃСЏС‡РЅРѕ: *{total_monthly:,.0f}* СЃСѓРј"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+        msg += f"📉 *ИТОГО:*\n"
+        msg += f"   💰 Остаток: *{total_balance:,.0f}* сум\n"
+        msg += f"   📊 Ежемесяцно: *{total_monthly:,.0f}* сум"
     
     keyboard = [[InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
         callback_data="back_to_debts_menu"
     )]]
     
@@ -4183,75 +4183,75 @@ async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFA
     total_receivable = total_lent
     
     if lang == "uz":
-        msg = "💰 *QARZLAR DASHBOARD*\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "💰 *QARZLAR DASHBOARD*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         if total_receivable > 0 and total_debt_burden > 0:
             diff = total_receivable - total_debt_burden
             if diff > 0:
-                msg += f"📉 *Balans:* рџ’љ +{diff:,.0f} so'm\n\n"
+                msg += f"📉 *Balans:* 💸 +{diff:,.0f} so'm\n\n"
             else:
-                msg += f"📉 *Balans:* рџ”ґ {diff:,.0f} so'm\n\n"
+                msg += f"📉 *Balans:* 💰 {diff:,.0f} so'm\n\n"
         elif total_receivable > 0:
-            msg += f"📉 *Balans:* рџ’љ +{total_receivable:,.0f} so'm\n\n"
+            msg += f"📉 *Balans:* 💸 +{total_receivable:,.0f} so'm\n\n"
         elif total_debt_burden > 0:
-            msg += f"📉 *Balans:* рџ”ґ -{total_debt_burden:,.0f} so'm\n\n"
+            msg += f"📉 *Balans:* 💰 -{total_debt_burden:,.0f} so'm\n\n"
         else:
             msg += "📉 *Balans:* вљЄ Qarz yo'q\n\n"
         
         msg += "👥 *SHAXSIY QARZLAR*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
         if total_lent > 0 or total_borrowed > 0:
             if total_lent > 0:
-                msg += f"рџ“¤ Berdingiz: *{total_lent:,.0f}* ({lent_count})\n"
+                msg += f"📉 Berdingiz: *{total_lent:,.0f}* ({lent_count})\n"
             if total_borrowed > 0:
-                msg += f"рџ“Ґ Oldingiz: *{total_borrowed:,.0f}* ({borrowed_count})\n"
+                msg += f"📈 Oldingiz: *{total_borrowed:,.0f}* ({borrowed_count})\n"
         else:
-            msg += "вњ… Shaxsiy qarz yo'q\n"
+            msg += "✅ Shaxsiy qarz yo'q\n"
         
         msg += "\n🏦 *BANK KREDITLARI*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
         if credit_count > 0:
-            msg += f"рџ’і Kreditlar: *{credit_count}* ta\n"
-            msg += f"рџ“‰ Qoldiq: *{total_credit_balance:,.0f}* so'm\n"
-            msg += f"рџ“† Oylik: *{total_monthly_payment:,.0f}* so'm\n"
+            msg += f"💵 Kreditlar: *{credit_count}* ta\n"
+            msg += f"👛 Qoldiq: *{total_credit_balance:,.0f}* so'm\n"
+            msg += f"📊 Oylik: *{total_monthly_payment:,.0f}* so'm\n"
         else:
-            msg += "вњ… Bank krediti yo'q\n"
+            msg += "✅ Bank krediti yo'q\n"
         
-        msg += "\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+        msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         msg += "💎 _Qarz: \"Ali 100k berdi\"_"
     else:
-        msg = "💰 *DASHBOARD Р”РћР›Р“РћР’*\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "💰 *DASHBOARD ДОР›ГОВ*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         if total_receivable > 0 and total_debt_burden > 0:
             diff = total_receivable - total_debt_burden
             if diff > 0:
-                msg += f"📉 *Р‘Р°Р»Р°РЅСЃ:* рџ’љ +{diff:,.0f} СЃСѓРј\n\n"
+                msg += f"📉 *Баланс:* 💸 +{diff:,.0f} сум\n\n"
             else:
-                msg += f"📉 *Р‘Р°Р»Р°РЅСЃ:* рџ”ґ {diff:,.0f} СЃСѓРј\n\n"
+                msg += f"📉 *Баланс:* 💰 {diff:,.0f} сум\n\n"
         elif total_receivable > 0:
-            msg += f"📉 *Р‘Р°Р»Р°РЅСЃ:* рџ’љ +{total_receivable:,.0f} СЃСѓРј\n\n"
+            msg += f"📉 *Баланс:* 💸 +{total_receivable:,.0f} сум\n\n"
         elif total_debt_burden > 0:
-            msg += f"📉 *Р‘Р°Р»Р°РЅСЃ:* рџ”ґ -{total_debt_burden:,.0f} СЃСѓРј\n\n"
+            msg += f"📉 *Баланс:* 💰 -{total_debt_burden:,.0f} сум\n\n"
         else:
-            msg += "📉 *Р‘Р°Р»Р°РЅСЃ:* вљЄ Р”РѕР»РіРѕРІ РЅРµС‚\n\n"
+            msg += "📉 *Баланс:* вљЄ Долгов нет\n\n"
         
-        msg += "👥 *Р›РР§РќР«Р• Р”РћР›Р“Р*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
+        msg += "👥 *Р›ИЧМЫЕ ДОР›ГИ*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
         if total_lent > 0 or total_borrowed > 0:
             if total_lent > 0:
-                msg += f"рџ“¤ Р’С‹ РґР°Р»Рё: *{total_lent:,.0f}* ({lent_count})\n"
+                msg += f"📉 Вы даЛи: *{total_lent:,.0f}* ({lent_count})\n"
             if total_borrowed > 0:
-                msg += f"рџ“Ґ Р’С‹ РІР·СЏР»Рё: *{total_borrowed:,.0f}* ({borrowed_count})\n"
+                msg += f"📈 Вы взяЛи: *{total_borrowed:,.0f}* ({borrowed_count})\n"
         else:
-            msg += "вњ… Р›РёС‡РЅС‹С… РґРѕР»РіРѕРІ РЅРµС‚\n"
+            msg += "✅ Р›ицных доЛгов нет\n"
         
-        msg += "\n🏦 *Р‘РђРќРљРћР’РЎРљРР• РљР Р•Р”РРўР«*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
+        msg += "\n🏦 *БАНКОВСКИЕ КРЕДИТЫ*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
         if credit_count > 0:
-            msg += f"рџ’і РљСЂРµРґРёС‚РѕРІ: *{credit_count}* С€С‚\n"
-            msg += f"рџ“‰ РћСЃС‚Р°С‚РѕРє: *{total_credit_balance:,.0f}* СЃСѓРј\n"
-            msg += f"рџ“† Р•Р¶РµРјРµСЃСЏС‡РЅРѕ: *{total_monthly_payment:,.0f}* СЃСѓРј\n"
+            msg += f"💵 Кредитов: *{credit_count}* шт\n"
+            msg += f"👛 Остаток: *{total_credit_balance:,.0f}* сум\n"
+            msg += f"📊 Ежемесяцно: *{total_monthly_payment:,.0f}* сум\n"
         else:
-            msg += "вњ… Р‘Р°РЅРєРѕРІСЃРєРёС… РєСЂРµРґРёС‚РѕРІ РЅРµС‚\n"
+            msg += "✅ Банковских кредитов нет\n"
         
-        msg += "\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-        msg += "💎 _Р”РѕР»Рі: \"РђР»Рё 100Рє РґР°Р»\"_"
+        msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+        msg += "💎 _Долг: \"АЛи 100к даЛ\"_"
     
     keyboard = []
     if total_lent > 0 or total_borrowed > 0:
@@ -4265,7 +4265,7 @@ async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFA
             callback_data="show_katm_credits"
         )])
     keyboard.append([
-        InlineKeyboardButton("➕ Qarz" if lang == "uz" else "вћ• Р”РѕР»Рі", callback_data="add_debt_manual"),
+        InlineKeyboardButton("➕ Qarz" if lang == "uz" else "вћ• Долг", callback_data="add_debt_manual"),
         InlineKeyboardButton("📄 KATM" if lang == "uz" else "📄 KATM", callback_data="upload_katm_pdf")
     ])
     
@@ -4371,27 +4371,27 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     if lang == "uz":
         msg = (
-            f"📉 *BUGUNGI HISOBOT* вЂў {today_date}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📉 *BUGUNGI HISOBOT* ↳ {today_date}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
         
         # Bugungi balans (katta va aniq)
         if today_balance >= 0:
             msg += f"💰 *Bugungi balans:* +{today_balance:,} so'm\n"
         else:
-            msg += f"рџ”ґ *Bugungi balans:* {today_balance:,} so'm\n"
+            msg += f"💰 *Bugungi balans:* {today_balance:,} so'm\n"
         
         msg += (
-            f"   в”њ рџ“Ґ Kirim: +{today_income:,}\n"
-            f"   в”” рџ“¤ Chiqim: -{today_expense:,}\n\n"
+            f"   ┃ 📈 Kirim: +{today_income:,}\n"
+            f"   ┃ 📉 Chiqim: -{today_expense:,}\n\n"
         )
         
         # Bugungi xarajatlar kategoriya bo'yicha
         if today_summary.get("expense_by_category"):
-            msg += "рџ’ё *Bugungi xarajatlar:*\n"
+            msg += "💳 *Bugungi xarajatlar:*\n"
             sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:5]:  # Top 5
-                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "рџ“¦ Boshqa")
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 percentage = (amount / today_expense * 100) if today_expense > 0 else 0
                 bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
                 msg += f"   {cat_name}\n   {bar} {amount:,} ({percentage:.0f}%)\n"
@@ -4399,16 +4399,16 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         
         # Oylik xulosa (qisqacha)
         msg += (
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“… *OYLIK XULOSA* (30 kun)\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📅 *OYLIK XULOSA* (30 kun)\n"
         )
         if month_balance >= 0:
-            msg += f"   рџ’љ Balans: +{month_balance:,} so'm\n"
+            msg += f"   💸 Balans: +{month_balance:,} so'm\n"
         else:
-            msg += f"   рџ”ґ Balans: {month_balance:,} so'm\n"
+            msg += f"   💰 Balans: {month_balance:,} so'm\n"
         msg += (
-            f"   в”њ Kirim: +{month_income:,}\n"
-            f"   в”” Chiqim: -{month_expense:,}\n\n"
+            f"   ┃ Kirim: +{month_income:,}\n"
+            f"   ┃ Chiqim: -{month_expense:,}\n\n"
         )
         
         # PRO uchun HALOS USULI
@@ -4418,8 +4418,8 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             wealth_10 = free_cash * 0.10
             
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџЊџ *HALOS USULI*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "👑 *HALOS USULI*\n"
                 f"   Bo'sh pul: *{free_cash:,}* so'm\n\n"
                 f"   🏠 *Yashash*\n"
                 f"      {living_70:,.0f} so'm/oy\n"
@@ -4432,7 +4432,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 from dateutil.relativedelta import relativedelta
                 months_to_pay = math.ceil(total_debt / (loan_payment + debt_20)) if (loan_payment + debt_20) > 0 else 0
                 exit_date = datetime.now() + relativedelta(months=months_to_pay)
-                msg += f"      рџ“† Qarzdan chiqish: {exit_date.strftime('%B %Y')}\n"
+                msg += f"      📊 Qarzdan chiqish: {exit_date.strftime('%B %Y')}\n"
             
             msg += (
                 f"\n   💰 *Jamg'arma*\n"
@@ -4441,8 +4441,8 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             )
         elif not is_pro and free_cash > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ”’ *HALOS USULI*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "🌟 *HALOS USULI*\n"
                 "   _PRO obuna bilan HALOS_\n"
                 "   _usulini oching_\n"
             )
@@ -4450,52 +4450,52 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         # Shaxsiy qarzlar (qisqacha)
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
             net = debt_summary['net_balance']
-            msg += "\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\nрџ¤ќ *QARZLAR*\n"
+            msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n💳 *QARZLAR*\n"
             if net > 0:
-                msg += f"   рџ’љ Sizga qaytariladi: +{net:,} so'm\n"
+                msg += f"   💸 Sizga qaytariladi: +{net:,} so'm\n"
             elif net < 0:
-                msg += f"   рџ”ґ Siz qaytarasiz: {net:,} so'm\n"
+                msg += f"   💰 Siz qaytarasiz: {net:,} so'm\n"
             else:
                 msg += "   вљЄ Qarz yo'q\n"
     
     else:
         # Russian version
         msg = (
-            f"📉 *РћРўР§РЃРў Р—Рђ РЎР•Р“РћР”РќРЇ* вЂў {today_date}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📉 *ОТЧРЃТ Р—А СЕГОДМРЇ* ↳ {today_date}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
         
         if today_balance >= 0:
-            msg += f"💰 *Р‘Р°Р»Р°РЅСЃ Р·Р° СЃРµРіРѕРґРЅСЏ:* +{today_balance:,} СЃСѓРј\n"
+            msg += f"💰 *Баланс за сегодня:* +{today_balance:,} сум\n"
         else:
-            msg += f"рџ”ґ *Р‘Р°Р»Р°РЅСЃ Р·Р° СЃРµРіРѕРґРЅСЏ:* {today_balance:,} СЃСѓРј\n"
+            msg += f"💰 *Баланс за сегодня:* {today_balance:,} сум\n"
         
         msg += (
-            f"   в”њ рџ“Ґ РџСЂРёС…РѕРґ: +{today_income:,}\n"
-            f"   в”” рџ“¤ Р Р°СЃС…РѕРґ: -{today_expense:,}\n\n"
+            f"   ┃ 📈 Приход: +{today_income:,}\n"
+            f"   ┃ 📉 Расход: -{today_expense:,}\n\n"
         )
         
         if today_summary.get("expense_by_category"):
-            msg += "рџ’ё *Р Р°СЃС…РѕРґС‹ СЃРµРіРѕРґРЅСЏ:*\n"
+            msg += "💳 *Расходы сегодня:*\n"
             sorted_expenses = sorted(today_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:5]:
-                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "рџ“¦ РџСЂРѕС‡РµРµ")
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 percentage = (amount / today_expense * 100) if today_expense > 0 else 0
                 bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
                 msg += f"   {cat_name}\n   {bar} {amount:,} ({percentage:.0f}%)\n"
             msg += "\n"
         
         msg += (
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“… *РРўРћР“Р РњР•РЎРЇР¦Рђ* (30 РґРЅРµР№)\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📅 *ИТОГИ РњЕСРЇЦА* (30 днеЙ)\n"
         )
         if month_balance >= 0:
-            msg += f"   рџ’љ Р‘Р°Р»Р°РЅСЃ: +{month_balance:,} СЃСѓРј\n"
+            msg += f"   💸 Баланс: +{month_balance:,} сум\n"
         else:
-            msg += f"   рџ”ґ Р‘Р°Р»Р°РЅСЃ: {month_balance:,} СЃСѓРј\n"
+            msg += f"   💰 Баланс: {month_balance:,} сум\n"
         msg += (
-            f"   в”њ РџСЂРёС…РѕРґ: +{month_income:,}\n"
-            f"   в”” Р Р°СЃС…РѕРґ: -{month_expense:,}\n\n"
+            f"   ┃ Приход: +{month_income:,}\n"
+            f"   ┃ Расход: -{month_expense:,}\n\n"
         )
         
         if is_pro and free_cash > 0:
@@ -4504,77 +4504,77 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             wealth_10 = free_cash * 0.10
             
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџЊџ *РњР•РўРћР” HALOS*\n"
-                f"   РЎРІРѕР±РѕРґРЅС‹Рµ: *{free_cash:,}* СЃСѓРј\n\n"
-                f"   🏠 *Р–РёР·РЅСЊ (70%)*\n"
-                f"      {living_70:,.0f} СЃСѓРј/РјРµСЃ\n"
-                f"      {living_70/30:,.0f} СЃСѓРј/РґРµРЅСЊ\n\n"
-                f"   вљЎ *РџРѕРіР°С€РµРЅРёРµ РґРѕР»РіР° (20%)*\n"
-                f"      {debt_20:,.0f} СЃСѓРј/РјРµСЃ\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "👑 *РњЕТОД HALOS*\n"
+                f"   Свободные: *{free_cash:,}* сум\n\n"
+                f"   🏠 *Р–изнъ (70%)*\n"
+                f"      {living_70:,.0f} сум/мес\n"
+                f"      {living_70/30:,.0f} сум/денъ\n\n"
+                f"   вљЎ *Погашение доЛга (20%)*\n"
+                f"      {debt_20:,.0f} сум/мес\n"
             )
             if total_debt > 0:
                 import math
                 from dateutil.relativedelta import relativedelta
                 months_to_pay = math.ceil(total_debt / (loan_payment + debt_20)) if (loan_payment + debt_20) > 0 else 0
                 exit_date = datetime.now() + relativedelta(months=months_to_pay)
-                msg += f"      рџ“† Р’С‹С…РѕРґ РёР· РґРѕР»РіР°: {exit_date.strftime('%B %Y')}\n"
+                msg += f"      📊 Выход из доЛга: {exit_date.strftime('%B %Y')}\n"
             
             msg += (
-                f"\n   💰 *РќР°РєРѕРїР»РµРЅРёСЏ (10%)*\n"
-                f"      {wealth_10:,.0f} СЃСѓРј/РјРµСЃ\n"
-                f"      Р’ РіРѕРґ: ~{wealth_10*12:,.0f} СЃСѓРј\n"
+                f"\n   💰 *МакопЛения (10%)*\n"
+                f"      {wealth_10:,.0f} сум/мес\n"
+                f"      В год: ~{wealth_10*12:,.0f} сум\n"
             )
         elif not is_pro and free_cash > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ”’ *РњР•РўРћР” HALOS*\n"
-                "   _РЎ PRO РїРѕРґРїРёСЃРєРѕР№ РјРµС‚РѕРґ_\n"
-                "   _HALOS РґРѕСЃС‚СѓРїРµРЅ_\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "🌟 *РњЕТОД HALOS*\n"
+                "   _С PRO подпискоЙ метод_\n"
+                "   _HALOS доступен_\n"
             )
         
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
             net = debt_summary['net_balance']
-            msg += "\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\nрџ¤ќ *Р”РћР›Р“Р*\n"
+            msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n💳 *ДОР›ГИ*\n"
             if net > 0:
-                msg += f"   рџ’љ Р’РµСЂРЅСѓС‚ РІР°Рј: +{net:,} СЃСѓРј\n"
+                msg += f"   💸 Вернут вам: +{net:,} сум\n"
             elif net < 0:
-                msg += f"   рџ”ґ Р’РµСЂРЅС‘С‚Рµ РІС‹: {net:,} СЃСѓРј\n"
+                msg += f"   💰 ВернС‘те вы: {net:,} сум\n"
             else:
-                msg += "   вљЄ Р”РѕР»РіРѕРІ РЅРµС‚\n"
+                msg += "   вљЄ Долгов нет\n"
     
     # ==================== TUGMALAR (YANGI UX) ====================
     if is_pro:
         keyboard = [
             [InlineKeyboardButton(
-                "рџЊџ HALOS holati" if lang == "uz" else "рџЊџ РЎС‚Р°С‚СѓСЃ HALOS",
+                "👑 HALOS holati" if lang == "uz" else "👑 Статус HALOS",
                 callback_data="show_halos_status"
             )],
             [InlineKeyboardButton(
-                "рџ“€ Batafsil hisobot" if lang == "uz" else "рџ“€ РџРѕРґСЂРѕР±РЅС‹Р№ РѕС‚С‡С‘С‚",
+                "📝 Batafsil hisobot" if lang == "uz" else "📝 ПодробныЙ отцС‘т",
                 callback_data="detailed_report"
             )],
             [
                 InlineKeyboardButton(
-                    "рџ“… Haftalik" if lang == "uz" else "рџ“… РќРµРґРµР»СЏ",
+                    "📅 Haftalik" if lang == "uz" else "📅 Неделя",
                     callback_data="report_weekly"
                 ),
                 InlineKeyboardButton(
-                    "рџ“† Oylik" if lang == "uz" else "рџ“† РњРµСЃСЏС†",
+                    "📊 Oylik" if lang == "uz" else "📊 Рњесяф",
                     callback_data="report_monthly"
                 )
             ],
             [InlineKeyboardButton(
-                "рџ“Ґ Excel yuklab olish" if lang == "uz" else "рџ“Ґ РЎРєР°С‡Р°С‚СЊ Excel",
+                "📈 Excel yuklab olish" if lang == "uz" else "📈 Скацатъ Excel",
                 callback_data="pro_export_excel"
             )],
             [
                 InlineKeyboardButton(
-                    "рџ“‹ Qarzlar" if lang == "uz" else "рџ“‹ Р”РѕР»РіРё",
+                    "📋 Qarzlar" if lang == "uz" else "📋 Долги",
                     callback_data="ai_debt_list"
                 ),
                 InlineKeyboardButton(
-                    "вњЏпёЏ Tahrirlash" if lang == "uz" else "вњЏпёЏ РР·РјРµРЅРёС‚СЊ",
+                    "вњЏпёЏ Tahrirlash" if lang == "uz" else "вњЏпёЏ Изменитъ",
                     callback_data="recalculate"
                 )
             ]
@@ -4582,20 +4582,20 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         keyboard = [
             [InlineKeyboardButton(
-                "рџ“€ Batafsil hisobot" if lang == "uz" else "рџ“€ РџРѕРґСЂРѕР±РЅС‹Р№ РѕС‚С‡С‘С‚",
+                "📝 Batafsil hisobot" if lang == "uz" else "📝 ПодробныЙ отцС‘т",
                 callback_data="detailed_report"
             )],
             [InlineKeyboardButton(
-                "рџ’Ћ PRO ga o'tish" if lang == "uz" else "рџ’Ћ РџРµСЂРµР№С‚Рё РЅР° PRO",
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 ПереЙти на PRO",
                 callback_data="show_pricing"
             )],
             [
                 InlineKeyboardButton(
-                    "рџ“‹ Qarzlar" if lang == "uz" else "рџ“‹ Р”РѕР»РіРё",
+                    "📋 Qarzlar" if lang == "uz" else "📋 Долги",
                     callback_data="ai_debt_list"
                 ),
                 InlineKeyboardButton(
-                    "вњЏпёЏ Tahrirlash" if lang == "uz" else "вњЏпёЏ РР·РјРµРЅРёС‚СЊ",
+                    "вњЏпёЏ Tahrirlash" if lang == "uz" else "вњЏпёЏ Изменитъ",
                     callback_data="recalculate"
                 )
             ]
@@ -4717,28 +4717,28 @@ async def ask_credit_history_choice(update: Update, context: ContextTypes.DEFAUL
 
 def parse_simple_number(text: str) -> int:
     """
-    Parse a simple number from text with mln/РјР»РЅ support.
+    Parse a simple number from text with mln/млн support.
     Returns the number in base units (so'm)
     """
     import re
     
     text_lower = text.lower().strip()
     
-    # Check if just "0" or "yo'q" / "РЅРµС‚"
-    if text_lower in ["0", "yo'q", "yoq", "РЅРµС‚", "net"]:
+    # Check if just "0" or "yo'q" / "нет"
+    if text_lower in ["0", "yo'q", "yoq", "нет", "net"]:
         return 0
     
     # Remove spaces
     text_clean = re.sub(r'\s+', '', text_lower)
     
-    # Check for mln/РјР»РЅ suffix
+    # Check for mln/млн suffix
     multiplier = 1
-    if 'mln' in text_clean or 'РјР»РЅ' in text_clean or 'million' in text_clean:
+    if 'mln' in text_clean or 'млн' in text_clean or 'million' in text_clean:
         multiplier = 1_000_000
-        text_clean = re.sub(r'(mln|РјР»РЅ|million)', '', text_clean)
-    elif 'ming' in text_clean or 'С‚С‹СЃ' in text_clean:
+        text_clean = re.sub(r'(mln|млн|million)', '', text_clean)
+    elif 'ming' in text_clean or 'тыс' in text_clean:
         multiplier = 1_000
-        text_clean = re.sub(r'(ming|С‚С‹СЃ)', '', text_clean)
+        text_clean = re.sub(r'(ming|тыс)', '', text_clean)
     
     # Extract number
     match = re.search(r'[\d.,]+', text_clean)
@@ -4789,7 +4789,7 @@ async def smart_credit_input_handler(update: Update, context: ContextTypes.DEFAU
             context.user_data["awaiting_credit_input"] = False
             context.user_data["awaiting_credit_file"] = False
             context.user_data["credit_step"] = None
-            await update.message.reply_text("вњ…")
+            await update.message.reply_text("✅")
             await save_and_show_menu_results(update.message, context, telegram_id, lang)
         else:
             # Move to step 2: Ask for total debt
@@ -4895,7 +4895,7 @@ async def menu_credit_choice_callback(update: Update, context: ContextTypes.DEFA
         context.user_data["awaiting_credit_input"] = False
         context.user_data["awaiting_credit_file"] = False
         context.user_data["credit_step"] = None
-        await query.edit_message_text("вњ…")
+        await query.edit_message_text("✅")
         await save_and_show_menu_results(query.message, context, telegram_id, lang)
 
 
@@ -4914,8 +4914,8 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
     if photo:
         # Handle photo - coming soon with AI vision
         await update.message.reply_text(
-            "рџ“· Rasm qabul qilindi. Hozircha PDF/HTML formatini yuboring." if lang == "uz" 
-            else "рџ“· Р¤РѕС‚Рѕ РїРѕР»СѓС‡РµРЅРѕ. РџРѕРєР° РѕС‚РїСЂР°РІСЊС‚Рµ РІ С„РѕСЂРјР°С‚Рµ PDF/HTML."
+            "📷 Rasm qabul qilindi. Hozircha PDF/HTML formatini yuboring." if lang == "uz" 
+            else "📷 Р¤ото поЛуцено. Пока отправъте в С„ормате PDF/HTML."
         )
         return
     
@@ -4998,7 +4998,7 @@ async def menu_credit_file_handler(update: Update, context: ContextTypes.DEFAULT
             # Format loans list with details
             loans_list = ""
             for loan in result.loans:
-                loans_list += f"в”њ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
+                loans_list += f"┃ 🏦 *{loan.bank_name}*: {format_number(loan.remaining_balance)} so'm\n"
             
             # Determine warning level
             interest_warning = ""
@@ -5146,7 +5146,7 @@ async def credit_show_schedule_callback(update: Update, context: ContextTypes.DE
     
     loan_type_name = "Annuitet (bir xil to'lov)" if loan_type == "annuity" else "Differensial (kamayib boruvchi)"
     if lang == "ru":
-        loan_type_name = "РђРЅРЅСѓРёС‚РµС‚ (СЂР°РІРЅС‹Рµ РїР»Р°С‚РµР¶Рё)" if loan_type == "annuity" else "Р”РёС„С„РµСЂРµРЅС†РёСЂРѕРІР°РЅРЅС‹Р№ (СѓР±С‹РІР°СЋС‰РёР№)"
+        loan_type_name = "Аннуитет (равные пЛатежи)" if loan_type == "annuity" else "ДиС„С„еренфированныЙ (убываСЋщиЙ)"
     
     schedule_msg = get_message("credit_payment_schedule", lang).format(
         schedule=schedule_text,
@@ -5254,72 +5254,72 @@ async def save_and_show_menu_results(message, context: ContextTypes.DEFAULT_TYPE
             
             if lang == "uz":
                 msg = (
-                    f"вњ… *Ma'lumotlar saqlandi!*\n\n"
+                    f"✅ *Ma'lumotlar saqlandi!*\n\n"
                     f"📉 *Sizning yo'lingiz:*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
                     f"💰 Daromad: *{format_number(income_self)} so'm*\n"
-                    f"рџ’і Yuk: *{format_number(total_debt)} so'm*\n"
-                    f"рџ“… To'lov: *{format_number(loan_payment)} so'm/oy*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"рџ—“ *Taxminiy HALOS sanangiz:* {exit_str}\n"
-                    f"рџ“† *Qolgan muddat:* {months} oy\n\n"
+                    f"💵 Yuk: *{format_number(total_debt)} so'm*\n"
+                    f"📅 To'lov: *{format_number(loan_payment)} so'm/oy*\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"📊 *Taxminiy HALOS sanangiz:* {exit_str}\n"
+                    f"📊 *Qolgan muddat:* {months} oy\n\n"
                 )
                 
                 if months_saved > 0:
                     msg += (
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                        f"рџ’Ћ *PRO YECHIM:*\n"
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                        f"💎 *PRO YECHIM:*\n"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                         f"📉 *Aqlli taqsimlash:*\n"
-                        f"в”њ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
-                        f"в”њ вљЎ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
-                        f"в”” 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
-                        f"рџ“… *Natija:*\n"
-                        f"в”њ вЏ± *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
-                        f"в”” 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
+                        f"┃ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
+                        f"┃ вљЎ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
+                        f"┃ 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
+                        f"📅 *Natija:*\n"
+                        f"┃ вЏ± *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
+                        f"┃ 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
                         f"🋃 *PRO imkoniyatlari:*\n"
-                        f"в”њ рџ“€ Haftalik/oylik statistika\n"
-                        f"в”њ 📉 Excel hisobotlar\n"
-                        f"в”њ 🔔 Eslatmalar va maslahatlar\n"
-                        f"в”” рџЏ† Shaxsiy maqsadlar\n\n"
-                        f"рџ”’ _To'liq foydalanish uchun PRO oling_"
+                        f"┃ 📝 Haftalik/oylik statistika\n"
+                        f"┃ 📉 Excel hisobotlar\n"
+                        f"┃ 🔔 Eslatmalar va maslahatlar\n"
+                        f"┃ 🎯 Shaxsiy maqsadlar\n\n"
+                        f"🌟 _To'liq foydalanish uchun PRO oling_"
                     )
                 else:
-                    msg += f"рџ’Ћ PRO bilan tezroq yengillashish mumkin!"
+                    msg += f"💎 PRO bilan tezroq yengillashish mumkin!"
             else:
                 msg = (
-                    f"вњ… *Р”Р°РЅРЅС‹Рµ СЃРѕС…СЂР°РЅРµРЅС‹!*\n\n"
-                    f"📉 *Р’Р°С€ РїСѓС‚СЊ:*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                    f"💰 Р”РѕС…РѕРґ: *{format_number(income_self)} СЃСѓРј*\n"
-                    f"рџ’і РќР°РіСЂСѓР·РєР°: *{format_number(total_debt)} СЃСѓРј*\n"
-                    f"рџ“… РџР»Р°С‚С‘Р¶: *{format_number(loan_payment)} СЃСѓРј/РјРµСЃ*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"рџ—“ *РџСЂРёРјРµСЂРЅР°СЏ РґР°С‚Р° HALOS:* {exit_str}\n"
-                    f"рџ“† *РћСЃС‚Р°Р»РѕСЃСЊ:* {months} РјРµСЃ\n\n"
+                    f"✅ *Данные сохранены!*\n\n"
+                    f"📉 *Ваш путъ:*\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                    f"💰 Доход: *{format_number(income_self)} сум*\n"
+                    f"💵 Магрузка: *{format_number(total_debt)} сум*\n"
+                    f"📅 ПЛатС‘ж: *{format_number(loan_payment)} сум/мес*\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"📊 *Примерная дата HALOS:* {exit_str}\n"
+                    f"📊 *ОстаЛосъ:* {months} мес\n\n"
                 )
                 
                 if months_saved > 0:
                     msg += (
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                        f"рџ’Ћ *PRO Р Р•РЁР•РќРР•:*\n"
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                        f"📉 *РЈРјРЅРѕРµ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ:*\n"
-                        f"в”њ 🏦 Р”Р»СЏ Р±РѕРіР°С‚СЃС‚РІР°: *{format_number(int(savings_monthly))} СЃСѓРј*\n"
-                        f"в”њ вљЎ РџР»Р°С‚С‘Р¶ РїРѕ РєСЂРµРґРёС‚Сѓ: *{format_number(int(extra_payment))} СЃСѓРј*\n"
-                        f"в”” 🏠 Р–РёР·РЅСЊ: *{format_number(int(free_cash * 0.7))} СЃСѓРј*\n\n"
-                        f"рџ“… *Р РµР·СѓР»СЊС‚Р°С‚:*\n"
-                        f"в”њ вЏ± РќР° *{months_saved} РјРµСЃ* СЂР°РЅСЊС€Рµ вЂ” *{pro_exit_str}*\n"
-                        f"в”” 💰 *{format_number(int(savings_at_exit))} СЃСѓРј* Р±РѕРіР°С‚СЃС‚РІР°\n\n"
-                        f"🋃 *Р’РѕР·РјРѕР¶РЅРѕСЃС‚Рё PRO:*\n"
-                        f"в”њ рџ“€ Р•Р¶РµРЅРµРґРµР»СЊРЅР°СЏ/РјРµСЃСЏС‡РЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°\n"
-                        f"в”њ 📉 Excel РѕС‚С‡С‘С‚С‹\n"
-                        f"в”њ 🔔 РќР°РїРѕРјРёРЅР°РЅРёСЏ Рё СЃРѕРІРµС‚С‹\n"
-                        f"в”” рџЏ† Р›РёС‡РЅС‹Рµ С†РµР»Рё\n\n"
-                        f"рџ”’ _РџРѕР»СѓС‡РёС‚Рµ PRO РґР»СЏ РїРѕР»РЅРѕРіРѕ РґРѕСЃС‚СѓРїР°_"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                        f"💎 *PRO РЕЁЕМИЕ:*\n"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                        f"📉 *РЈмное распредеЛение:*\n"
+                        f"┃ 🏦 ДЛя богатства: *{format_number(int(savings_monthly))} сум*\n"
+                        f"┃ вљЎ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
+                        f"┃ 🏠 Р–изнъ: *{format_number(int(free_cash * 0.7))} сум*\n\n"
+                        f"📅 *РезуЛътат:*\n"
+                        f"┃ вЏ± Ма *{months_saved} мес* ранъше вЂ” *{pro_exit_str}*\n"
+                        f"┃ 💰 *{format_number(int(savings_at_exit))} сум* богатства\n\n"
+                        f"🋃 *Возможности PRO:*\n"
+                        f"┃ 📝 ЕженедеЛъная/месяцная статистика\n"
+                        f"┃ 📉 Excel отцС‘ты\n"
+                        f"┃ 🔔 Мапоминания и советы\n"
+                        f"┃ 🎯 Р›ицные феЛи\n\n"
+                        f"🌟 _ПоЛуците PRO дЛя поЛного доступа_"
                     )
                 else:
-                    msg += f"рџ’Ћ РЎ PRO РјРѕР¶РЅРѕ РѕСЃРІРѕР±РѕРґРёС‚СЊСЃСЏ Р±С‹СЃС‚СЂРµРµ!"
+                    msg += f"💎 С PRO можно освободитъся быстрее!"
         else:
             msg = get_message("debt_no_data", lang) if lang == "uz" else get_message("debt_no_data", lang)
         
@@ -5459,72 +5459,72 @@ async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_
             
             if lang == "uz":
                 msg = (
-                    f"вњ… *Ma'lumotlar saqlandi!*\n\n"
+                    f"✅ *Ma'lumotlar saqlandi!*\n\n"
                     f"📉 *Sizning yo'lingiz:*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
                     f"💰 Daromad: *{format_number(income_self)} so'm*\n"
-                    f"рџ’і Yuk: *{format_number(debt)} so'm*\n"
-                    f"рџ“… To'lov: *{format_number(loan_payment)} so'm/oy*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"рџ—“ *Taxminiy HALOS sanangiz:* {exit_str}\n"
-                    f"рџ“† *Qolgan muddat:* {months} oy\n\n"
+                    f"💵 Yuk: *{format_number(debt)} so'm*\n"
+                    f"📅 To'lov: *{format_number(loan_payment)} so'm/oy*\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"📊 *Taxminiy HALOS sanangiz:* {exit_str}\n"
+                    f"📊 *Qolgan muddat:* {months} oy\n\n"
                 )
                 
                 if months_saved > 0:
                     msg += (
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                        f"рџ’Ћ *PRO YECHIM:*\n"
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                        f"💎 *PRO YECHIM:*\n"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                         f"📉 *Aqlli taqsimlash:*\n"
-                        f"в”њ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
-                        f"в”њ вљЎ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
-                        f"в”” 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
-                        f"рџ“… *Natija:*\n"
-                        f"в”њ вЏ± *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
-                        f"в”” 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
+                        f"┃ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
+                        f"┃ вљЎ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
+                        f"┃ 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
+                        f"📅 *Natija:*\n"
+                        f"┃ вЏ± *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
+                        f"┃ 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
                         f"🋃 *PRO imkoniyatlari:*\n"
-                        f"в”њ рџ“€ Haftalik/oylik statistika\n"
-                        f"в”њ 📉 Excel hisobotlar\n"
-                        f"в”њ 🔔 Eslatmalar va maslahatlar\n"
-                        f"в”” рџЏ† Shaxsiy maqsadlar\n\n"
-                        f"рџ”’ _To'liq foydalanish uchun PRO oling_"
+                        f"┃ 📝 Haftalik/oylik statistika\n"
+                        f"┃ 📉 Excel hisobotlar\n"
+                        f"┃ 🔔 Eslatmalar va maslahatlar\n"
+                        f"┃ 🎯 Shaxsiy maqsadlar\n\n"
+                        f"🌟 _To'liq foydalanish uchun PRO oling_"
                     )
                 else:
-                    msg += f"рџ’Ћ PRO bilan tezroq yengillashish mumkin!"
+                    msg += f"💎 PRO bilan tezroq yengillashish mumkin!"
             else:
                 msg = (
-                    f"вњ… *Р”Р°РЅРЅС‹Рµ СЃРѕС…СЂР°РЅРµРЅС‹!*\n\n"
-                    f"📉 *Р’Р°С€ РїСѓС‚СЊ:*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                    f"💰 Р”РѕС…РѕРґ: *{format_number(income_self)} СЃСѓРј*\n"
-                    f"рџ’і РќР°РіСЂСѓР·РєР°: *{format_number(debt)} СЃСѓРј*\n"
-                    f"рџ“… РџР»Р°С‚С‘Р¶: *{format_number(loan_payment)} СЃСѓРј/РјРµСЃ*\n"
-                    f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"рџ—“ *РџСЂРёРјРµСЂРЅР°СЏ РґР°С‚Р° HALOS:* {exit_str}\n"
-                    f"рџ“† *РћСЃС‚Р°Р»РѕСЃСЊ:* {months} РјРµСЃ\n\n"
+                    f"✅ *Данные сохранены!*\n\n"
+                    f"📉 *Ваш путъ:*\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                    f"💰 Доход: *{format_number(income_self)} сум*\n"
+                    f"💵 Магрузка: *{format_number(debt)} сум*\n"
+                    f"📅 ПЛатС‘ж: *{format_number(loan_payment)} сум/мес*\n"
+                    f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"📊 *Примерная дата HALOS:* {exit_str}\n"
+                    f"📊 *ОстаЛосъ:* {months} мес\n\n"
                 )
                 
                 if months_saved > 0:
                     msg += (
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                        f"рџ’Ћ *PRO Р Р•РЁР•РќРР•:*\n"
-                        f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                        f"📉 *РЈРјРЅРѕРµ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ:*\n"
-                        f"в”њ 🏦 Р”Р»СЏ Р±РѕРіР°С‚СЃС‚РІР°: *{format_number(int(savings_monthly))} СЃСѓРј*\n"
-                        f"в”њ вљЎ РџР»Р°С‚С‘Р¶ РїРѕ РєСЂРµРґРёС‚Сѓ: *{format_number(int(extra_payment))} СЃСѓРј*\n"
-                        f"в”” 🏠 Р–РёР·РЅСЊ: *{format_number(int(free_cash * 0.7))} СЃСѓРј*\n\n"
-                        f"рџ“… *Р РµР·СѓР»СЊС‚Р°С‚:*\n"
-                        f"в”њ вЏ± РќР° *{months_saved} РјРµСЃ* СЂР°РЅСЊС€Рµ вЂ” *{pro_exit_str}*\n"
-                        f"в”” 💰 *{format_number(int(savings_at_exit))} СЃСѓРј* Р±РѕРіР°С‚СЃС‚РІР°\n\n"
-                        f"🋃 *Р’РѕР·РјРѕР¶РЅРѕСЃС‚Рё PRO:*\n"
-                        f"в”њ рџ“€ Р•Р¶РµРЅРµРґРµР»СЊРЅР°СЏ/РјРµСЃСЏС‡РЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°\n"
-                        f"в”њ 📉 Excel РѕС‚С‡С‘С‚С‹\n"
-                        f"в”њ 🔔 РќР°РїРѕРјРёРЅР°РЅРёСЏ Рё СЃРѕРІРµС‚С‹\n"
-                        f"в”” рџЏ† Р›РёС‡РЅС‹Рµ С†РµР»Рё\n\n"
-                        f"рџ”’ _РџРѕР»СѓС‡РёС‚Рµ PRO РґР»СЏ РїРѕР»РЅРѕРіРѕ РґРѕСЃС‚СѓРїР°_"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                        f"💎 *PRO РЕЁЕМИЕ:*\n"
+                        f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                        f"📉 *РЈмное распредеЛение:*\n"
+                        f"┃ 🏦 ДЛя богатства: *{format_number(int(savings_monthly))} сум*\n"
+                        f"┃ вљЎ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
+                        f"┃ 🏠 Р–изнъ: *{format_number(int(free_cash * 0.7))} сум*\n\n"
+                        f"📅 *РезуЛътат:*\n"
+                        f"┃ вЏ± Ма *{months_saved} мес* ранъше вЂ” *{pro_exit_str}*\n"
+                        f"┃ 💰 *{format_number(int(savings_at_exit))} сум* богатства\n\n"
+                        f"🋃 *Возможности PRO:*\n"
+                        f"┃ 📝 ЕженедеЛъная/месяцная статистика\n"
+                        f"┃ 📉 Excel отцС‘ты\n"
+                        f"┃ 🔔 Мапоминания и советы\n"
+                        f"┃ 🎯 Р›ицные феЛи\n\n"
+                        f"🌟 _ПоЛуците PRO дЛя поЛного доступа_"
                     )
                 else:
-                    msg += f"рџ’Ћ РЎ PRO РјРѕР¶РЅРѕ РѕСЃРІРѕР±РѕРґРёС‚СЊСЃСЏ Р±С‹СЃС‚СЂРµРµ!"
+                    msg += f"💎 С PRO можно освободитъся быстрее!"
         else:
             msg = get_message("debt_no_data", lang) if lang == "uz" else get_message("debt_no_data", lang)
         
@@ -5561,7 +5561,7 @@ async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle рџ’Ћ PRO button - show PRO features menu for PRO users, pricing for others"""
+    """Handle 💎 PRO button - show PRO features menu for PRO users, pricing for others"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -5653,55 +5653,55 @@ async def menu_expense_input_handler(update: Update, context: ContextTypes.DEFAU
     if lang == "uz":
         msg = (
             "вњЌпёЏ *MATN ORQALI XARAJAT KIRITISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "рџ¤– *AI yordamchi matndan avtomatik aniqlaydi:*\n"
-            "вЂў 💰 Summalarni\n"
-            "вЂў рџ“Ѓ Kategoriyalarni\n"
-            "вЂў рџ“ќ Tavsiflarni\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“ќ *Misol xabarlar:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "вЂў `50 ming ovqatga`\n"
-            "вЂў `100000 taksiga`\n"
-            "вЂў `bugun 30 mingga non oldim, 50 mingga benzin quydum`\n"
-            "вЂў `2 mln kredit to'ladim`\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџЋЇ *Qoidalar:*\n"
-            "вЂў Bir xabarda bir nechta xarajat yozishingiz mumkin\n"
-            "вЂў AI avtomatik ajratib oladi\n"
-            "вЂў Limit yo'q - xohlagancha yozing!\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџЋ™ *Ovozli xabar* ham yuborishingiz mumkin (PRO)\n\n"
-            "рџ‘‡ *Xarajatlaringizni yozing:*"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "🤖 *AI yordamchi matndan avtomatik aniqlaydi:*\n"
+            "↳ 💰 Summalarni\n"
+            "↳ 📃 Kategoriyalarni\n"
+            "↳ 💡 Tavsiflarni\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "💡 *Misol xabarlar:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "↳ `50 ming ovqatga`\n"
+            "↳ `100000 taksiga`\n"
+            "↳ `bugun 30 mingga non oldim, 50 mingga benzin quydum`\n"
+            "↳ `2 mln kredit to'ladim`\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📖 *Qoidalar:*\n"
+            "↳ Bir xabarda bir nechta xarajat yozishingiz mumkin\n"
+            "↳ AI avtomatik ajratib oladi\n"
+            "↳ Limit yo'q - xohlagancha yozing!\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "🎙 *Ovozli xabar* ham yuborishingiz mumkin (PRO)\n\n"
+            "🙋 *Xarajatlaringizni yozing:*"
         )
     else:
         msg = (
-            "вњЌпёЏ *Р’Р’РћР” Р РђРЎРҐРћР”РћР’ РўР•РљРЎРўРћРњ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "рџ¤– *AI РїРѕРјРѕС‰РЅРёРє Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕРїСЂРµРґРµР»РёС‚:*\n"
-            "вЂў 💰 РЎСѓРјРјС‹\n"
-            "вЂў рџ“Ѓ РљР°С‚РµРіРѕСЂРёРё\n"
-            "вЂў рџ“ќ РћРїРёСЃР°РЅРёСЏ\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“ќ *РџСЂРёРјРµСЂС‹ СЃРѕРѕР±С‰РµРЅРёР№:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "вЂў `50 С‚С‹СЃСЏС‡ РЅР° РµРґСѓ`\n"
-            "вЂў `100000 РЅР° С‚Р°РєСЃРё`\n"
-            "вЂў `СЃРµРіРѕРґРЅСЏ 30 С‚С‹СЃСЏС‡ РЅР° С…Р»РµР±, 50 С‚С‹СЃСЏС‡ РЅР° Р±РµРЅР·РёРЅ`\n"
-            "вЂў `2 РјР»РЅ РѕРїР»Р°С‚Р° РєСЂРµРґРёС‚Р°`\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџЋЇ *РџСЂР°РІРёР»Р°:*\n"
-            "вЂў РњРѕР¶РЅРѕ РїРёСЃР°С‚СЊ РЅРµСЃРєРѕР»СЊРєРѕ СЂР°СЃС…РѕРґРѕРІ РІ РѕРґРЅРѕРј СЃРѕРѕР±С‰РµРЅРёРё\n"
-            "вЂў AI Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё СЂР°Р·РґРµР»РёС‚\n"
-            "вЂў Р›РёРјРёС‚Р° РЅРµС‚ - РїРёС€РёС‚Рµ СЃРєРѕР»СЊРєРѕ С…РѕС‚РёС‚Рµ!\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџЋ™ *Р“РѕР»РѕСЃРѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ* С‚РѕР¶Рµ СЂР°Р±РѕС‚Р°РµС‚ (PRO)\n\n"
-            "рџ‘‡ *РќР°РїРёС€РёС‚Рµ РІР°С€Рё СЂР°СЃС…РѕРґС‹:*"
+            "вњЌпёЏ *ВВОД РАСРҐОДОВ ТЕКСТОРњ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "🤖 *AI помощник автоматицески опредеЛит:*\n"
+            "↳ 💰 Суммы\n"
+            "↳ 📃 Категории\n"
+            "↳ 💡 Описания\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "💡 *Примеры сообщениЙ:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "↳ `50 тысяц на еду`\n"
+            "↳ `100000 на такси`\n"
+            "↳ `сегодня 30 тысяц на хЛеб, 50 тысяц на бензин`\n"
+            "↳ `2 млн опЛата кредита`\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📖 *ПравиЛа:*\n"
+            "↳ Рњожно писатъ нескоЛъко расходов в одном сообщении\n"
+            "↳ AI автоматицески раздеЛит\n"
+            "↳ Р›имита нет - пишите скоЛъко хотите!\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "🎙 *ГоЛосовое сообщение* тоже работает (PRO)\n\n"
+            "🙋 *Мапишите ваши расходы:*"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "вќЊ Bekor qilish" if lang == "uz" else "вќЊ РћС‚РјРµРЅР°",
+            "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
             callback_data="cancel_expense_mode"
         )]
     ]
@@ -5725,7 +5725,7 @@ async def cancel_expense_mode_callback(update: Update, context: ContextTypes.DEF
     context.user_data.pop("pending_transactions", None)
     
     await query.edit_message_text(
-        "вњ… Bekor qilindi" if lang == "uz" else "вњ… РћС‚РјРµРЅРµРЅРѕ",
+        "✅ Bekor qilindi" if lang == "uz" else "✅ Отменено",
         parse_mode="Markdown"
     )
 
@@ -5782,9 +5782,9 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Show processing message
     if lang == "uz":
-        processing_text = "рџ¤– *AI tahlil qilmoqda...*"
+        processing_text = "🤖 *AI tahlil qilmoqda...*"
     else:
-        processing_text = "рџ¤– *AI Р°РЅР°Р»РёР·РёСЂСѓРµС‚...*"
+        processing_text = "🤖 *AI анаЛизирует...*"
     
     processing_msg = await update.message.reply_text(
         processing_text,
@@ -5810,89 +5810,89 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         
         # Format preview message
         if lang == "uz":
-            msg = "рџ¤– *AI TAHLIL NATIJASI*\n"
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            msg = "🤖 *AI TAHLIL NATIJASI*\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             total_expense = 0
             total_income = 0
             
             for i, tx in enumerate(transactions, 1):
                 if tx["type"] == "income":
-                    emoji = "рџ“Ґ"
+                    emoji = "📈"
                     type_name = "Daromad"
                     total_income += tx["amount"]
                 else:
-                    emoji = "рџ“¤"
+                    emoji = "📉"
                     type_name = "Xarajat"
                     total_expense += tx["amount"]
                 
                 msg += f"{emoji} *#{i} {type_name}*\n"
-                msg += f"в”њ Summa: *{format_number(tx['amount'])} so'm*\n"
-                msg += f"в”њ Kategoriya: {tx['category_name']}\n"
+                msg += f"┃ Summa: *{format_number(tx['amount'])} so'm*\n"
+                msg += f"┃ Kategoriya: {tx['category_name']}\n"
                 if tx.get('description'):
-                    msg += f"в”” Tavsif: _{tx['description'][:30]}_\n"
+                    msg += f"┃ Tavsif: _{tx['description'][:30]}_\n"
                 msg += "\n"
             
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             if total_income > 0:
-                msg += f"рџ“Ґ Jami daromad: *{format_number(total_income)} so'm*\n"
+                msg += f"📈 Jami daromad: *{format_number(total_income)} so'm*\n"
             if total_expense > 0:
-                msg += f"рџ“¤ Jami xarajat: *{format_number(total_expense)} so'm*\n"
+                msg += f"📉 Jami xarajat: *{format_number(total_expense)} so'm*\n"
             msg += "\n"
-            msg += "рџ‘‡ *To'g'rimi?*"
+            msg += "🙋 *To'g'rimi?*"
         else:
-            msg = "рџ¤– *Р Р•Р—РЈР›Р¬РўРђРў AI РђРќРђР›РР—Рђ*\n"
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            msg = "🤖 *РЕР—РЈР›Р¬ТАТ AI АМАР›ИР—А*\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             total_expense = 0
             total_income = 0
             
             for i, tx in enumerate(transactions, 1):
                 if tx["type"] == "income":
-                    emoji = "рџ“Ґ"
-                    type_name = "Р”РѕС…РѕРґ"
+                    emoji = "📈"
+                    type_name = "Доход"
                     total_income += tx["amount"]
                 else:
-                    emoji = "рџ“¤"
-                    type_name = "Р Р°СЃС…РѕРґ"
+                    emoji = "📉"
+                    type_name = "Расход"
                     total_expense += tx["amount"]
                 
                 msg += f"{emoji} *#{i} {type_name}*\n"
-                msg += f"в”њ РЎСѓРјРјР°: *{format_number(tx['amount'])} СЃСѓРј*\n"
-                msg += f"в”њ РљР°С‚РµРіРѕСЂРёСЏ: {tx['category_name']}\n"
+                msg += f"┃ Сумма: *{format_number(tx['amount'])} сум*\n"
+                msg += f"┃ Категория: {tx['category_name']}\n"
                 if tx.get('description'):
-                    msg += f"в”” РћРїРёСЃР°РЅРёРµ: _{tx['description'][:30]}_\n"
+                    msg += f"┃ Описание: _{tx['description'][:30]}_\n"
                 msg += "\n"
             
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             if total_income > 0:
-                msg += f"рџ“Ґ Р’СЃРµРіРѕ РґРѕС…РѕРґ: *{format_number(total_income)} СЃСѓРј*\n"
+                msg += f"📈 Всего доход: *{format_number(total_income)} сум*\n"
             if total_expense > 0:
-                msg += f"рџ“¤ Р’СЃРµРіРѕ СЂР°СЃС…РѕРґ: *{format_number(total_expense)} СЃСѓРј*\n"
+                msg += f"📉 Всего расход: *{format_number(total_expense)} сум*\n"
             msg += "\n"
-            msg += "рџ‘‡ *Р’РµСЂРЅРѕ?*"
+            msg += "🙋 *Верно?*"
         
         # Create confirmation keyboard
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "вњ… Ha, saqlash" if lang == "uz" else "вњ… Р”Р°, СЃРѕС…СЂР°РЅРёС‚СЊ",
+                    "✅ Ha, saqlash" if lang == "uz" else "✅ Да, сохранитъ",
                     callback_data="confirm_transaction_save"
                 ),
                 InlineKeyboardButton(
-                    "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ РР·РјРµРЅРёС‚СЊ",
+                    "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ",
                     callback_data="edit_pending_transaction"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    "рџ”„ Turni almashtirish" if lang == "uz" else "рџ”„ РџРѕРјРµРЅСЏС‚СЊ С‚РёРї",
+                    "🕐 Turni almashtirish" if lang == "uz" else "🕐 Поменятъ тип",
                     callback_data="swap_pending_type"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    "вќЊ Bekor qilish" if lang == "uz" else "вќЊ РћС‚РјРµРЅР°",
+                    "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
                     callback_data="cancel_pending_transaction"
                 )
             ]
@@ -5923,7 +5923,7 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
     transactions = context.user_data.get("pending_transactions")
     if not transactions:
         await query.edit_message_text(
-            "вќЊ Ma'lumot topilmadi" if lang == "uz" else "вќЊ Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹"
+            "вќЊ Ma'lumot topilmadi" if lang == "uz" else "вќЊ Данные не наЙдены"
         )
         return
     
@@ -5963,57 +5963,57 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
     
     # Build beautiful success message
     if lang == "uz":
-        msg = "вњ… *SAQLANDI!*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "✅ *SAQLANDI!*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         for tx in transactions:
-            emoji = "💰" if tx["type"] == "income" else "рџ’ё"
+            emoji = "💰" if tx["type"] == "income" else "💳"
             msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* so'm\n"
         
         msg += "\n"
         msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
         msg += "в”‚    📉 *BUGUNGI HISOBOT*    в”‚\n"
-        msg += "в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+        msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
         
         msg += f"💰 Daromad: *{format_number(today_income)}* so'm\n"
-        msg += f"рџ’ё Xarajat: *{format_number(today_expense)}* so'm\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+        msg += f"💳 Xarajat: *{format_number(today_expense)}* so'm\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         
         if today_balance >= 0:
-            msg += f"рџ“€ Balans: *+{format_number(today_balance)}* so'm вњ…"
+            msg += f"📝 Balans: *+{format_number(today_balance)}* so'm ✅"
         else:
-            msg += f"рџ“‰ Balans: *{format_number(today_balance)}* so'm вљ пёЏ"
+            msg += f"👛 Balans: *{format_number(today_balance)}* so'm вљ пёЏ"
         
     else:
-        msg = "вњ… *РЎРћРҐР РђРќР•РќРћ!*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "✅ *СОРҐРАМЕМО!*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         for tx in transactions:
-            emoji = "💰" if tx["type"] == "income" else "рџ’ё"
-            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* СЃСѓРј\n"
+            emoji = "💰" if tx["type"] == "income" else "💳"
+            msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* сум\n"
         
         msg += "\n"
         msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
-        msg += "в”‚    📉 *РћРўР§РЃРў Р—Рђ Р”Р•РќР¬*    в”‚\n"
-        msg += "в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+        msg += "в”‚    📉 *ОТЧРЃТ Р—А ДЕМР¬*    в”‚\n"
+        msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
         
-        msg += f"💰 Р”РѕС…РѕРґ: *{format_number(today_income)}* СЃСѓРј\n"
-        msg += f"рџ’ё Р Р°СЃС…РѕРґ: *{format_number(today_expense)}* СЃСѓРј\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+        msg += f"💰 Доход: *{format_number(today_income)}* сум\n"
+        msg += f"💳 Расход: *{format_number(today_expense)}* сум\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         
         if today_balance >= 0:
-            msg += f"рџ“€ Р‘Р°Р»Р°РЅСЃ: *+{format_number(today_balance)}* СЃСѓРј вњ…"
+            msg += f"📝 Баланс: *+{format_number(today_balance)}* сум ✅"
         else:
-            msg += f"рџ“‰ Р‘Р°Р»Р°РЅСЃ: *{format_number(today_balance)}* СЃСѓРј вљ пёЏ"
+            msg += f"👛 Баланс: *{format_number(today_balance)}* сум вљ пёЏ"
     
     # Add quick action buttons
     keyboard = [[
         InlineKeyboardButton(
-            "📉 Batafsil" if lang == "uz" else "📉 РџРѕРґСЂРѕР±РЅРµРµ",
+            "📉 Batafsil" if lang == "uz" else "📉 Подробнее",
             callback_data="show_reports"
         ),
         InlineKeyboardButton(
-            "вћ• Yana kiritish" if lang == "uz" else "вћ• Р•С‰С‘ Р·Р°РїРёСЃСЊ",
+            "вћ• Yana kiritish" if lang == "uz" else "вћ• ЕщС‘ записъ",
             callback_data="add_transaction_menu"
         )
     ]]
@@ -6037,7 +6037,7 @@ async def cancel_pending_transaction_callback(update: Update, context: ContextTy
     context.user_data.pop("pending_original_text", None)
     
     await query.edit_message_text(
-        "вќЊ Bekor qilindi" if lang == "uz" else "вќЊ РћС‚РјРµРЅРµРЅРѕ"
+        "вќЊ Bekor qilindi" if lang == "uz" else "вќЊ Отменено"
     )
 
 
@@ -6061,84 +6061,84 @@ async def swap_pending_type_callback(update: Update, context: ContextTypes.DEFAU
             # Change category
             if tx["category"] in INCOME_CATEGORIES.get("uz", {}):
                 tx["category"] = "boshqa"
-            tx["category_name"] = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(tx["category"], "рџ“¦ Boshqa")
+            tx["category_name"] = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(tx["category"], "📆 Boshqa")
         else:
             tx["type"] = "income"
             # Change category
             if tx["category"] in EXPENSE_CATEGORIES.get("uz", {}):
                 tx["category"] = "boshqa"
-            tx["category_name"] = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(tx["category"], "рџ“¦ Boshqa")
+            tx["category_name"] = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(tx["category"], "📆 Boshqa")
     
     context.user_data["pending_transactions"] = transactions
     
     # Rebuild preview message
     if lang == "uz":
-        msg = "рџ”„ *TUR ALMASHTIRILDI*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "🕐 *TUR ALMASHTIRILDI*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_expense = 0
         total_income = 0
         
         for i, tx in enumerate(transactions, 1):
             if tx["type"] == "income":
-                emoji = "рџ“Ґ"
+                emoji = "📈"
                 type_name = "Daromad"
                 total_income += tx["amount"]
             else:
-                emoji = "рџ“¤"
+                emoji = "📉"
                 type_name = "Xarajat"
                 total_expense += tx["amount"]
             
             msg += f"{emoji} *#{i} {type_name}*\n"
-            msg += f"в”њ Summa: *{format_number(tx['amount'])} so'm*\n"
-            msg += f"в”” Kategoriya: {tx['category_name']}\n\n"
+            msg += f"┃ Summa: *{format_number(tx['amount'])} so'm*\n"
+            msg += f"┃ Kategoriya: {tx['category_name']}\n\n"
         
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-        msg += "рџ‘‡ *To'g'rimi?*"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+        msg += "🙋 *To'g'rimi?*"
     else:
-        msg = "рџ”„ *РўРРџ РР—РњР•РќРЃРќ*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "🕐 *ТИП ИР—РњЕМРЃМ*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_expense = 0
         total_income = 0
         
         for i, tx in enumerate(transactions, 1):
             if tx["type"] == "income":
-                emoji = "рџ“Ґ"
-                type_name = "Р”РѕС…РѕРґ"
+                emoji = "📈"
+                type_name = "Доход"
                 total_income += tx["amount"]
             else:
-                emoji = "рџ“¤"
-                type_name = "Р Р°СЃС…РѕРґ"
+                emoji = "📉"
+                type_name = "Расход"
                 total_expense += tx["amount"]
             
             msg += f"{emoji} *#{i} {type_name}*\n"
-            msg += f"в”њ РЎСѓРјРјР°: *{format_number(tx['amount'])} СЃСѓРј*\n"
-            msg += f"в”” РљР°С‚РµРіРѕСЂРёСЏ: {tx['category_name']}\n\n"
+            msg += f"┃ Сумма: *{format_number(tx['amount'])} сум*\n"
+            msg += f"┃ Категория: {tx['category_name']}\n\n"
         
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-        msg += "рџ‘‡ *Р’РµСЂРЅРѕ?*"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+        msg += "🙋 *Верно?*"
     
     keyboard = [
         [
             InlineKeyboardButton(
-                "вњ… Ha, saqlash" if lang == "uz" else "вњ… Р”Р°, СЃРѕС…СЂР°РЅРёС‚СЊ",
+                "✅ Ha, saqlash" if lang == "uz" else "✅ Да, сохранитъ",
                 callback_data="confirm_transaction_save"
             ),
             InlineKeyboardButton(
-                "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ РР·РјРµРЅРёС‚СЊ",
+                "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ",
                 callback_data="edit_pending_transaction"
             )
         ],
         [
             InlineKeyboardButton(
-                "рџ”„ Turni almashtirish" if lang == "uz" else "рџ”„ РџРѕРјРµРЅСЏС‚СЊ С‚РёРї",
+                "🕐 Turni almashtirish" if lang == "uz" else "🕐 Поменятъ тип",
                 callback_data="swap_pending_type"
             )
         ],
         [
             InlineKeyboardButton(
-                "вќЊ Bekor qilish" if lang == "uz" else "вќЊ РћС‚РјРµРЅР°",
+                "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
                 callback_data="cancel_pending_transaction"
             )
         ]
@@ -6165,23 +6165,23 @@ async def edit_pending_transaction_callback(update: Update, context: ContextType
     # Show edit options
     if lang == "uz":
         msg = "вњЏпёЏ *TAHRIRLASH*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         msg += "Qaysi tranzaksiyani tahrirlash kerak?\n\n"
     else:
-        msg = "вњЏпёЏ *Р Р•Р”РђРљРўРР РћР’РђРќРР•*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-        msg += "РљР°РєСѓСЋ С‚СЂР°РЅР·Р°РєС†РёСЋ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ?\n\n"
+        msg = "вњЏпёЏ *РЕДАКТИРОВАМИЕ*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        msg += "КакуСЋ транзакфиСЋ редактироватъ?\n\n"
     
     keyboard = []
     
     for i, tx in enumerate(transactions):
-        emoji = "рџ“Ґ" if tx["type"] == "income" else "рџ“¤"
+        emoji = "📈" if tx["type"] == "income" else "📉"
         btn_text = f"{emoji} #{i+1}: {format_number(tx['amount'])} - {tx['category_name']}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"edit_tx_{i}")])
     
     keyboard.append([
         InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_pending_preview"
         )
     ])
@@ -6215,20 +6215,20 @@ async def edit_single_tx_callback(update: Update, context: ContextTypes.DEFAULT_
     # Show category selection
     if lang == "uz":
         msg = f"вњЏпёЏ *KATEGORIYA TANLANG*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         msg += f"💰 Summa: *{format_number(tx['amount'])} so'm*\n\n"
     else:
-        msg = f"вњЏпёЏ *Р’Р«Р‘Р•Р РРўР• РљРђРўР•Р“РћР РР®*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-        msg += f"💰 РЎСѓРјРјР°: *{format_number(tx['amount'])} СЃСѓРј*\n\n"
+        msg = f"вњЏпёЏ *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        msg += f"💰 Сумма: *{format_number(tx['amount'])} сум*\n\n"
     
     keyboard = []
     
     # Show expense categories first, then income
     if lang == "uz":
-        msg += "рџ“¤ *Xarajat kategoriyalari:*\n"
+        msg += "📉 *Xarajat kategoriyalari:*\n"
     else:
-        msg += "рџ“¤ *РљР°С‚РµРіРѕСЂРёРё СЂР°СЃС…РѕРґРѕРІ:*\n"
+        msg += "📉 *Категории расходов:*\n"
     
     expense_cats = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
     row = []
@@ -6242,12 +6242,12 @@ async def edit_single_tx_callback(update: Update, context: ContextTypes.DEFAULT_
         keyboard.append(row)
     
     # Separator
-    keyboard.append([InlineKeyboardButton("в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ", callback_data="noop")])
+    keyboard.append([InlineKeyboardButton("┃┃┃┃┃┃┃┃┃┃┃┃", callback_data="noop")])
     
     if lang == "uz":
-        msg += "\nрџ“Ґ *Daromad kategoriyalari:*\n"
+        msg += "\n📈 *Daromad kategoriyalari:*\n"
     else:
-        msg += "\nрџ“Ґ *РљР°С‚РµРіРѕСЂРёРё РґРѕС…РѕРґРѕРІ:*\n"
+        msg += "\n📈 *Категории доходов:*\n"
     
     income_cats = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"])
     row = []
@@ -6262,7 +6262,7 @@ async def edit_single_tx_callback(update: Update, context: ContextTypes.DEFAULT_
     
     keyboard.append([
         InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="edit_pending_transaction"
         )
     ])
@@ -6300,9 +6300,9 @@ async def set_category_callback(update: Update, context: ContextTypes.DEFAULT_TY
     transactions[tx_index]["category"] = category
     
     if tx_type == "income":
-        transactions[tx_index]["category_name"] = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "рџ“¦ Boshqa")
+        transactions[tx_index]["category_name"] = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📆 Boshqa")
     else:
-        transactions[tx_index]["category_name"] = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "рџ“¦ Boshqa")
+        transactions[tx_index]["category_name"] = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📆 Boshqa")
     
     context.user_data["pending_transactions"] = transactions
     
@@ -6324,86 +6324,86 @@ async def back_to_pending_preview_callback(update: Update, context: ContextTypes
     
     # Rebuild preview message
     if lang == "uz":
-        msg = "рџ¤– *AI TAHLIL NATIJASI*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "🤖 *AI TAHLIL NATIJASI*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_expense = 0
         total_income = 0
         
         for i, tx in enumerate(transactions, 1):
             if tx["type"] == "income":
-                emoji = "рџ“Ґ"
+                emoji = "📈"
                 type_name = "Daromad"
                 total_income += tx["amount"]
             else:
-                emoji = "рџ“¤"
+                emoji = "📉"
                 type_name = "Xarajat"
                 total_expense += tx["amount"]
             
             msg += f"{emoji} *#{i} {type_name}*\n"
-            msg += f"в”њ Summa: *{format_number(tx['amount'])} so'm*\n"
-            msg += f"в”њ Kategoriya: {tx['category_name']}\n"
+            msg += f"┃ Summa: *{format_number(tx['amount'])} so'm*\n"
+            msg += f"┃ Kategoriya: {tx['category_name']}\n"
             if tx.get('description'):
-                msg += f"в”” Tavsif: _{tx['description'][:30]}_\n"
+                msg += f"┃ Tavsif: _{tx['description'][:30]}_\n"
             msg += "\n"
         
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         if total_income > 0:
-            msg += f"рџ“Ґ Jami daromad: *{format_number(total_income)} so'm*\n"
+            msg += f"📈 Jami daromad: *{format_number(total_income)} so'm*\n"
         if total_expense > 0:
-            msg += f"рџ“¤ Jami xarajat: *{format_number(total_expense)} so'm*\n"
-        msg += "\nрџ‘‡ *To'g'rimi?*"
+            msg += f"📉 Jami xarajat: *{format_number(total_expense)} so'm*\n"
+        msg += "\n🙋 *To'g'rimi?*"
     else:
-        msg = "рџ¤– *Р Р•Р—РЈР›Р¬РўРђРў AI РђРќРђР›РР—Рђ*\n"
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        msg = "🤖 *РЕР—РЈР›Р¬ТАТ AI АМАР›ИР—А*\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_expense = 0
         total_income = 0
         
         for i, tx in enumerate(transactions, 1):
             if tx["type"] == "income":
-                emoji = "рџ“Ґ"
-                type_name = "Р”РѕС…РѕРґ"
+                emoji = "📈"
+                type_name = "Доход"
                 total_income += tx["amount"]
             else:
-                emoji = "рџ“¤"
-                type_name = "Р Р°СЃС…РѕРґ"
+                emoji = "📉"
+                type_name = "Расход"
                 total_expense += tx["amount"]
             
             msg += f"{emoji} *#{i} {type_name}*\n"
-            msg += f"в”њ РЎСѓРјРјР°: *{format_number(tx['amount'])} СЃСѓРј*\n"
-            msg += f"в”њ РљР°С‚РµРіРѕСЂРёСЏ: {tx['category_name']}\n"
+            msg += f"┃ Сумма: *{format_number(tx['amount'])} сум*\n"
+            msg += f"┃ Категория: {tx['category_name']}\n"
             if tx.get('description'):
-                msg += f"в”” РћРїРёСЃР°РЅРёРµ: _{tx['description'][:30]}_\n"
+                msg += f"┃ Описание: _{tx['description'][:30]}_\n"
             msg += "\n"
         
-        msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         if total_income > 0:
-            msg += f"рџ“Ґ Р’СЃРµРіРѕ РґРѕС…РѕРґ: *{format_number(total_income)} СЃСѓРј*\n"
+            msg += f"📈 Всего доход: *{format_number(total_income)} сум*\n"
         if total_expense > 0:
-            msg += f"рџ“¤ Р’СЃРµРіРѕ СЂР°СЃС…РѕРґ: *{format_number(total_expense)} СЃСѓРј*\n"
-        msg += "\nрџ‘‡ *Р’РµСЂРЅРѕ?*"
+            msg += f"📉 Всего расход: *{format_number(total_expense)} сум*\n"
+        msg += "\n🙋 *Верно?*"
     
     keyboard = [
         [
             InlineKeyboardButton(
-                "вњ… Ha, saqlash" if lang == "uz" else "вњ… Р”Р°, СЃРѕС…СЂР°РЅРёС‚СЊ",
+                "✅ Ha, saqlash" if lang == "uz" else "✅ Да, сохранитъ",
                 callback_data="confirm_transaction_save"
             ),
             InlineKeyboardButton(
-                "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ РР·РјРµРЅРёС‚СЊ",
+                "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ",
                 callback_data="edit_pending_transaction"
             )
         ],
         [
             InlineKeyboardButton(
-                "рџ”„ Turni almashtirish" if lang == "uz" else "рџ”„ РџРѕРјРµРЅСЏС‚СЊ С‚РёРї",
+                "🕐 Turni almashtirish" if lang == "uz" else "🕐 Поменятъ тип",
                 callback_data="swap_pending_type"
             )
         ],
         [
             InlineKeyboardButton(
-                "вќЊ Bekor qilish" if lang == "uz" else "вќЊ РћС‚РјРµРЅР°",
+                "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
                 callback_data="cancel_pending_transaction"
             )
         ]
@@ -6427,14 +6427,14 @@ async def add_more_expense_callback(update: Update, context: ContextTypes.DEFAUL
     context.user_data["expense_text_mode"] = True
     
     await query.edit_message_text(
-        "рџ‘‡ *Keyingi xarajatni yozing:*" if lang == "uz" else "рџ‘‡ *РќР°РїРёС€РёС‚Рµ СЃР»РµРґСѓСЋС‰РёР№ СЂР°СЃС…РѕРґ:*",
+        "🙋 *Keyingi xarajatni yozing:*" if lang == "uz" else "🙋 *Мапишите сЛедуСЋщиЙ расход:*",
         parse_mode="Markdown"
     )
 
 
 async def show_halos_status_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    рџЊџ HALOS USULI STATUS - PRO foydalanuvchilar uchun
+    👑 HALOS USULI STATUS - PRO foydalanuvchilar uchun
     
     Bu callback HALOS usuliga qanchalik amal qilinayotganini ko'rsatadi:
     - 70% yashash
@@ -6453,12 +6453,12 @@ async def show_halos_status_callback(update: Update, context: ContextTypes.DEFAU
     is_pro = await is_user_pro(telegram_id)
     if not is_pro:
         if lang == "uz":
-            msg = "рџ”’ *HALOS USULI* PRO obunachilarga ochiq.\n\nрџ’Ћ PRO ga o'ting va HALOS usuli bilan qarzdan tezroq chiqing!"
+            msg = "🌟 *HALOS USULI* PRO obunachilarga ochiq.\n\n💎 PRO ga o'ting va HALOS usuli bilan qarzdan tezroq chiqing!"
         else:
-            msg = "рџ”’ *РњР•РўРћР” HALOS* РґРѕСЃС‚СѓРїРµРЅ PRO РїРѕРґРїРёСЃС‡РёРєР°Рј.\n\nрџ’Ћ РџРµСЂРµР№РґРёС‚Рµ РЅР° PRO Рё РІС‹С…РѕРґРёС‚Рµ РёР· РґРѕР»РіР° Р±С‹СЃС‚СЂРµРµ СЃ РјРµС‚РѕРґРѕРј HALOS!"
+            msg = "🌟 *РњЕТОД HALOS* доступен PRO подписцикам.\n\n💎 ПереЙдите на PRO и выходите из доЛга быстрее с методом HALOS!"
         
         keyboard = [[InlineKeyboardButton(
-            "рџ’Ћ PRO olish" if lang == "uz" else "рџ’Ћ РџРѕР»СѓС‡РёС‚СЊ PRO",
+            "💎 PRO olish" if lang == "uz" else "💎 ПоЛуцитъ PRO",
             callback_data="show_pricing"
         )]]
         
@@ -6484,11 +6484,11 @@ async def show_halos_status_callback(update: Update, context: ContextTypes.DEFAU
     # Tugmalar
     keyboard = [
         [InlineKeyboardButton(
-            "📉 Hisobotga qaytish" if lang == "uz" else "📉 Р’РµСЂРЅСѓС‚СЊСЃСЏ Рє РѕС‚С‡С‘С‚Сѓ",
+            "📉 Hisobotga qaytish" if lang == "uz" else "📉 Вернутъся к отцС‘ту",
             callback_data="menu_plan"
         )],
         [InlineKeyboardButton(
-            "👤 Profilni tahrirlash" if lang == "uz" else "👤 Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ РїСЂРѕС„РёР»СЊ",
+            "👤 Profilni tahrirlash" if lang == "uz" else "👤 Редактироватъ проС„иЛъ",
             callback_data="show_profile"
         )]
     ]
@@ -6575,67 +6575,67 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
     
     if lang == "uz":
         msg = (
-            "рџ“€ *BATAFSIL HISOBOT*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📝 *BATAFSIL HISOBOT*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "💰 *DAROMADLAR:*\n"
-            f"в”њ 👤 Shaxsiy: *{income_self:,}* so'm\n"
+            f"┃ 👤 Shaxsiy: *{income_self:,}* so'm\n"
         )
         if income_partner > 0:
-            msg += f"в”њ рџ‘« Sherik: *{income_partner:,}* so'm\n"
-        msg += f"в”” 📉 Jami oylik: *{total_income:,}* so'm\n\n"
+            msg += f"┃ 👫 Sherik: *{income_partner:,}* so'm\n"
+        msg += f"┃ 📉 Jami oylik: *{total_income:,}* so'm\n\n"
         
         msg += (
             "📊 *MAJBURIY TO'LOVLAR:*\n"
-            f"в”њ 🏠 Ijara/ipoteka: *{rent:,}* so'm\n"
-            f"в”њ рџ‘¶ Bog'cha/maktab: *{kindergarten:,}* so'm\n"
-            f"в”њ 💎 Kommunal: *{utilities:,}* so'm\n"
-            f"в”њ рџ’і Kredit to'lovi: *{loan_payment:,}* so'm\n"
-            f"в”” 📉 Jami majburiy: *{mandatory_total:,}* so'm\n\n"
+            f"┃ 🏠 Ijara/ipoteka: *{rent:,}* so'm\n"
+            f"┃ 👶 Bog'cha/maktab: *{kindergarten:,}* so'm\n"
+            f"┃ 💎 Kommunal: *{utilities:,}* so'm\n"
+            f"┃ 💵 Kredit to'lovi: *{loan_payment:,}* so'm\n"
+            f"┃ 📉 Jami majburiy: *{mandatory_total:,}* so'm\n\n"
             
             f"💵 *BO'SH PUL:* *{free_cash:,}* so'm\n\n"
         )
         
         if total_debt > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ’і *QARZ HOLATI:*\n"
-                f"в”њ Umumiy qarz: *{total_debt:,}* so'm\n"
-                f"в”њ Oylik to'lov: *{loan_payment:,}* so'm\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "💵 *QARZ HOLATI:*\n"
+                f"┃ Umumiy qarz: *{total_debt:,}* so'm\n"
+                f"┃ Oylik to'lov: *{loan_payment:,}* so'm\n\n"
                 
-                "рџЊї *Oddiy usul:*\n"
-                f"в”њ Muddat: {simple_exit_months} oy\n"
-                f"в”” Sana: {simple_exit_formatted}\n\n"
+                "🔗 *Oddiy usul:*\n"
+                f"┃ Muddat: {simple_exit_months} oy\n"
+                f"┃ Sana: {simple_exit_formatted}\n\n"
             )
             
             if is_pro:
                 msg += (
-                    "рџЊџ *HALOS PRO usuli:*\n"
-                    f"в”њ Muddat: *{pro_exit_months}* oy\n"
-                    f"в”њ Sana: *{pro_exit_formatted}*\n"
-                    f"в”њ вЏ± {months_saved} oy tezroq!\n"
-                    f"в”њ рџ’Ћ Jamg'arma: {savings_at_exit:,.0f} so'm\n"
-                    f"в”” Oylik qo'shimcha: {extra_debt:,.0f} so'm\n\n"
+                    "👑 *HALOS PRO usuli:*\n"
+                    f"┃ Muddat: *{pro_exit_months}* oy\n"
+                    f"┃ Sana: *{pro_exit_formatted}*\n"
+                    f"┃ вЏ± {months_saved} oy tezroq!\n"
+                    f"┃ 💎 Jamg'arma: {savings_at_exit:,.0f} so'm\n"
+                    f"┃ Oylik qo'shimcha: {extra_debt:,.0f} so'm\n\n"
                 )
         
         # Oylik AI tranzaksiyalar
         if month_income > 0 or month_expense > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ¤– *AI YORDAMCHI (30 kun):*\n"
-                f"в”њ рџ“Ґ Kirim: +{month_income:,} so'm\n"
-                f"в”њ рџ“¤ Chiqim: -{month_expense:,} so'm\n"
-                f"в”” 💰 Balans: {month_income - month_expense:,} so'm\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "🤖 *AI YORDAMCHI (30 kun):*\n"
+                f"┃ 📈 Kirim: +{month_income:,} so'm\n"
+                f"┃ 📉 Chiqim: -{month_expense:,} so'm\n"
+                f"┃ 💰 Balans: {month_income - month_expense:,} so'm\n\n"
             )
             
             # Xarajatlar bo'yicha
             if month_summary.get("expense_by_category"):
-                msg += "рџ’ё *Xarajatlar kategoriya bo'yicha:*\n"
+                msg += "💳 *Xarajatlar kategoriya bo'yicha:*\n"
                 sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
                 for cat, amount in sorted_expenses:
-                    cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "рџ“¦ Boshqa")
+                    cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                     percentage = (amount / month_expense * 100) if month_expense > 0 else 0
-                    msg += f"в”њ {cat_name}: {amount:,} ({percentage:.0f}%)\n"
+                    msg += f"┃ {cat_name}: {amount:,} ({percentage:.0f}%)\n"
                 msg += "\n"
             
             # Daromadlar bo'yicha
@@ -6643,107 +6643,107 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
                 msg += "💰 *Daromadlar kategoriya bo'yicha:*\n"
                 for cat, amount in month_summary["income_by_category"].items():
                     cat_name = INCOME_CATEGORIES["uz"].get(cat, "💵 Boshqa")
-                    msg += f"в”њ {cat_name}: +{amount:,} so'm\n"
+                    msg += f"┃ {cat_name}: +{amount:,} so'm\n"
                 msg += "\n"
         
         # Shaxsiy qarzlar
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ¤ќ *SHAXSIY QARZLAR:*\n"
-                f"в”њ рџ“¤ Bergan: {debt_summary['total_lent']:,} so'm ({debt_summary['lent_count']} ta)\n"
-                f"в”њ рџ“Ґ Olgan: {debt_summary['total_borrowed']:,} so'm ({debt_summary['borrowed_count']} ta)\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "💳 *SHAXSIY QARZLAR:*\n"
+                f"┃ 📉 Bergan: {debt_summary['total_lent']:,} so'm ({debt_summary['lent_count']} ta)\n"
+                f"┃ 📈 Olgan: {debt_summary['total_borrowed']:,} so'm ({debt_summary['borrowed_count']} ta)\n"
             )
             net = debt_summary['net_balance']
             if net > 0:
-                msg += f"в”” рџ’љ Sof: +{net:,} so'm\n"
+                msg += f"┃ 💸 Sof: +{net:,} so'm\n"
             elif net < 0:
-                msg += f"в”” рџ”ґ Sof: {net:,} so'm\n"
+                msg += f"┃ 💰 Sof: {net:,} so'm\n"
             else:
-                msg += "в”” вљЄ Sof: 0 so'm\n"
+                msg += "┃ вљЄ Sof: 0 so'm\n"
     
     else:
         # Russian version
         msg = (
-            "рџ“€ *РџРћР”Р РћР‘РќР«Р™ РћРўР§РЃРў*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📝 *ПОДРОБМЫР™ ОТЧРЃТ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            "💰 *Р”РћРҐРћР”Р«:*\n"
-            f"в”њ 👤 Р›РёС‡РЅС‹Р№: *{income_self:,}* СЃСѓРј\n"
+            "💰 *ДОРҐОДЫ:*\n"
+            f"┃ 👤 Р›ицныЙ: *{income_self:,}* сум\n"
         )
         if income_partner > 0:
-            msg += f"в”њ рџ‘« РџР°СЂС‚РЅС‘СЂ: *{income_partner:,}* СЃСѓРј\n"
-        msg += f"в”” 📉 Р’СЃРµРіРѕ РІ РјРµСЃСЏС†: *{total_income:,}* СЃСѓРј\n\n"
+            msg += f"┃ 👫 ПартнС‘р: *{income_partner:,}* сум\n"
+        msg += f"┃ 📉 Всего в месяф: *{total_income:,}* сум\n\n"
         
         msg += (
-            "📊 *РћР‘РЇР—РђРўР•Р›Р¬РќР«Р•:*\n"
-            f"в”њ 🏠 РђСЂРµРЅРґР°/РёРїРѕС‚РµРєР°: *{rent:,}* СЃСѓРј\n"
-            f"в”њ рџ‘¶ Р”РµС‚СЃР°Рґ/С€РєРѕР»Р°: *{kindergarten:,}* СЃСѓРј\n"
-            f"в”њ 💎 РљРѕРјРјСѓРЅР°Р»СЊРЅС‹Рµ: *{utilities:,}* СЃСѓРј\n"
-            f"в”њ рџ’і РџР»Р°С‚С‘Р¶ РїРѕ РєСЂРµРґРёС‚Сѓ: *{loan_payment:,}* СЃСѓРј\n"
-            f"в”” 📉 Р’СЃРµРіРѕ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С…: *{mandatory_total:,}* СЃСѓРј\n\n"
+            "📊 *ОБРЇР—АТЕР›Р¬МЫЕ:*\n"
+            f"┃ 🏠 Аренда/ипотека: *{rent:,}* сум\n"
+            f"┃ 👶 Детсад/шкоЛа: *{kindergarten:,}* сум\n"
+            f"┃ 💎 КоммунаЛъные: *{utilities:,}* сум\n"
+            f"┃ 💵 Платёж по кредиту: *{loan_payment:,}* сум\n"
+            f"┃ 📉 Всего обязатеЛъных: *{mandatory_total:,}* сум\n\n"
             
-            f"💵 *РЎР’РћР‘РћР”РќР«Р•:* *{free_cash:,}* СЃСѓРј\n\n"
+            f"💵 *СВОБОДМЫЕ:* *{free_cash:,}* сум\n\n"
         )
         
         if total_debt > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ’і *РЎРћРЎРўРћРЇРќРР• Р”РћР›Р“Рђ:*\n"
-                f"в”њ РћР±С‰РёР№ РґРѕР»Рі: *{total_debt:,}* СЃСѓРј\n"
-                f"в”њ Р•Р¶РµРјРµСЃСЏС‡РЅС‹Р№ РїР»Р°С‚С‘Р¶: *{loan_payment:,}* СЃСѓРј\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "💵 *СОСТОРЇМИЕ ДОР›ГА:*\n"
+                f"┃ ОбщиЙ доЛг: *{total_debt:,}* сум\n"
+                f"┃ ЕжемесяцныЙ пЛатС‘ж: *{loan_payment:,}* сум\n\n"
                 
-                "рџЊї *РћР±С‹С‡РЅС‹Р№ СЃРїРѕСЃРѕР±:*\n"
-                f"в”њ РЎСЂРѕРє: {simple_exit_months} РјРµСЃ\n"
-                f"в”” Р”Р°С‚Р°: {simple_exit_formatted}\n\n"
+                "🔗 *ОбыцныЙ способ:*\n"
+                f"┃ Срок: {simple_exit_months} мес\n"
+                f"┃ Дата: {simple_exit_formatted}\n\n"
             )
             
             if is_pro:
                 msg += (
-                    "рџЊџ *РЎРїРѕСЃРѕР± HALOS PRO:*\n"
-                    f"в”њ РЎСЂРѕРє: *{pro_exit_months}* РјРµСЃ\n"
-                    f"в”њ Р”Р°С‚Р°: *{pro_exit_formatted}*\n"
-                    f"в”њ вЏ± РќР° {months_saved} РјРµСЃ Р±С‹СЃС‚СЂРµРµ!\n"
-                    f"в”њ рџ’Ћ РќР°РєРѕРїР»РµРЅРёСЏ: {savings_at_exit:,.0f} СЃСѓРј\n"
-                    f"в”” Р”РѕРї. РїР»Р°С‚С‘Р¶: {extra_debt:,.0f} СЃСѓРј\n\n"
+                    "👑 *Способ HALOS PRO:*\n"
+                    f"┃ Срок: *{pro_exit_months}* мес\n"
+                    f"┃ Дата: *{pro_exit_formatted}*\n"
+                    f"┃ вЏ± Ма {months_saved} мес быстрее!\n"
+                    f"┃ 💎 МакопЛения: {savings_at_exit:,.0f} сум\n"
+                    f"┃ Доп. пЛатС‘ж: {extra_debt:,.0f} сум\n\n"
                 )
         
         if month_income > 0 or month_expense > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ¤– *AI РџРћРњРћР©РќРРљ (30 РґРЅРµР№):*\n"
-                f"в”њ рџ“Ґ РџСЂРёС…РѕРґ: +{month_income:,} СЃСѓРј\n"
-                f"в”њ рџ“¤ Р Р°СЃС…РѕРґ: -{month_expense:,} СЃСѓРј\n"
-                f"в”” 💰 Р‘Р°Р»Р°РЅСЃ: {month_income - month_expense:,} СЃСѓРј\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "🤖 *AI ПОРњОЩМИК (30 днеЙ):*\n"
+                f"┃ 📈 Приход: +{month_income:,} сум\n"
+                f"┃ 📉 Расход: -{month_expense:,} сум\n"
+                f"┃ 💰 Баланс: {month_income - month_expense:,} сум\n\n"
             )
             
             if month_summary.get("expense_by_category"):
-                msg += "рџ’ё *Р Р°СЃС…РѕРґС‹ РїРѕ РєР°С‚РµРіРѕСЂРёСЏРј:*\n"
+                msg += "💳 *Расходы по категориям:*\n"
                 sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
                 for cat, amount in sorted_expenses:
-                    cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "рџ“¦ РџСЂРѕС‡РµРµ")
+                    cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                     percentage = (amount / month_expense * 100) if month_expense > 0 else 0
-                    msg += f"в”њ {cat_name}: {amount:,} ({percentage:.0f}%)\n"
+                    msg += f"┃ {cat_name}: {amount:,} ({percentage:.0f}%)\n"
                 msg += "\n"
         
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
             msg += (
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                "рџ¤ќ *Р›РР§РќР«Р• Р”РћР›Р“Р:*\n"
-                f"в”њ рџ“¤ Р”Р°Р»: {debt_summary['total_lent']:,} СЃСѓРј ({debt_summary['lent_count']})\n"
-                f"в”њ рџ“Ґ Р’Р·СЏР»: {debt_summary['total_borrowed']:,} СЃСѓРј ({debt_summary['borrowed_count']})\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                "💳 *Р›ИЧМЫЕ ДОР›ГИ:*\n"
+                f"┃ 📉 ДаЛ: {debt_summary['total_lent']:,} сум ({debt_summary['lent_count']})\n"
+                f"┃ 📈 ВзяЛ: {debt_summary['total_borrowed']:,} сум ({debt_summary['borrowed_count']})\n"
             )
             net = debt_summary['net_balance']
             if net > 0:
-                msg += f"в”” рџ’љ Р§РёСЃС‚С‹Р№: +{net:,} СЃСѓРј\n"
+                msg += f"┃ 💸 ЧистыЙ: +{net:,} сум\n"
             elif net < 0:
-                msg += f"в”” рџ”ґ Р§РёСЃС‚С‹Р№: {net:,} СЃСѓРј\n"
+                msg += f"┃ 💰 ЧистыЙ: {net:,} сум\n"
             else:
-                msg += "в”” вљЄ Р§РёСЃС‚С‹Р№: 0 СЃСѓРј\n"
+                msg += "┃ вљЄ ЧистыЙ: 0 сум\n"
     
     keyboard = [
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_report"
         )]
     ]
@@ -6787,66 +6787,66 @@ async def report_weekly_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     if lang == "uz":
         msg = (
-            f"рџ“… *HAFTALIK HISOBOT*\n"
-            f"рџ“† {start_date} - {end_date}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📅 *HAFTALIK HISOBOT*\n"
+            f"📊 {start_date} - {end_date}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             f"💰 *UMUMIY:*\n"
-            f"в”њ рџ“Ґ Kirim: +{week_income:,} so'm\n"
-            f"в”њ рџ“¤ Chiqim: -{week_expense:,} so'm\n"
+            f"┃ 📈 Kirim: +{week_income:,} so'm\n"
+            f"┃ 📉 Chiqim: -{week_expense:,} so'm\n"
         )
         if week_balance >= 0:
-            msg += f"в”” рџ’љ Balans: +{week_balance:,} so'm\n\n"
+            msg += f"┃ 💸 Balans: +{week_balance:,} so'm\n\n"
         else:
-            msg += f"в”” рџ”ґ Balans: {week_balance:,} so'm\n\n"
+            msg += f"┃ 💰 Balans: {week_balance:,} so'm\n\n"
         
         msg += (
             f"📉 *KUNLIK O'RTACHA:*\n"
-            f"в”њ Kirim: ~{avg_income:,.0f} so'm\n"
-            f"в”” Chiqim: ~{avg_expense:,.0f} so'm\n\n"
+            f"┃ Kirim: ~{avg_income:,.0f} so'm\n"
+            f"┃ Chiqim: ~{avg_expense:,.0f} so'm\n\n"
         )
         
         if week_summary.get("expense_by_category"):
-            msg += "рџ’ё *XARAJATLAR:*\n"
+            msg += "💳 *XARAJATLAR:*\n"
             sorted_expenses = sorted(week_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:7]:
-                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "рџ“¦ Boshqa")
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 percentage = (amount / week_expense * 100) if week_expense > 0 else 0
                 bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     else:
         msg = (
-            f"рџ“… *РќР•Р”Р•Р›Р¬РќР«Р™ РћРўР§РЃРў*\n"
-            f"рџ“† {start_date} - {end_date}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📅 *МЕДЕР›Р¬МЫР™ ОТЧРЃТ*\n"
+            f"📊 {start_date} - {end_date}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            f"💰 *РРўРћР“Рћ:*\n"
-            f"в”њ рџ“Ґ РџСЂРёС…РѕРґ: +{week_income:,} СЃСѓРј\n"
-            f"в”њ рџ“¤ Р Р°СЃС…РѕРґ: -{week_expense:,} СЃСѓРј\n"
+            f"💰 *ИТОГО:*\n"
+            f"┃ 📈 Приход: +{week_income:,} сум\n"
+            f"┃ 📉 Расход: -{week_expense:,} сум\n"
         )
         if week_balance >= 0:
-            msg += f"в”” рџ’љ Р‘Р°Р»Р°РЅСЃ: +{week_balance:,} СЃСѓРј\n\n"
+            msg += f"┃ 💸 Баланс: +{week_balance:,} сум\n\n"
         else:
-            msg += f"в”” рџ”ґ Р‘Р°Р»Р°РЅСЃ: {week_balance:,} СЃСѓРј\n\n"
+            msg += f"┃ 💰 Баланс: {week_balance:,} сум\n\n"
         
         msg += (
-            f"📉 *РЎР Р•Р”РќР•Р• Р’ Р”Р•РќР¬:*\n"
-            f"в”њ РџСЂРёС…РѕРґ: ~{avg_income:,.0f} СЃСѓРј\n"
-            f"в”” Р Р°СЃС…РѕРґ: ~{avg_expense:,.0f} СЃСѓРј\n\n"
+            f"📉 *СРЕДМЕЕ В ДЕМР¬:*\n"
+            f"┃ Приход: ~{avg_income:,.0f} сум\n"
+            f"┃ Расход: ~{avg_expense:,.0f} сум\n\n"
         )
         
         if week_summary.get("expense_by_category"):
-            msg += "рџ’ё *Р РђРЎРҐРћР”Р«:*\n"
+            msg += "💳 *РАСРҐОДЫ:*\n"
             sorted_expenses = sorted(week_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:7]:
-                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "рџ“¦ РџСЂРѕС‡РµРµ")
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 percentage = (amount / week_expense * 100) if week_expense > 0 else 0
                 bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     
     keyboard = [
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_report"
         )]
     ]
@@ -6889,66 +6889,66 @@ async def report_monthly_callback(update: Update, context: ContextTypes.DEFAULT_
     
     if lang == "uz":
         msg = (
-            f"рџ“† *OYLIK HISOBOT*\n"
-            f"рџ“… {current_month}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📊 *OYLIK HISOBOT*\n"
+            f"📅 {current_month}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             f"💰 *UMUMIY:*\n"
-            f"в”њ рџ“Ґ Kirim: +{month_income:,} so'm\n"
-            f"в”њ рџ“¤ Chiqim: -{month_expense:,} so'm\n"
+            f"┃ 📈 Kirim: +{month_income:,} so'm\n"
+            f"┃ 📉 Chiqim: -{month_expense:,} so'm\n"
         )
         if month_balance >= 0:
-            msg += f"в”” рџ’љ Balans: +{month_balance:,} so'm\n\n"
+            msg += f"┃ 💸 Balans: +{month_balance:,} so'm\n\n"
         else:
-            msg += f"в”” рџ”ґ Balans: {month_balance:,} so'm\n\n"
+            msg += f"┃ 💰 Balans: {month_balance:,} so'm\n\n"
         
         msg += (
             f"📉 *KUNLIK O'RTACHA:*\n"
-            f"в”њ Kirim: ~{avg_income:,.0f} so'm\n"
-            f"в”” Chiqim: ~{avg_expense:,.0f} so'm\n\n"
+            f"┃ Kirim: ~{avg_income:,.0f} so'm\n"
+            f"┃ Chiqim: ~{avg_expense:,.0f} so'm\n\n"
         )
         
         if month_summary.get("expense_by_category"):
-            msg += "рџ’ё *XARAJATLAR TAQSIMOTI:*\n"
+            msg += "💳 *XARAJATLAR TAQSIMOTI:*\n"
             sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses:
-                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "рџ“¦ Boshqa")
+                cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 percentage = (amount / month_expense * 100) if month_expense > 0 else 0
                 bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     else:
         msg = (
-            f"рџ“† *РњР•РЎРЇР§РќР«Р™ РћРўР§РЃРў*\n"
-            f"рџ“… {current_month}\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"📊 *РњЕСРЇЧМЫР™ ОТЧРЃТ*\n"
+            f"📅 {current_month}\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            f"💰 *РРўРћР“Рћ:*\n"
-            f"в”њ рџ“Ґ РџСЂРёС…РѕРґ: +{month_income:,} СЃСѓРј\n"
-            f"в”њ рџ“¤ Р Р°СЃС…РѕРґ: -{month_expense:,} СЃСѓРј\n"
+            f"💰 *ИТОГО:*\n"
+            f"┃ 📈 Приход: +{month_income:,} сум\n"
+            f"┃ 📉 Расход: -{month_expense:,} сум\n"
         )
         if month_balance >= 0:
-            msg += f"в”” рџ’љ Р‘Р°Р»Р°РЅСЃ: +{month_balance:,} СЃСѓРј\n\n"
+            msg += f"┃ 💸 Баланс: +{month_balance:,} сум\n\n"
         else:
-            msg += f"в”” рџ”ґ Р‘Р°Р»Р°РЅСЃ: {month_balance:,} СЃСѓРј\n\n"
+            msg += f"┃ 💰 Баланс: {month_balance:,} сум\n\n"
         
         msg += (
-            f"📉 *РЎР Р•Р”РќР•Р• Р’ Р”Р•РќР¬:*\n"
-            f"в”њ РџСЂРёС…РѕРґ: ~{avg_income:,.0f} СЃСѓРј\n"
-            f"в”” Р Р°СЃС…РѕРґ: ~{avg_expense:,.0f} СЃСѓРј\n\n"
+            f"📉 *СРЕДМЕЕ В ДЕМР¬:*\n"
+            f"┃ Приход: ~{avg_income:,.0f} сум\n"
+            f"┃ Расход: ~{avg_expense:,.0f} сум\n\n"
         )
         
         if month_summary.get("expense_by_category"):
-            msg += "рџ’ё *Р РђРЎРџР Р•Р”Р•Р›Р•РќРР• Р РђРЎРҐРћР”РћР’:*\n"
+            msg += "💳 *РАСПРЕДЕР›ЕМИЕ РАСРҐОДОВ:*\n"
             sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses:
-                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "рџ“¦ РџСЂРѕС‡РµРµ")
+                cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 percentage = (amount / month_expense * 100) if month_expense > 0 else 0
                 bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     
     keyboard = [
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_report"
         )]
     ]
@@ -6982,7 +6982,7 @@ async def back_to_report_callback(update: Update, context: ContextTypes.DEFAULT_
     # menu_plan_handler ni chaqirish o'rniga sodda qaytarish
     await query.edit_message_text(
         "📉 *Hisobotga qaytish uchun* \"📉 Hisobotlarim\" *tugmasini bosing*" if lang == "uz" else 
-        "📉 *Р”Р»СЏ РІРѕР·РІСЂР°С‚Р° Рє РѕС‚С‡С‘С‚Сѓ РЅР°Р¶РјРёС‚Рµ* \"📉 РњРѕРё РѕС‚С‡С‘С‚С‹\"",
+        "📉 *ДЛя возврата к отцС‘ту нажмите* \"📉 Рњои отцС‘ты\"",
         parse_mode="Markdown"
     )
 
@@ -7007,37 +7007,37 @@ async def show_expense_report_callback(update: Update, context: ContextTypes.DEF
     if lang == "uz":
         msg = (
             "📉 *BUGUNGI HISOBOT*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“Ґ Daromad: *{format_number(budget_status.get('today_income', 0))} so'm*\n"
-            f"рџ“¤ Xarajat: *{format_number(budget_status.get('today_expense', 0))} so'm*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📈 Daromad: *{format_number(budget_status.get('today_income', 0))} so'm*\n"
+            f"📉 Xarajat: *{format_number(budget_status.get('today_expense', 0))} so'm*\n"
             f"💰 Balans: *{format_number(budget_status.get('today_balance', 0))} so'm*\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"рџ“… *Oylik:*\n"
-            f"в”њ Daromad: *{format_number(budget_status.get('monthly_income', 0))} so'm*\n"
-            f"в”њ Xarajat: *{format_number(budget_status.get('monthly_expense', 0))} so'm*\n"
-            f"в”” Balans: *{format_number(budget_status.get('monthly_balance', 0))} so'm*"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"📅 *Oylik:*\n"
+            f"┃ Daromad: *{format_number(budget_status.get('monthly_income', 0))} so'm*\n"
+            f"┃ Xarajat: *{format_number(budget_status.get('monthly_expense', 0))} so'm*\n"
+            f"┃ Balans: *{format_number(budget_status.get('monthly_balance', 0))} so'm*"
         )
     else:
         msg = (
-            "📉 *РћРўР§РЃРў Р—Рђ РЎР•Р“РћР”РќРЇ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“Ґ Р”РѕС…РѕРґ: *{format_number(budget_status.get('today_income', 0))} СЃСѓРј*\n"
-            f"рџ“¤ Р Р°СЃС…РѕРґ: *{format_number(budget_status.get('today_expense', 0))} СЃСѓРј*\n"
-            f"💰 Р‘Р°Р»Р°РЅСЃ: *{format_number(budget_status.get('today_balance', 0))} СЃСѓРј*\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"рџ“… *Р—Р° РјРµСЃСЏС†:*\n"
-            f"в”њ Р”РѕС…РѕРґ: *{format_number(budget_status.get('monthly_income', 0))} СЃСѓРј*\n"
-            f"в”њ Р Р°СЃС…РѕРґ: *{format_number(budget_status.get('monthly_expense', 0))} СЃСѓРј*\n"
-            f"в”” Р‘Р°Р»Р°РЅСЃ: *{format_number(budget_status.get('monthly_balance', 0))} СЃСѓРј*"
+            "📉 *ОТЧРЃТ Р—А СЕГОДМРЇ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📈 Доход: *{format_number(budget_status.get('today_income', 0))} сум*\n"
+            f"📉 Расход: *{format_number(budget_status.get('today_expense', 0))} сум*\n"
+            f"💰 Баланс: *{format_number(budget_status.get('today_balance', 0))} сум*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"📅 *Р—а месяф:*\n"
+            f"┃ Доход: *{format_number(budget_status.get('monthly_income', 0))} сум*\n"
+            f"┃ Расход: *{format_number(budget_status.get('monthly_expense', 0))} сум*\n"
+            f"┃ Баланс: *{format_number(budget_status.get('monthly_balance', 0))} сум*"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "вћ• Yana qo'shish" if lang == "uz" else "вћ• Р”РѕР±Р°РІРёС‚СЊ РµС‰С‘",
+            "вћ• Yana qo'shish" if lang == "uz" else "вћ• Добавитъ ещС‘",
             callback_data="add_more_expense"
         )],
         [InlineKeyboardButton(
-            "вњ… Tayyor" if lang == "uz" else "вњ… Р“РѕС‚РѕРІРѕ",
+            "✅ Tayyor" if lang == "uz" else "✅ Готово",
             callback_data="cancel_expense_mode"
         )]
     ]
@@ -7090,7 +7090,7 @@ async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_
     profile = await db.get_financial_profile(user["id"]) if user else None
     
     if not profile:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
         return
     
     import math
@@ -7116,76 +7116,76 @@ async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_
     
     if lang == "uz":
         msg = (
-            "рџ†“ *BEPUL QARZDAN CHIQISH REJASI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🆓 *BEPUL QARZDAN CHIQISH REJASI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            "рџ“‹ *USUL:* Faqat minimal to'lov\n\n"
+            "📋 *USUL:* Faqat minimal to'lov\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "💰 *MOLIYAVIY HOLAT:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Daromad: *{format_number(total_income)} so'm*\n"
-            f"в”њ Xarajatlar: *{format_number(total_expenses)} so'm*\n"
-            f"в”” Bo'sh pul: *{format_number(free_cash)} so'm*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Daromad: *{format_number(total_income)} so'm*\n"
+            f"┃ Xarajatlar: *{format_number(total_expenses)} so'm*\n"
+            f"┃ Bo'sh pul: *{format_number(free_cash)} so'm*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "📉 *QARZ:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Umumiy qarz: *{format_number(total_debt)} so'm*\n"
-            f"в”” Oylik to'lov: *{format_number(loan_payment)} so'm*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Umumiy qarz: *{format_number(total_debt)} so'm*\n"
+            f"┃ Oylik to'lov: *{format_number(loan_payment)} so'm*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“… *NATIJA:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📅 *NATIJA:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"вЏ± Chiqish muddati: *{simple_exit_months} oy*\n"
-            f"рџ“† Sana: *{simple_exit_formatted}*\n"
+            f"📊 Sana: *{simple_exit_formatted}*\n"
             f"💰 Yig'ilgan boylik: *0 so'm*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "вљ пёЏ *Eslatma:* Bu usulda faqat qarz to'lanadi.\n"
             "Boylik yig'ilmaydi. PRO bilan tezroq chiqasiz\n"
             "va boylik ham ortirasiz!"
         )
     else:
         msg = (
-            "рџ†“ *Р‘Р•РЎРџР›РђРўРќР«Р™ РџР›РђРќ Р’Р«РҐРћР”Рђ РР— Р”РћР›Р“Рђ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🆓 *БЕСПР›АТМЫР™ ПР›АМ ВЫРҐОДА ИР— ДОР›ГА*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            "рџ“‹ *РњР•РўРћР”:* РўРѕР»СЊРєРѕ РјРёРЅРёРјР°Р»СЊРЅС‹Р№ РїР»Р°С‚С‘Р¶\n\n"
+            "📋 *РњЕТОД:* ТоЛъко минимаЛъныЙ пЛатС‘ж\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "💰 *Р¤РРќРђРќРЎРћР’РћР• РЎРћРЎРўРћРЇРќРР•:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Р”РѕС…РѕРґ: *{format_number(total_income)} СЃСѓРј*\n"
-            f"в”њ Р Р°СЃС…РѕРґС‹: *{format_number(total_expenses)} СЃСѓРј*\n"
-            f"в”” РЎРІРѕР±РѕРґРЅС‹Рµ: *{format_number(free_cash)} СЃСѓРј*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "💰 *Р¤ИМАМСОВОЕ СОСТОРЇМИЕ:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Доход: *{format_number(total_income)} сум*\n"
+            f"┃ Расходы: *{format_number(total_expenses)} сум*\n"
+            f"┃ Свободные: *{format_number(free_cash)} сум*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "📉 *Р”РћР›Р“:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ РћР±С‰РёР№ РґРѕР»Рі: *{format_number(total_debt)} СЃСѓРј*\n"
-            f"в”” Р•Р¶РµРјРµСЃСЏС‡РЅРѕ: *{format_number(loan_payment)} СЃСѓРј*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📉 *ДОР›Г:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ ОбщиЙ доЛг: *{format_number(total_debt)} сум*\n"
+            f"┃ Ежемесяцно: *{format_number(loan_payment)} сум*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“… *Р Р•Р—РЈР›Р¬РўРђРў:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"вЏ± РЎСЂРѕРє РІС‹С…РѕРґР°: *{simple_exit_months} РјРµСЃ*\n"
-            f"рџ“† Р”Р°С‚Р°: *{simple_exit_formatted}*\n"
-            f"💰 РќР°РєРѕРїР»РµРЅРЅРѕРµ Р±РѕРіР°С‚СЃС‚РІРѕ: *0 СЃСѓРј*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📅 *РЕР—РЈР›Р¬ТАТ:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"вЏ± Срок выхода: *{simple_exit_months} мес*\n"
+            f"📊 Дата: *{simple_exit_formatted}*\n"
+            f"💰 МакопЛенное богатство: *0 сум*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "вљ пёЏ *РџСЂРёРјРµС‡Р°РЅРёРµ:* Р­С‚РѕС‚ СЃРїРѕСЃРѕР± С‚РѕР»СЊРєРѕ РїРѕРіР°С€Р°РµС‚ РґРѕР»Рі.\n"
-            "Р‘РѕРіР°С‚СЃС‚РІРѕ РЅРµ РєРѕРїРёС‚СЃСЏ. РЎ PRO РІС‹Р№РґРµС‚Рµ Р±С‹СЃС‚СЂРµРµ\n"
-            "Рё РЅР°РєРѕРїРёС‚Рµ Р±РѕРіР°С‚СЃС‚РІРѕ!"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "вљ пёЏ *Примецание:* Этот способ тоЛъко погашает доЛг.\n"
+            "Богатство не копится. С PRO выЙдете быстрее\n"
+            "и накопите богатство!"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "рџ’Ћ PRO ga o'tish" if lang == "uz" else "рџ’Ћ РџРµСЂРµР№С‚Рё РЅР° PRO",
+            "💎 PRO ga o'tish" if lang == "uz" else "💎 ПереЙти на PRO",
             callback_data="show_pricing"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -7216,7 +7216,7 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
     profile = await db.get_financial_profile(user["id"]) if user else None
     
     if not profile:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
         return
     
     import math
@@ -7259,88 +7259,88 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     if lang == "uz":
         msg = (
-            "рџ’Ћ *PRO QARZDAN CHIQISH REJASI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "💎 *PRO QARZDAN CHIQISH REJASI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            "рџ“‹ *USUL:* Aqlli taqsimlash\n\n"
+            "📋 *USUL:* Aqlli taqsimlash\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "💰 *MOLIYAVIY HOLAT:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Daromad: *{format_number(total_income)} so'm*\n"
-            f"в”њ Majburiy: *{format_number(mandatory)} so'm*\n"
-            f"в”њ Qarz to'lovi: *{format_number(loan_payment)} so'm*\n"
-            f"в”” Bo'sh pul: *{format_number(free_cash)} so'm*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Daromad: *{format_number(total_income)} so'm*\n"
+            f"┃ Majburiy: *{format_number(mandatory)} so'm*\n"
+            f"┃ Qarz to'lovi: *{format_number(loan_payment)} so'm*\n"
+            f"┃ Bo'sh pul: *{format_number(free_cash)} so'm*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "📉 *AQLLI TAQSIMLASH:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ 🏦 Boylik uchun: *{format_number(int(savings))} so'm*\n"
-            f"в”њ вљЎ Kredit to'lovi: *{format_number(int(extra_debt))} so'm*\n"
-            f"в”” 🏠 Yashash: *{format_number(int(living))} so'm*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ 🏦 Boylik uchun: *{format_number(int(savings))} so'm*\n"
+            f"┃ вљЎ Kredit to'lovi: *{format_number(int(extra_debt))} so'm*\n"
+            f"┃ 🏠 Yashash: *{format_number(int(living))} so'm*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“… *NATIJA:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📅 *NATIJA:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"вЏ± Chiqish muddati: *{pro_exit_months} oy*\n"
-            f"рџ“† Sana: *{pro_exit_formatted}*\n"
+            f"📊 Sana: *{pro_exit_formatted}*\n"
             f"вЏ± Tejash: *{months_saved} oy tezroq!*\n"
             f"💰 Yig'ilgan boylik: *{format_number(int(savings_at_exit))} so'm*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"вњ… Oylik qarz to'lovi: *{format_number(int(total_payment))} so'm*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"✅ Oylik qarz to'lovi: *{format_number(int(total_payment))} so'm*\n"
             f"   (asosiy + qo'shimcha)"
         )
     else:
         msg = (
-            "рџ’Ћ *PRO РџР›РђРќ Р’Р«РҐРћР”Рђ РР— Р”РћР›Р“Рђ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "💎 *PRO ПР›АМ ВЫРҐОДА ИР— ДОР›ГА*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            "рџ“‹ *РњР•РўРћР”:* РЈРјРЅРѕРµ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ\n\n"
+            "📋 *РњЕТОД:* РЈмное распредеЛение\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "💰 *Р¤РРќРђРќРЎРћР’РћР• РЎРћРЎРўРћРЇРќРР•:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ Р”РѕС…РѕРґ: *{format_number(total_income)} СЃСѓРј*\n"
-            f"в”њ РћР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ: *{format_number(mandatory)} СЃСѓРј*\n"
-            f"в”њ РџР»Р°С‚С‘Р¶ РїРѕ РґРѕР»РіСѓ: *{format_number(loan_payment)} СЃСѓРј*\n"
-            f"в”” РЎРІРѕР±РѕРґРЅС‹Рµ: *{format_number(free_cash)} СЃСѓРј*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "💰 *Р¤ИМАМСОВОЕ СОСТОРЇМИЕ:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ Доход: *{format_number(total_income)} сум*\n"
+            f"┃ ОбязатеЛъные: *{format_number(mandatory)} сум*\n"
+            f"┃ ПЛатС‘ж по доЛгу: *{format_number(loan_payment)} сум*\n"
+            f"┃ Свободные: *{format_number(free_cash)} сум*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "📉 *РЈРњРќРћР• Р РђРЎРџР Р•Р”Р•Р›Р•РќРР•:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"в”њ 🏦 Р”Р»СЏ Р±РѕРіР°С‚СЃС‚РІР°: *{format_number(int(savings))} СЃСѓРј*\n"
-            f"в”њ вљЎ РџР»Р°С‚С‘Р¶ РїРѕ РєСЂРµРґРёС‚Сѓ: *{format_number(int(extra_debt))} СЃСѓРј*\n"
-            f"в”” 🏠 Р–РёР·РЅСЊ: *{format_number(int(living))} СЃСѓРј*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📉 *РЈРњМОЕ РАСПРЕДЕР›ЕМИЕ:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"┃ 🏦 ДЛя богатства: *{format_number(int(savings))} сум*\n"
+            f"┃ вљЎ Платёж по кредиту: *{format_number(int(extra_debt))} сум*\n"
+            f"┃ 🏠 Р–изнъ: *{format_number(int(living))} сум*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "рџ“… *Р Р•Р—РЈР›Р¬РўРђРў:*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"вЏ± РЎСЂРѕРє РІС‹С…РѕРґР°: *{pro_exit_months} РјРµСЃ*\n"
-            f"рџ“† Р”Р°С‚Р°: *{pro_exit_formatted}*\n"
-            f"вЏ± Р­РєРѕРЅРѕРјРёСЏ: *{months_saved} РјРµСЃ Р±С‹СЃС‚СЂРµРµ!*\n"
-            f"💰 РќР°РєРѕРїР»РµРЅРЅРѕРµ Р±РѕРіР°С‚СЃС‚РІРѕ: *{format_number(int(savings_at_exit))} СЃСѓРј*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📅 *РЕР—РЈР›Р¬ТАТ:*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"вЏ± Срок выхода: *{pro_exit_months} мес*\n"
+            f"📊 Дата: *{pro_exit_formatted}*\n"
+            f"вЏ± Экономия: *{months_saved} мес быстрее!*\n"
+            f"💰 МакопЛенное богатство: *{format_number(int(savings_at_exit))} сум*\n\n"
             
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"вњ… Р•Р¶РµРјРµСЃСЏС‡РЅС‹Р№ РїР»Р°С‚С‘Р¶: *{format_number(int(total_payment))} СЃСѓРј*\n"
-            f"   (РѕСЃРЅРѕРІРЅРѕР№ + РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Р№)"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"✅ ЕжемесяцныЙ пЛатС‘ж: *{format_number(int(total_payment))} сум*\n"
+            f"   (основноЙ + допоЛнитеЛъныЙ)"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "📉 Statistika" if lang == "uz" else "📉 РЎС‚Р°С‚РёСЃС‚РёРєР°",
+            "📉 Statistika" if lang == "uz" else "📉 Статистика",
             callback_data="pro_statistics"
         )],
         [InlineKeyboardButton(
-            "рџ“‹ Qarz nazorati" if lang == "uz" else "рџ“‹ РљРѕРЅС‚СЂРѕР»СЊ РґРѕР»РіРѕРІ",
+            "📋 Qarz nazorati" if lang == "uz" else "📋 КонтроЛъ доЛгов",
             callback_data="pro_debt_monitor"
         )],
         [InlineKeyboardButton(
-            "рџ“Ґ Excel yuklab olish" if lang == "uz" else "рџ“Ґ РЎРєР°С‡Р°С‚СЊ Excel",
+            "📈 Excel yuklab olish" if lang == "uz" else "📈 Скацатъ Excel",
             callback_data="pro_export_excel"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -7369,31 +7369,31 @@ async def ai_assistant_callback(update: Update, context: ContextTypes.DEFAULT_TY
     if not is_pro:
         if lang == "uz":
             msg = (
-                "рџ¤– *AI YORDAMCHI*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "🤖 *AI YORDAMCHI*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 "Bu funksiya faqat PRO foydalanuvchilar uchun!\n\n"
-                "рџ’Ћ PRO obuna bilan:\n"
-                "в”њ 🋤 Ovozli xabar orqali daromad/xarajat yozish\n"
-                "в”њ 📉 Avtomatik kategoriyalash\n"
-                "в”њ рџ“€ Guruhlab hisobot ko'rish\n"
-                "в”” 🧠 AI tahlil va maslahatlar\n\n"
+                "💎 PRO obuna bilan:\n"
+                "┃ 🋤 Ovozli xabar orqali daromad/xarajat yozish\n"
+                "┃ 📉 Avtomatik kategoriyalash\n"
+                "┃ 📝 Guruhlab hisobot ko'rish\n"
+                "┃ 🧠 AI tahlil va maslahatlar\n\n"
                 "PRO obuna oling va AI yordamchidan foydalaning!"
             )
         else:
             msg = (
-                "рџ¤– *AI РџРћРњРћР©РќРРљ*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "Р­С‚Р° С„СѓРЅРєС†РёСЏ С‚РѕР»СЊРєРѕ РґР»СЏ PRO РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№!\n\n"
-                "рџ’Ћ РЎ PRO РїРѕРґРїРёСЃРєРѕР№:\n"
-                "в”њ 🋤 Р—Р°РїРёСЃСЊ РґРѕС…РѕРґРѕРІ/СЂР°СЃС…РѕРґРѕРІ РіРѕР»РѕСЃРѕРј\n"
-                "в”њ 📉 РђРІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ РєР°С‚РµРіРѕСЂРёР·Р°С†РёСЏ\n"
-                "в”њ рџ“€ Р“СЂСѓРїРїРѕРІС‹Рµ РѕС‚С‡С‘С‚С‹\n"
-                "в”” 🧠 AI Р°РЅР°Р»РёР· Рё СЃРѕРІРµС‚С‹\n\n"
-                "РћС„РѕСЂРјРёС‚Рµ PRO Рё РїРѕР»СЊР·СѓР№С‚РµСЃСЊ AI РїРѕРјРѕС‰РЅРёРєРѕРј!"
+                "🤖 *AI ПОРњОЩМИК*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "Эта С„ункфия тоЛъко дЛя PRO поЛъзоватеЛеЙ!\n\n"
+                "💎 С PRO подпискоЙ:\n"
+                "┃ 🋤 Р—аписъ доходов/расходов гоЛосом\n"
+                "┃ 📉 Автоматицеская категоризафия\n"
+                "┃ 📝 Групповые отцС‘ты\n"
+                "┃ 🧠 AI анаЛиз и советы\n\n"
+                "ОС„ормите PRO и поЛъзуЙтесъ AI помощником!"
             )
         
         keyboard = [[InlineKeyboardButton(
-            "рџ’Ћ PRO olish" if lang == "uz" else "рџ’Ћ РџРѕР»СѓС‡РёС‚СЊ PRO",
+            "💎 PRO olish" if lang == "uz" else "💎 ПоЛуцитъ PRO",
             callback_data="show_pricing"
         )]]
         
@@ -7407,46 +7407,46 @@ async def ai_assistant_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # PRO user - show AI assistant menu
     if lang == "uz":
         msg = (
-            "рџ¤– *AI YORDAMCHI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🤖 *AI YORDAMCHI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "🋤 *Ovozli xabar* yuboring va men:\n"
-            "в”њ рџ“ќ Matnni aniqlayman\n"
-            "в”њ 💰 Daromad yoki xarajatni ajrataman\n"
-            "в”њ 📉 Kategoriyaga qo'shaman\n"
-            "в”” рџ“€ Hisobotda ko'rsataman\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            "┃ 💡 Matnni aniqlayman\n"
+            "┃ 💰 Daromad yoki xarajatni ajrataman\n"
+            "┃ 📉 Kategoriyaga qo'shaman\n"
+            "┃ 📝 Hisobotda ko'rsataman\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "📊 *MISOL:*\n"
             "\"Bugun ovqatga 50 ming berdim\"\n"
             "\"Maosh tushdi 5 million\"\n\n"
-            "рџ‘‡ Ovozli xabar yuboring yoki tugmani bosing:"
+            "🙋 Ovozli xabar yuboring yoki tugmani bosing:"
         )
     else:
         msg = (
-            "рџ¤– *AI РџРћРњРћР©РќРРљ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "🋤 РћС‚РїСЂР°РІСЊС‚Рµ *РіРѕР»РѕСЃРѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ* Рё СЏ:\n"
-            "в”њ рџ“ќ Р Р°СЃРїРѕР·РЅР°СЋ С‚РµРєСЃС‚\n"
-            "в”њ 💰 РћРїСЂРµРґРµР»СЋ РґРѕС…РѕРґ РёР»Рё СЂР°СЃС…РѕРґ\n"
-            "в”њ 📉 Р”РѕР±Р°РІР»СЋ РІ РєР°С‚РµРіРѕСЂРёСЋ\n"
-            "в”” рџ“€ РџРѕРєР°Р¶Сѓ РІ РѕС‚С‡С‘С‚Рµ\n\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            "📊 *РџР РРњР•Р :*\n"
-            "\"РЎРµРіРѕРґРЅСЏ РЅР° РµРґСѓ РїРѕС‚СЂР°С‚РёР» 50 С‚С‹СЃСЏС‡\"\n"
-            "\"РџРѕР»СѓС‡РёР» Р·Р°СЂРїР»Р°С‚Сѓ 5 РјРёР»Р»РёРѕРЅРѕРІ\"\n\n"
-            "рџ‘‡ РћС‚РїСЂР°РІСЊС‚Рµ РіРѕР»РѕСЃРѕРІРѕРµ РёР»Рё РЅР°Р¶РјРёС‚Рµ РєРЅРѕРїРєСѓ:"
+            "🤖 *AI ПОРњОЩМИК*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "🋤 Отправъте *гоЛосовое сообщение* и я:\n"
+            "┃ 💡 РаспознаСЋ текст\n"
+            "┃ 💰 ОпредеЛСЋ доход иЛи расход\n"
+            "┃ 📉 ДобавЛСЋ в категориСЋ\n"
+            "┃ 📝 Покажу в отцС‘те\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            "📊 *ПРИРњЕР:*\n"
+            "\"Сегодня на еду потратиЛ 50 тысяц\"\n"
+            "\"ПоЛуциЛ зарпЛату 5 миЛЛионов\"\n\n"
+            "🙋 Отправъте гоЛосовое иЛи нажмите кнопку:"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "📉 Hisobot ko'rish" if lang == "uz" else "📉 РџРѕСЃРјРѕС‚СЂРµС‚СЊ РѕС‚С‡С‘С‚",
+            "📉 Hisobot ko'rish" if lang == "uz" else "📉 Посмотретъ отцС‘т",
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "рџ“‹ Oxirgi yozuvlar" if lang == "uz" else "рџ“‹ РџРѕСЃР»РµРґРЅРёРµ Р·Р°РїРёСЃРё",
+            "📋 Oxirgi yozuvlar" if lang == "uz" else "📋 ПосЛедние записи",
             callback_data="ai_recent"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -7511,27 +7511,27 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if lang == "uz":
             msg = (
                 "🋤 *Ovozli kiritish - PRO funksiya*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 "Ovozli xabarlar orqali xarajatlarni kiritish "
                 "faqat PRO foydalanuvchilar uchun mavjud.\n\n"
-                "вњ… Matnli kiritish *BEPUL* va cheksiz!\n"
+                "✅ Matnli kiritish *BEPUL* va cheksiz!\n"
                 "Shunchaki yozing: _\"non 5000, choy 3000\"_\n\n"
-                "рџ’Ћ PRO bilan ovoz orqali ham kiritishingiz mumkin!"
+                "💎 PRO bilan ovoz orqali ham kiritishingiz mumkin!"
             )
         else:
             msg = (
-                "🋤 *Р“РѕР»РѕСЃРѕРІРѕР№ РІРІРѕРґ - PRO С„СѓРЅРєС†РёСЏ*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "Р’РІРѕРґ СЂР°СЃС…РѕРґРѕРІ РіРѕР»РѕСЃРѕРј РґРѕСЃС‚СѓРїРµРЅ "
-                "С‚РѕР»СЊРєРѕ РґР»СЏ PRO РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№.\n\n"
-                "вњ… РўРµРєСЃС‚РѕРІС‹Р№ РІРІРѕРґ *Р‘Р•РЎРџР›РђРўРќРћ* Рё Р±РµР· Р»РёРјРёС‚РѕРІ!\n"
-                "РџСЂРѕСЃС‚Рѕ РЅР°РїРёС€РёС‚Рµ: _\"С…Р»РµР± 5000, С‡Р°Р№ 3000\"_\n\n"
-                "рџ’Ћ РЎ PRO РјРѕР¶РµС‚Рµ РІРІРѕРґРёС‚СЊ Рё РіРѕР»РѕСЃРѕРј!"
+                "🋤 *ГоЛосовоЙ ввод - PRO С„ункфия*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "Ввод расходов гоЛосом доступен "
+                "тоЛъко дЛя PRO поЛъзоватеЛеЙ.\n\n"
+                "✅ ТекстовыЙ ввод *БЕСПР›АТМО* и без Лимитов!\n"
+                "Просто напишите: _\"хЛеб 5000, цаЙ 3000\"_\n\n"
+                "💎 С PRO можете вводитъ и гоЛосом!"
             )
         
         keyboard = [
             [InlineKeyboardButton(
-                "рџ’Ћ PRO ga o'tish" if lang == "uz" else "рџ’Ћ РџРµСЂРµР№С‚Рё РЅР° PRO",
+                "💎 PRO ga o'tish" if lang == "uz" else "💎 ПереЙти на PRO",
                 callback_data="show_pricing"
             )]
         ]
@@ -7600,21 +7600,21 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if lang == "uz":
                 msg = (
                     "🋤 *Oylik limit tugadi*\n"
-                    "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                    "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                     f"Siz bu oyda *{limit_info['limit']} ta* ovozli xabar ishlatdingiz.\n\n"
-                    "рџљЂ *Voice Unlimited* bilan cheksiz ovozli xabar yuboring!"
+                    "🗣 *Voice Unlimited* bilan cheksiz ovozli xabar yuboring!"
                 )
             else:
                 msg = (
-                    "🋤 *РњРµСЃСЏС‡РЅС‹Р№ Р»РёРјРёС‚ РёСЃС‡РµСЂРїР°РЅ*\n"
-                    "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                    f"Р’С‹ РёСЃРїРѕР»СЊР·РѕРІР°Р»Рё *{limit_info['limit']}* РіРѕР»РѕСЃРѕРІС‹С… СЃРѕРѕР±С‰РµРЅРёР№ РІ СЌС‚РѕРј РјРµСЃСЏС†Рµ.\n\n"
-                    "рџљЂ РЎ *Voice Unlimited* РѕС‚РїСЂР°РІР»СЏР№С‚Рµ Р±РµР· РѕРіСЂР°РЅРёС‡РµРЅРёР№!"
+                    "🋤 *РњесяцныЙ Лимит исцерпан*\n"
+                    "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                    f"Вы испоЛъзоваЛи *{limit_info['limit']}* гоЛосовых сообщениЙ в ьтом месяфе.\n\n"
+                    "🗣 С *Voice Unlimited* отправЛяЙте без ограницениЙ!"
                 )
             
             keyboard = [
                 [InlineKeyboardButton(
-                    f"🋤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🋤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} СЃСѓРј",
+                    f"🋤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} so'm" if lang == "uz" else f"🋤 Voice Unlimited - {format_number(VOICE_UNLIMITED_PRICE)} сум",
                     callback_data="buy_voice_unlimited"
                 )]
             ]
@@ -7637,14 +7637,14 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if is_admin:
             limit_text = ""
         elif voice_tier == "unlimited":
-            limit_text = " _(cheksiz)_" if lang == "uz" else " _(Р±РµР·Р»РёРјРёС‚)_"
+            limit_text = " _(cheksiz)_" if lang == "uz" else " _(безЛимит)_"
         else:
             limit_text = f" _({used}/{limit})_"
         
         if lang == "uz":
             step1_text = "🋤 _Ovoz qabul qilindi..._"
         else:
-            step1_text = "🋤 _Р“РѕР»РѕСЃ РїРѕР»СѓС‡РµРЅ..._"
+            step1_text = "🋤 _ГоЛос поЛуцен..._"
         
         processing_msg = await update.message.reply_text(step1_text, parse_mode="Markdown")
         
@@ -7661,9 +7661,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         # Update message - AI tahlil qilmoqda + limit ko'rsatish
         if lang == "uz":
-            step2_text = f"рџ¤– _AI tahlil qilmoqda..._{limit_text}"
+            step2_text = f"🤖 _AI tahlil qilmoqda..._{limit_text}"
         else:
-            step2_text = f"рџ¤– _AI Р°РЅР°Р»РёР·РёСЂСѓРµС‚..._{limit_text}"
+            step2_text = f"🤖 _AI анаЛизирует..._{limit_text}"
         
         await processing_msg.edit_text(step2_text, parse_mode="Markdown")
         
@@ -7682,7 +7682,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             logger.warning(f"[VOICE] Transcription returned None/empty")
             await processing_msg.edit_text(
                 "вќЊ Ovozni aniqlab bo'lmadi. Qaytadan urinib ko'ring." if lang == "uz" else 
-                "вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ СЂР°СЃРїРѕР·РЅР°С‚СЊ РіРѕР»РѕСЃ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РµС‰С‘ СЂР°Р·.",
+                "вќЊ Ме удаЛосъ распознатъ гоЛос. ПопробуЙте ещС‘ раз.",
                 parse_mode="Markdown"
             )
             return
@@ -7756,12 +7756,12 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # AI manbasini ko'rsatish
                     ai_source = transaction.get("ai_source", "local")
                     if ai_source == "gemini":
-                        msg += "\n\nрџ¤– _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\nрџ¤– _РђРЅР°Р»РёР· СЃ РїРѕРјРѕС‰СЊСЋ Gemini AI_"
+                        msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _АнаЛиз с помощъСЋ Gemini AI_"
                     
                     # Get updated voice limit info (Admin uchun ko'rsatmaslik)
                     if not is_admin:
                         new_limit_info = await check_voice_limit(db, user["id"])
-                        limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} РіРѕР»РѕСЃРѕРІС‹С… РѕСЃС‚Р°Р»РѕСЃСЊ_"
+                        limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
                         msg += limit_msg
                     
                     # Aniqlashtirish kerakmi tekshirish - kengaytirilgan
@@ -7778,27 +7778,27 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # Aniqlashtirish tugmasi - ixtiyoriy (birinchi qatorda)
                     if needs_clarification:
                         keyboard.append([InlineKeyboardButton(
-                            "рџ”Ќ Kategoriyani aniqlashtirish" if lang == "uz" else "рџ”Ќ РЈС‚РѕС‡РЅРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ",
+                            "🏷 Kategoriyani aniqlashtirish" if lang == "uz" else "🏷 РЈтоцнитъ категориСЋ",
                             callback_data=f"ai_clarify_category_{transaction_id}"
                         )])
                         # Xabar oxiriga eslatma
-                        msg += "\n\n_💎 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💎 РљР°С‚РµРіРѕСЂРёСЏ РЅРµС‚РѕС‡РЅР°. РЈС‚РѕС‡РЅРµРЅРёРµ РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ._"
+                        msg += "\n\n_💎 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💎 Категория нетоцна. РЈтоцнение необязатеЛъно._"
                     
                     # To'g'ri/Noto'g'ri tugmalari
                     keyboard.append([
                         InlineKeyboardButton(
-                            "вњ… To'g'ri" if lang == "uz" else "вњ… Р’РµСЂРЅРѕ",
+                            "✅ To'g'ri" if lang == "uz" else "✅ Верно",
                             callback_data="ai_confirm_learn"
                         ),
                         InlineKeyboardButton(
-                            "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ РќРµРІРµСЂРЅРѕ",
+                            "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
                             callback_data=f"ai_correct_{transaction_id}"
                         )
                     ])
                     
                     # Hisobot tugmasi
                     keyboard.append([InlineKeyboardButton(
-                        "📉 Hisobot" if lang == "uz" else "📉 РћС‚С‡С‘С‚",
+                        "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
                         callback_data="ai_report"
                     )])
                     
@@ -7830,7 +7830,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # Get updated voice limit info (Admin uchun ko'rsatmaslik)
                     if not is_admin:
                         new_limit_info = await check_voice_limit(db, user["id"])
-                        limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} РіРѕР»РѕСЃРѕРІС‹С… РѕСЃС‚Р°Р»РѕСЃСЊ_"
+                        limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
                         msg += limit_msg
                     
                     # Keyboard
@@ -7840,22 +7840,22 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # Aniqlashtirish tugmasi - agar kerak bo'lsa
                     if needs_clarification_list:
                         keyboard.append([InlineKeyboardButton(
-                            f"рџ”Ќ Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"рџ”Ќ РЈС‚РѕС‡РЅРёС‚СЊ ({len(needs_clarification_list)})",
+                            f"🏷 Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"🏷 РЈтоцнитъ ({len(needs_clarification_list)})",
                             callback_data=f"ai_clarify_multi_{ids_str}"
                         )])
                     
                     keyboard.append([
                         InlineKeyboardButton(
-                            "вњ… Hammasi to'g'ri" if lang == "uz" else "вњ… Р’СЃС‘ РІРµСЂРЅРѕ",
+                            "✅ Hammasi to'g'ri" if lang == "uz" else "✅ ВсС‘ верно",
                             callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
                         ),
                         InlineKeyboardButton(
-                            "вњЏпёЏ Tuzatish" if lang == "uz" else "вњЏпёЏ РСЃРїСЂР°РІРёС‚СЊ",
+                            "вњЏпёЏ Tuzatish" if lang == "uz" else "вњЏпёЏ Исправитъ",
                             callback_data=f"ai_correct_multi_{ids_str}"
                         )
                     ])
                     keyboard.append([InlineKeyboardButton(
-                        "📉 Hisobot" if lang == "uz" else "📉 РћС‚С‡С‘С‚",
+                        "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
                         callback_data="ai_report"
                     )])
                     
@@ -7884,7 +7884,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             # Get updated voice limit info (Admin uchun ko'rsatmaslik)
             if not is_admin:
                 new_limit_info = await check_voice_limit(db, user["id"])
-                msg += f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} РіРѕР»РѕСЃРѕРІС‹С… РѕСЃС‚Р°Р»РѕСЃСЊ_"
+                msg += f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
             
             await update.message.reply_text(
                 msg,
@@ -7907,22 +7907,22 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             # Get updated voice limit info (Admin uchun ko'rsatmaslik)
             if not is_admin:
                 new_limit_info = await check_voice_limit(db, user["id"])
-                limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} РіРѕР»РѕСЃРѕРІС‹С… РѕСЃС‚Р°Р»РѕСЃСЊ_"
+                limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
                 msg += limit_msg
             
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        "вњ… To'g'ri" if lang == "uz" else "вњ… Р’РµСЂРЅРѕ",
+                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
                         callback_data="ai_confirm_ok"
                     ),
                     InlineKeyboardButton(
-                        "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ РќРµРІРµСЂРЅРѕ",
+                        "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
                         callback_data=f"ai_debt_correct_{debt_id}"
                     )
                 ],
                 [InlineKeyboardButton(
-                    "рџ“‹ Qarzlar ro'yxati" if lang == "uz" else "рџ“‹ РЎРїРёСЃРѕРє РґРѕР»РіРѕРІ",
+                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
                     callback_data="ai_debt_list"
                 )]
             ]
@@ -7940,10 +7940,10 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         if not transactions:
             await processing_msg.edit_text(
-                f"рџ“ќ *Aniqlangan matn:* {text}\n\n"
+                f"💡 *Aniqlangan matn:* {text}\n\n"
                 f"вќЊ Summa topilmadi. Summani aniq ayting." if lang == "uz" else
-                f"рџ“ќ *Р Р°СЃРїРѕР·РЅР°РЅРЅС‹Р№ С‚РµРєСЃС‚:* {text}\n\n"
-                f"вќЊ РЎСѓРјРјР° РЅРµ РЅР°Р№РґРµРЅР°. РќР°Р·РѕРІРёС‚Рµ СЃСѓРјРјСѓ С‡С‘С‚РєРѕ.",
+                f"💡 *РаспознанныЙ текст:* {text}\n\n"
+                f"вќЊ Сумма не наЙдена. Мазовите сумму цС‘тко.",
                 parse_mode="Markdown"
             )
             return
@@ -7977,7 +7977,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # Admin uchun limit ko'rsatmaslik
         if not is_admin:
             new_limit_info = await check_voice_limit(db, user["id"])
-            limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} РіРѕР»РѕСЃРѕРІС‹С… РѕСЃС‚Р°Р»РѕСЃСЊ_"
+            limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
             msg += limit_msg
         
         # Aniqlashtirish kerakmi tekshirish
@@ -7986,11 +7986,11 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "вњ… To'g'ri" if lang == "uz" else "вњ… Р’РµСЂРЅРѕ",
+                    "✅ To'g'ri" if lang == "uz" else "✅ Верно",
                     callback_data="ai_confirm_learn"
                 ),
                 InlineKeyboardButton(
-                    "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ РќРµРІРµСЂРЅРѕ",
+                    "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
                     callback_data=f"ai_correct_{transaction_id}"
                 )
             ]
@@ -7998,13 +7998,13 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         if needs_clarification:
             keyboard.insert(0, [InlineKeyboardButton(
-                "рџ”Ќ Kategoriyani aniqlashtirish" if lang == "uz" else "рџ”Ќ РЈС‚РѕС‡РЅРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ",
+                "🏷 Kategoriyani aniqlashtirish" if lang == "uz" else "🏷 РЈтоцнитъ категориСЋ",
                 callback_data=f"ai_clarify_category_{transaction_id}"
             )])
-            msg += "\n\n_💎 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💎 РљР°С‚РµРіРѕСЂРёСЏ РЅРµС‚РѕС‡РЅР°. РЈС‚РѕС‡РЅРµРЅРёРµ РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ._"
+            msg += "\n\n_💎 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💎 Категория нетоцна. РЈтоцнение необязатеЛъно._"
         
         keyboard.append([InlineKeyboardButton(
-            "📉 Hisobot" if lang == "uz" else "📉 РћС‚С‡С‘С‚",
+            "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
             callback_data="ai_report"
         )])
         
@@ -8019,7 +8019,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         import traceback
         traceback.print_exc()
         await update.message.reply_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°",
+            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка",
             parse_mode="Markdown"
         )
 
@@ -8038,9 +8038,9 @@ async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
     # Summa patterns
     amount_patterns = [
         r'(\d+)\s*mln',           # 5 mln, 5mln
-        r'(\d+)\s*РјР»РЅ',           # 5 РјР»РЅ (rus)
+        r'(\d+)\s*млн',           # 5 млн (rus)
         r'(\d+)\s*ming',          # 50 ming
-        r'(\d+)\s*С‚С‹СЃ',           # 50 С‚С‹СЃ (rus)
+        r'(\d+)\s*тыс',           # 50 тыс (rus)
         r'(\d+)\s*k\b',           # 50k
         r'(\d[\d\s]*\d)',         # 50 000, 50000
         r'(\d+)',                 # oddiy raqam
@@ -8057,9 +8057,9 @@ async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
             amount = int(amount_str)
             
             # Multiplier
-            if 'mln' in amount_text or 'РјР»РЅ' in amount_text:
+            if 'mln' in amount_text or 'млн' in amount_text:
                 amount *= 1_000_000
-            elif 'ming' in amount_text or 'С‚С‹СЃ' in amount_text or 'k' in amount_text.lower():
+            elif 'ming' in amount_text or 'тыс' in amount_text or 'k' in amount_text.lower():
                 amount *= 1_000
             break
     
@@ -8072,12 +8072,12 @@ async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
     description = description.strip()
     
     if not description:
-        description = "Boshqa" if lang == "uz" else "РџСЂРѕС‡РµРµ"
+        description = "Boshqa" if lang == "uz" else "Процее"
     
     # Type aniqlash - kirim so'zlari
     income_words = [
         'maosh', 'oylik', 'daromad', 'kirim', 'pul keldi', 'oldi', 'ishdan',
-        'Р·Р°СЂРїР»Р°С‚Р°', 'РґРѕС…РѕРґ', 'РїСЂРёС…РѕРґ', 'РїРѕР»СѓС‡РёР»', 'Р·Р°СЂР°Р±РѕС‚Р°Р»'
+        'зарпЛата', 'доход', 'приход', 'поЛуциЛ', 'заработаЛ'
     ]
     
     tx_type = "expense"  # default
@@ -8090,7 +8090,7 @@ async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
         "type": tx_type,
         "amount": amount,
         "description": description.capitalize(),
-        "category": "рџ“¦ Boshqa" if lang == "uz" else "рџ“¦ РџСЂРѕС‡РµРµ",
+        "category": "📆 Boshqa" if lang == "uz" else "📆 Процее",
         "category_key": "boshqa"
     }
 
@@ -8128,13 +8128,13 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     # Skip menu buttons and commands
     menu_patterns = [
-        "📉", "👤", "рџ’Ћ", "🌐", "вќ“", "/", "Hisobotlarim", "РњРѕРё РѕС‚С‡С‘С‚С‹",
-        "Profil", "РџСЂРѕС„РёР»СЊ", "PRO", "Til", "РЇР·С‹Рє", "Yordam", "РџРѕРјРѕС‰СЊ",
+        "📉", "👤", "💎", "🌐", "вќ“", "/", "Hisobotlarim", "Рњои отцС‘ты",
+        "Profil", "ПроС„иЛъ", "PRO", "Til", "РЇзык", "Yordam", "Помощъ",
         # Menu tugmalari - yangi qo'shildi
-        "вњЌпёЏ", "Xarajat", "Р Р°СЃС…РѕРґ", "💰", "Daromad", "Р”РѕС…РѕРґ",
-        "рџ“‹", "Qarzlar", "Р”РѕР»РіРё", "рџ”„", "Transfer", "РџРµСЂРµРІРѕРґ",
-        "вљ™пёЏ", "Sozlamalar", "РќР°СЃС‚СЂРѕР№РєРё", "рџ“€", "Statistika", "РЎС‚Р°С‚РёСЃС‚РёРєР°",
-        "🏠", "Bosh sahifa", "Р“Р»Р°РІРЅР°СЏ", "в¬…пёЏ", "Orqaga", "РќР°Р·Р°Рґ"
+        "вњЌпёЏ", "Xarajat", "Расход", "💰", "Daromad", "Доход",
+        "📋", "Qarzlar", "Долги", "🕐", "Transfer", "Перевод",
+        "вљ™пёЏ", "Sozlamalar", "Настройки", "📝", "Statistika", "Статистика",
+        "🏠", "Bosh sahifa", "ГЛавная", "в¬…пёЏ", "Orqaga", "Мазад"
     ]
     for pattern in menu_patterns:
         if pattern in text:
@@ -8156,7 +8156,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 name = emoji_match.group(2)
                 category_key = f"custom_{name.lower().replace(' ', '_')}"
             else:
-                emoji = "рџ“¦"
+                emoji = "📆"
                 name = new_category_name
                 category_key = f"custom_{name.lower().replace(' ', '_')}"
                 new_category_name = f"{emoji} {name}"
@@ -8200,26 +8200,26 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                         lang = context.user_data.get("lang", "uz")
                         if lang == "uz":
                             msg = (
-                                "вњ… *YANGI KATEGORIYA YARATILDI*\n"
-                                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                                f"рџ“‚ Kategoriya: *{new_category_name}*\n"
+                                "✅ *YANGI KATEGORIYA YARATILDI*\n"
+                                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                                f"📝 Kategoriya: *{new_category_name}*\n"
                                 f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
                                 "🧠 _AI bu kategoriyani o'rgandi!_"
                             )
                         else:
                             msg = (
-                                "вњ… *РќРћР’РђРЇ РљРђРўР•Р“РћР РРЇ РЎРћР—Р”РђРќРђ*\n"
-                                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                                f"рџ“‚ РљР°С‚РµРіРѕСЂРёСЏ: *{new_category_name}*\n"
-                                f"💰 РЎСѓРјРјР°: *{transaction['amount']:,}* СЃСѓРј\n\n"
-                                "🧠 _AI Р·Р°РїРѕРјРЅРёР» СЌС‚Сѓ РєР°С‚РµРіРѕСЂРёСЋ!_"
+                                "✅ *МОВАРЇ КАТЕГОРИРЇ СОР—ДАМА*\n"
+                                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                                f"📝 Категория: *{new_category_name}*\n"
+                                f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
+                                "🧠 _AI запомниЛ ьту категориСЋ!_"
                             )
                         
                         await update.message.reply_text(msg, parse_mode="Markdown")
                         
                     except Exception as e:
                         print(f"[NEW-CATEGORY] Error: {e}")
-                        await update.message.reply_text("вќЊ Xatolik" if lang == "uz" else "вќЊ РћС€РёР±РєР°")
+                        await update.message.reply_text("вќЊ Xatolik" if lang == "uz" else "вќЊ Ошибка")
             
             # Flaglarni tozalash
             context.user_data["awaiting_new_category"] = False
@@ -8285,16 +8285,16 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            "вњ… To'g'ri" if lang == "uz" else "вњ… Р’РµСЂРЅРѕ",
+                            "✅ To'g'ri" if lang == "uz" else "✅ Верно",
                             callback_data="ai_confirm_ok"
                         ),
                         InlineKeyboardButton(
-                            "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ РќРµРІРµСЂРЅРѕ",
+                            "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
                             callback_data=f"ai_debt_correct_{debt_id}"
                         )
                     ],
                     [InlineKeyboardButton(
-                        "рџ“‹ Qarzlar ro'yxati" if lang == "uz" else "рџ“‹ РЎРїРёСЃРѕРє РґРѕР»РіРѕРІ",
+                        "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
                         callback_data="ai_debt_list"
                     )]
                 ]
@@ -8321,7 +8321,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     transaction_id = await save_transaction(db, user["id"], simple_tx)
                     
                     # Qisqa xabar
-                    emoji = "рџ“¤" if simple_tx["type"] == "expense" else "рџ“Ґ"
+                    emoji = "📉" if simple_tx["type"] == "expense" else "📈"
                     amount = simple_tx["amount"]
                     desc = simple_tx.get("description", "")
                     
@@ -8333,7 +8333,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     if lang == "uz":
                         msg = f"{emoji} *{desc}* вЂ” {amount:,} so'm\n📉 Bugun: {today_balance:+,}"
                     else:
-                        msg = f"{emoji} *{desc}* вЂ” {amount:,} СЃСѓРј\n📉 РЎРµРіРѕРґРЅСЏ: {today_balance:+,}"
+                        msg = f"{emoji} *{desc}* вЂ” {amount:,} сум\n📉 Сегодня: {today_balance:+,}"
                     
                     await update.message.reply_text(msg, parse_mode="Markdown")
                     return
@@ -8369,9 +8369,9 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             ai_source = transaction.get("ai_source", "local")
             confidence = transaction.get("confidence", 0)
             if ai_source == "gemini":
-                msg += f"\n\nрџ¤– _Gemini AI tahlili_" if lang == "uz" else f"\n\nрџ¤– _РђРЅР°Р»РёР· Gemini AI_"
+                msg += f"\n\n🤖 _Gemini AI tahlili_" if lang == "uz" else f"\n\n🤖 _АнаЛиз Gemini AI_"
             elif ai_source == "learned":
-                msg += f"\n\n🧠 _O'rganilgan pattern ({confidence}%)_" if lang == "uz" else f"\n\n🧠 _РР·СѓС‡РµРЅРЅС‹Р№ РїР°С‚С‚РµСЂРЅ ({confidence}%)_"
+                msg += f"\n\n🧠 _O'rganilgan pattern ({confidence}%)_" if lang == "uz" else f"\n\n🧠 _ИзуценныЙ паттерн ({confidence}%)_"
             
             # Aniqlashtirish kerakmi tekshirish
             needs_clarification = (
@@ -8387,26 +8387,26 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # Aniqlashtirish tugmasi - agar kerak bo'lsa, birinchi qatorda
             if needs_clarification:
                 keyboard.append([InlineKeyboardButton(
-                    "рџ”Ќ Kategoriyani aniqlashtirish" if lang == "uz" else "рџ”Ќ РЈС‚РѕС‡РЅРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ",
+                    "🏷 Kategoriyani aniqlashtirish" if lang == "uz" else "🏷 РЈтоцнитъ категориСЋ",
                     callback_data=f"ai_clarify_category_{transaction_id}"
                 )])
-                msg += "\n\n_💎 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💎 РљР°С‚РµРіРѕСЂРёСЏ РЅРµС‚РѕС‡РЅР°. РЈС‚РѕС‡РЅРµРЅРёРµ РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ._"
+                msg += "\n\n_💎 Kategoriya noaniq. Aniqlashtirish ixtiyoriy._" if lang == "uz" else "\n\n_💎 Категория нетоцна. РЈтоцнение необязатеЛъно._"
             
             # To'g'ri/Noto'g'ri tugmalari
             keyboard.append([
                 InlineKeyboardButton(
-                    "вњ… To'g'ri" if lang == "uz" else "вњ… Р’РµСЂРЅРѕ",
+                    "✅ To'g'ri" if lang == "uz" else "✅ Верно",
                     callback_data="ai_confirm_learn"  # O'rganish bilan
                 ),
                 InlineKeyboardButton(
-                    "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ РќРµРІРµСЂРЅРѕ",
+                    "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
                     callback_data=f"ai_correct_{transaction_id}"
                 )
             ])
             
             # Hisobot tugmasi
             keyboard.append([InlineKeyboardButton(
-                "📉 Hisobot" if lang == "uz" else "📉 РћС‚С‡С‘С‚",
+                "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
                 callback_data="ai_report"
             )])
         else:
@@ -8428,21 +8428,21 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 keyboard = []
                 if needs_clarification_list:
                     keyboard.append([InlineKeyboardButton(
-                        f"рџ”Ќ Aniqlashtirish (1 ta)" if lang == "uz" else f"рџ”Ќ РЈС‚РѕС‡РЅРёС‚СЊ (1)",
+                        f"🏷 Aniqlashtirish (1 ta)" if lang == "uz" else f"🏷 РЈтоцнитъ (1)",
                         callback_data=f"ai_clarify_multi_{ids_str}"
                     )])
                 keyboard.append([
                     InlineKeyboardButton(
-                        "вњ… Hammasi to'g'ri" if lang == "uz" else "вњ… Р’СЃС‘ РІРµСЂРЅРѕ",
+                        "✅ Hammasi to'g'ri" if lang == "uz" else "✅ ВсС‘ верно",
                         callback_data="ai_confirm_learn"
                     ),
                     InlineKeyboardButton(
-                        "вњЏпёЏ Tuzatish" if lang == "uz" else "вњЏпёЏ РСЃРїСЂР°РІРёС‚СЊ",
+                        "вњЏпёЏ Tuzatish" if lang == "uz" else "вњЏпёЏ Исправитъ",
                         callback_data=f"ai_correct_multi_{ids_str}"
                     )
                 ])
                 keyboard.append([InlineKeyboardButton(
-                    "📉 Hisobot" if lang == "uz" else "📉 РћС‚С‡С‘С‚",
+                    "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
                     callback_data="ai_report"
                 )])
                 await update.message.reply_text(
@@ -8465,7 +8465,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def ai_confirm_ok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """User confirmed transaction is correct - WITHOUT learning"""
     query = update.callback_query
-    await query.answer("вњ…" if context.user_data.get("lang") == "uz" else "вњ…")
+    await query.answer("✅" if context.user_data.get("lang") == "uz" else "✅")
     
     # Just remove the buttons, keep the message
     await query.edit_message_reply_markup(reply_markup=None)
@@ -8535,47 +8535,47 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
         
         # Build beautiful confirmation message with daily stats
         if lang == "uz":
-            msg = "вњ… *TASDIQLANDI!*\n"
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            msg = "✅ *TASDIQLANDI!*\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
             msg += "в”‚    📉 *BUGUNGI HISOBOT*    в”‚\n"
-            msg += "в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+            msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
             msg += f"💰 Daromad: *{format_number(today_income)}* so'm\n"
-            msg += f"рџ’ё Xarajat: *{format_number(today_expense)}* so'm\n"
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            msg += f"💳 Xarajat: *{format_number(today_expense)}* so'm\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             
             if today_balance >= 0:
-                msg += f"рџ“€ Balans: *+{format_number(today_balance)}* so'm вњ…"
+                msg += f"📝 Balans: *+{format_number(today_balance)}* so'm ✅"
             else:
-                msg += f"рџ“‰ Balans: *{format_number(today_balance)}* so'm вљ пёЏ"
+                msg += f"👛 Balans: *{format_number(today_balance)}* so'm вљ пёЏ"
         else:
-            msg = "вњ… *РџРћР”РўР’Р•Р Р–Р”Р•РќРћ!*\n"
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            msg = "✅ *ПОДТВЕРР–ДЕМО!*\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
-            msg += "в”‚    📉 *РћРўР§РЃРў Р—Рђ Р”Р•РќР¬*    в”‚\n"
-            msg += "в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
-            msg += f"💰 Р”РѕС…РѕРґ: *{format_number(today_income)}* СЃСѓРј\n"
-            msg += f"рџ’ё Р Р°СЃС…РѕРґ: *{format_number(today_expense)}* СЃСѓРј\n"
-            msg += "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+            msg += "в”‚    📉 *ОТЧРЃТ Р—А ДЕМР¬*    в”‚\n"
+            msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+            msg += f"💰 Доход: *{format_number(today_income)}* сум\n"
+            msg += f"💳 Расход: *{format_number(today_expense)}* сум\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             
             if today_balance >= 0:
-                msg += f"рџ“€ Р‘Р°Р»Р°РЅСЃ: *+{format_number(today_balance)}* СЃСѓРј вњ…"
+                msg += f"📝 Баланс: *+{format_number(today_balance)}* сум ✅"
             else:
-                msg += f"рџ“‰ Р‘Р°Р»Р°РЅСЃ: *{format_number(today_balance)}* СЃСѓРј вљ пёЏ"
+                msg += f"👛 Баланс: *{format_number(today_balance)}* сум вљ пёЏ"
         
         # Quick action buttons
         keyboard = [[
             InlineKeyboardButton(
-                "📉 Batafsil" if lang == "uz" else "📉 РџРѕРґСЂРѕР±РЅРµРµ",
+                "📉 Batafsil" if lang == "uz" else "📉 Подробнее",
                 callback_data="show_reports"
             ),
             InlineKeyboardButton(
-                "вћ• Yana kiritish" if lang == "uz" else "вћ• Р•С‰С‘ Р·Р°РїРёСЃСЊ",
+                "вћ• Yana kiritish" if lang == "uz" else "вћ• ЕщС‘ записъ",
                 callback_data="add_transaction_menu"
             )
         ]]
         
-        await query.answer("вњ…")
+        await query.answer("✅")
         await query.edit_message_text(
             msg,
             parse_mode="Markdown",
@@ -8584,7 +8584,7 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
     else:
         # Fallback - just remove buttons
         await query.answer(
-            "вњ… Qabul qilindi!" if lang == "uz" else "вњ… РџСЂРёРЅСЏС‚Рѕ!",
+            "✅ Qabul qilindi!" if lang == "uz" else "✅ Принято!",
             show_alert=False
         )
         await query.edit_message_reply_markup(reply_markup=None)
@@ -8608,7 +8608,7 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
         ids_str = callback_data.replace("ai_correct_multi_", "")
         transaction_ids = [int(x) for x in ids_str.split(",")]
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
@@ -8628,7 +8628,7 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
     
     if not transactions:
         await query.edit_message_text(
-            "вќЊ Tranzaksiyalar topilmadi" if lang == "uz" else "вќЊ РўСЂР°РЅР·Р°РєС†РёРё РЅРµ РЅР°Р№РґРµРЅС‹"
+            "вќЊ Tranzaksiyalar topilmadi" if lang == "uz" else "вќЊ Транзакфии не наЙдены"
         )
         return
     
@@ -8636,19 +8636,19 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
     if lang == "uz":
         msg = (
             "вњЏпёЏ *QAYSI YOZUVNI TUZATISH KERAK?*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
     else:
         msg = (
-            "вњЏпёЏ *РљРђРљРЈР® Р—РђРџРРЎР¬ РРЎРџР РђР’РРўР¬?*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "вњЏпёЏ *КАКРЈЮ Р—АПИСР¬ ИСПРАВИТР¬?*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
     
     keyboard = []
     for i, tx in enumerate(transactions, 1):
-        tx_type = "рџ“Ґ Daromad" if tx['type'] == 'income' else "рџ“¤ Xarajat"
+        tx_type = "📈 Daromad" if tx['type'] == 'income' else "📉 Xarajat"
         if lang == "ru":
-            tx_type = "рџ“Ґ Р”РѕС…РѕРґ" if tx['type'] == 'income' else "рџ“¤ Р Р°СЃС…РѕРґ"
+            tx_type = "📈 Доход" if tx['type'] == 'income' else "📉 Расход"
         
         msg += f"{i}. {tx_type}: *{tx['amount']:,}* - {tx.get('description', '')[:30]}\n"
         
@@ -8658,11 +8658,11 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
         )])
     
     keyboard.append([InlineKeyboardButton(
-        "рџ—‘ Hammasini o'chirish" if lang == "uz" else "рџ—‘ РЈРґР°Р»РёС‚СЊ РІСЃС‘",
+        "🚀 Hammasini o'chirish" if lang == "uz" else "🚀 РЈдаЛитъ всС‘",
         callback_data=f"ai_delete_all_{ids_str}"
     )])
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ РћС‚РјРµРЅР°",
+        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
         callback_data="ai_cancel_correct"
     )])
     
@@ -8687,7 +8687,7 @@ async def ai_clarify_multi_callback(update: Update, context: ContextTypes.DEFAUL
         ids_str = callback_data.replace("ai_clarify_multi_", "")
         transaction_ids = [int(x) for x in ids_str.split(",")]
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id
@@ -8704,39 +8704,39 @@ async def ai_clarify_multi_callback(update: Update, context: ContextTypes.DEFAUL
         tx = await get_transaction_by_id(db, tid)
         if tx and tx["user_id"] == user["id"]:
             # Kategoriya "boshqa" yoki noaniq bo'lsa
-            if tx.get("category_key") == "boshqa" or tx.get("category") in ["Boshqa", "Р”СЂСѓРіРѕРµ", "boshqa"]:
+            if tx.get("category_key") == "boshqa" or tx.get("category") in ["Boshqa", "Другое", "boshqa"]:
                 needs_clarification.append(tx)
     
     if not needs_clarification:
         await query.edit_message_text(
-            "вњ… Barcha tranzaksiyalar aniq" if lang == "uz" else "вњ… Р’СЃРµ С‚СЂР°РЅР·Р°РєС†РёРё С‚РѕС‡РЅС‹"
+            "✅ Barcha tranzaksiyalar aniq" if lang == "uz" else "✅ Все транзакфии тоцны"
         )
         return
     
     # Ro'yxatni ko'rsatish
     if lang == "uz":
         msg = (
-            "рџ”Ќ *QAYSI YOZUVNI ANIQLASHTIRISH KERAK?*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🏷 *QAYSI YOZUVNI ANIQLASHTIRISH KERAK?*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
     else:
         msg = (
-            "рџ”Ќ *РљРђРљРЈР® Р—РђРџРРЎР¬ РЈРўРћР§РќРРўР¬?*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🏷 *КАКРЈЮ Р—АПИСР¬ РЈТОЧМИТР¬?*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
     
     keyboard = []
     for i, tx in enumerate(needs_clarification, 1):
-        tx_type = "рџ“Ґ" if tx['type'] == 'income' else "рџ“¤"
+        tx_type = "📈" if tx['type'] == 'income' else "📉"
         msg += f"{i}. {tx_type} *{tx['amount']:,}* - {tx.get('description', '')[:30]}\n"
         
         keyboard.append([InlineKeyboardButton(
-            f"рџ”Ќ #{i} - {tx['amount']:,}",
+            f"🏷 #{i} - {tx['amount']:,}",
             callback_data=f"ai_clarify_category_{tx['id']}"
         )])
     
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
         callback_data="ai_cancel_correct"
     )])
     
@@ -8760,7 +8760,7 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     try:
         transaction_id = int(callback_data.split("_")[-1])
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
@@ -8775,7 +8775,7 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     
     if not transaction or transaction["user_id"] != user["id"]:
         await query.edit_message_text(
-            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ РўСЂР°РЅР·Р°РєС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°"
+            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ Транзакция не наЙдена"
         )
         return
     
@@ -8787,19 +8787,19 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     
     if lang == "uz":
         msg = (
-            "рџ”Ќ *Kategoriyani tanlang*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“ќ Tavsif: _{transaction['description']}_\n"
+            "🏷 *Kategoriyani tanlang*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"💡 Tavsif: _{transaction['description']}_\n"
             f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
             "_Qaysi kategoriyaga saqlash kerak?_"
         )
     else:
         msg = (
-            "рџ”Ќ *Р’С‹Р±РµСЂРёС‚Рµ РєР°С‚РµРіРѕСЂРёСЋ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“ќ РћРїРёСЃР°РЅРёРµ: _{transaction['description']}_\n"
-            f"💰 РЎСѓРјРјР°: *{transaction['amount']:,}* СЃСѓРј\n\n"
-            "_Р’ РєР°РєСѓСЋ РєР°С‚РµРіРѕСЂРёСЋ СЃРѕС…СЂР°РЅРёС‚СЊ?_"
+            "🏷 *Выберите категориСЋ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"💡 Описание: _{transaction['description']}_\n"
+            f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
+            "_В какуСЋ категориСЋ сохранитъ?_"
         )
     
     # Kategoriyalar tugmalari (2 ta qatorda)
@@ -8819,7 +8819,7 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     
     # Bekor qilish tugmasi
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ РћС‚РјРµРЅР°",
+        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
         callback_data="ai_cancel_correct"
     )])
     
@@ -8846,7 +8846,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         transaction_id = int(parts[0])
         new_category = parts[1] if len(parts) > 1 else "boshqa"
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, learn_from_correction
@@ -8861,7 +8861,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     
     if not transaction or transaction["user_id"] != user["id"]:
         await query.edit_message_text(
-            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ РўСЂР°РЅР·Р°РєС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°"
+            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ Транзакция не наЙдена"
         )
         return
     
@@ -8873,7 +8873,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     else:
         categories = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"])
     
-    new_category_name = categories.get(new_category, "рџ“¦ Boshqa")
+    new_category_name = categories.get(new_category, "📆 Boshqa")
     
     # Database'da yangilash
     try:
@@ -8911,15 +8911,15 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         
         if lang == "uz":
             msg = (
-                "вњ… *Kategoriya yangilandi!*\n\n"
-                f"рџ“Ѓ Yangi kategoriya: *{new_category_name}*\n\n"
+                "✅ *Kategoriya yangilandi!*\n\n"
+                f"📃 Yangi kategoriya: *{new_category_name}*\n\n"
                 "_🧠 AI bu so'zni keyingi safar to'g'ri taniydi._"
             )
         else:
             msg = (
-                "вњ… *РљР°С‚РµРіРѕСЂРёСЏ РѕР±РЅРѕРІР»РµРЅР°!*\n\n"
-                f"рџ“Ѓ РќРѕРІР°СЏ РєР°С‚РµРіРѕСЂРёСЏ: *{new_category_name}*\n\n"
-                "_🧠 AI Р·Р°РїРѕРјРЅРёС‚ СЌС‚Рѕ РґР»СЏ СЃР»РµРґСѓСЋС‰РёС… СЂР°Р·РѕРІ._"
+                "✅ *Категория обновЛена!*\n\n"
+                f"📃 Мовая категория: *{new_category_name}*\n\n"
+                "_🧠 AI запомнит ьто дЛя сЛедуСЋщих разов._"
             )
         
         await query.edit_message_text(msg, parse_mode="Markdown")
@@ -8927,7 +8927,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         logger.error(f"Error updating category: {e}")
         await query.edit_message_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°"
+            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка"
         )
 
 
@@ -8963,7 +8963,7 @@ async def ai_delete_all_callback(update: Update, context: ContextTypes.DEFAULT_T
             deleted += 1
     
     await query.edit_message_text(
-        f"рџ—‘ {deleted} ta yozuv o'chirildi" if lang == "uz" else f"рџ—‘ РЈРґР°Р»РµРЅРѕ {deleted} Р·Р°РїРёСЃРµР№",
+        f"🚀 {deleted} ta yozuv o'chirildi" if lang == "uz" else f"🚀 РЈдаЛено {deleted} записеЙ",
         parse_mode="Markdown"
     )
 
@@ -8981,7 +8981,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         transaction_id = int(callback_data.split("_")[-1])
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
@@ -8996,7 +8996,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if not transaction or transaction["user_id"] != user["id"]:
         await query.edit_message_text(
-            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ РўСЂР°РЅР·Р°РєС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°"
+            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ Транзакция не наЙдена"
         )
         return
     
@@ -9008,7 +9008,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     current_type = transaction['type']
     new_type = "expense" if current_type == "income" else "income"
     new_type_label = "Xarajat" if new_type == "expense" else "Daromad"
-    new_type_label_ru = "Р Р°СЃС…РѕРґ" if new_type == "expense" else "Р”РѕС…РѕРґ"
+    new_type_label_ru = "Расход" if new_type == "expense" else "Доход"
     
     # Description uchun xavfsiz escape (Markdown maxsus belgilardan)
     description = transaction.get('description', '') or ''
@@ -9019,50 +9019,50 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if lang == "uz":
         msg = (
             "вњЏпёЏ *TUZATISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“ќ Joriy yozuv:\n"
-            f"в”њ Turi: *{'Daromad' if transaction['type'] == 'income' else 'Xarajat'}*\n"
-            f"в”њ Kategoriya: *{transaction['category']}*\n"
-            f"в”њ Summa: *{transaction['amount']:,}* so'm\n"
-            f"в”” Tavsif: _{description}_\n\n"
-            "рџ¤– _Noto'g'ri tahlil qildim. Qanday tuzatay?_"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"💡 Joriy yozuv:\n"
+            f"┃ Turi: *{'Daromad' if transaction['type'] == 'income' else 'Xarajat'}*\n"
+            f"┃ Kategoriya: *{transaction['category']}*\n"
+            f"┃ Summa: *{transaction['amount']:,}* so'm\n"
+            f"┃ Tavsif: _{description}_\n\n"
+            "🤖 _Noto'g'ri tahlil qildim. Qanday tuzatay?_"
         )
     else:
         msg = (
-            "вњЏпёЏ *РРЎРџР РђР’Р›Р•РќРР•*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“ќ РўРµРєСѓС‰Р°СЏ Р·Р°РїРёСЃСЊ:\n"
-            f"в”њ РўРёРї: *{'Р”РѕС…РѕРґ' if transaction['type'] == 'income' else 'Р Р°СЃС…РѕРґ'}*\n"
-            f"в”њ РљР°С‚РµРіРѕСЂРёСЏ: *{transaction['category']}*\n"
-            f"в”њ РЎСѓРјРјР°: *{transaction['amount']:,}* СЃСѓРј\n"
-            f"в”” РћРїРёСЃР°РЅРёРµ: _{description}_\n\n"
-            "рџ¤– _РќРµРІРµСЂРЅС‹Р№ Р°РЅР°Р»РёР·. РљР°Рє РёСЃРїСЂР°РІРёС‚СЊ?_"
+            "вњЏпёЏ *ИСПРАВР›ЕМИЕ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"💡 Текущая записъ:\n"
+            f"┃ Тип: *{'Доход' if transaction['type'] == 'income' else 'Расход'}*\n"
+            f"┃ Категория: *{transaction['category']}*\n"
+            f"┃ Сумма: *{transaction['amount']:,}* сум\n"
+            f"┃ Описание: _{description}_\n\n"
+            "🤖 _МеверныЙ анаЛиз. Как исправитъ?_"
         )
     
     keyboard = [
         # Gemini bilan qayta tahlil
         [InlineKeyboardButton(
-            "рџ¤– Gemini bilan qayta tahlil" if lang == "uz" else "рџ¤– РџРѕРІС‚РѕСЂРЅС‹Р№ Р°РЅР°Р»РёР· Gemini",
+            "🤖 Gemini bilan qayta tahlil" if lang == "uz" else "🤖 ПовторныЙ анаЛиз Gemini",
             callback_data=f"ai_reanalyze_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            f"рџ”„ {new_type_label}ga o'zgartirish" if lang == "uz" else f"рџ”„ РЎРґРµР»Р°С‚СЊ {new_type_label_ru.lower()}РѕРј",
+            f"🕐 {new_type_label}ga o'zgartirish" if lang == "uz" else f"🕐 СдеЛатъ {new_type_label_ru.lower()}ом",
             callback_data=f"ai_swap_type_{transaction_id}_{new_type}"
         )],
         [InlineKeyboardButton(
-            "рџ“ќ Kategoriyani o'zgartirish" if lang == "uz" else "рџ“ќ РР·РјРµРЅРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ",
+            "💡 Kategoriyani o'zgartirish" if lang == "uz" else "💡 Изменитъ категориСЋ",
             callback_data=f"ai_change_category_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            "вњЏпёЏ Summani o'zgartirish" if lang == "uz" else "вњЏпёЏ РР·РјРµРЅРёС‚СЊ СЃСѓРјРјСѓ",
+            "вњЏпёЏ Summani o'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ сумму",
             callback_data=f"ai_edit_amount_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            "рџ—‘ O'chirish" if lang == "uz" else "рџ—‘ РЈРґР°Р»РёС‚СЊ",
+            "🚀 O'chirish" if lang == "uz" else "🚀 РЈдаЛитъ",
             callback_data=f"ai_delete_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ РћС‚РјРµРЅР°",
+            "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
             callback_data="ai_cancel_correct"
         )]
     ]
@@ -9126,7 +9126,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
             new_category = "uy_joy"
         elif any(w in desc_lower for w in ['qarz', 'nasiya']):
             new_category = "qarz_berdim"
-        new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "рџ“¦ Boshqa")
+        new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📆 Boshqa")
     else:
         new_category = "ish_haqi"  # Default income category
         desc_lower = description.lower()
@@ -9136,7 +9136,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
             new_category = "ijara_daromad"
         elif any(w in desc_lower for w in ['qarz', 'qaytardi']):
             new_category = "qarz_qaytarish"
-        new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "рџ’ј Ish haqi")
+        new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "💼 Ish haqi")
     
     # ==================== XATOLARDAN O'RGANISH (KUCHLI!) ====================
     if original_text and (old_type != new_type or old_category != new_category):
@@ -9175,7 +9175,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         print(f"[AI-CORRECT] Error updating transaction: {e}")
         await query.edit_message_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°"
+            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка"
         )
         return
     
@@ -9183,27 +9183,27 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     if lang == "uz":
         msg = (
-            "вњ… *Tuzatildi va AI xatadan xulosa chiqardi!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ”„ Turi o'zgartirildi:\n"
-            f"в”њ {'рџ“Ґ Daromad' if old_type == 'income' else 'рџ“¤ Xarajat'} в†’ "
-            f"{'рџ“Ґ Daromad' if new_type == 'income' else 'рџ“¤ Xarajat'}\n"
-            f"в”њ Kategoriya: *{new_category_name}*\n"
-            f"в”” Summa: *{transaction['amount']:,}* so'm\n\n"
+            "✅ *Tuzatildi va AI xatadan xulosa chiqardi!*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"🕐 Turi o'zgartirildi:\n"
+            f"┃ {'📈 Daromad' if old_type == 'income' else '📉 Xarajat'} в†’ "
+            f"{'📈 Daromad' if new_type == 'income' else '📉 Xarajat'}\n"
+            f"┃ Kategoriya: *{new_category_name}*\n"
+            f"┃ Summa: *{transaction['amount']:,}* so'm\n\n"
             "🧠 _AI bu xatoni chuqur tahlil qildi va eslab qoldi!_\n"
             "_Keyingi safar xuddi shunday xabarni to'g'ri tahlil qiladi._"
         )
     else:
         msg = (
-            "вњ… *РСЃРїСЂР°РІР»РµРЅРѕ! AI СЃРґРµР»Р°Р» РІС‹РІРѕРґС‹!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ”„ РўРёРї РёР·РјРµРЅС‘РЅ:\n"
-            f"в”њ {'рџ“Ґ Р”РѕС…РѕРґ' if old_type == 'income' else 'рџ“¤ Р Р°СЃС…РѕРґ'} в†’ "
-            f"{'рџ“Ґ Р”РѕС…РѕРґ' if new_type == 'income' else 'рџ“¤ Р Р°СЃС…РѕРґ'}\n"
-            f"в”њ РљР°С‚РµРіРѕСЂРёСЏ: *{new_category_name}*\n"
-            f"в”” РЎСѓРјРјР°: *{transaction['amount']:,}* СЃСѓРј\n\n"
-            "🧠 _AI РіР»СѓР±РѕРєРѕ РїСЂРѕР°РЅР°Р»РёР·РёСЂРѕРІР°Р» СЌС‚Сѓ РѕС€РёР±РєСѓ!_\n"
-            "_Р’ СЃР»РµРґСѓСЋС‰РёР№ СЂР°Р· РїРѕРґРѕР±РЅРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ Р±СѓРґРµС‚ РѕР±СЂР°Р±РѕС‚Р°РЅРѕ РїСЂР°РІРёР»СЊРЅРѕ._"
+            "✅ *ИсправЛено! AI сдеЛаЛ выводы!*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"🕐 Тип изменС‘н:\n"
+            f"┃ {'📈 Доход' if old_type == 'income' else '📉 Расход'} в†’ "
+            f"{'📈 Доход' if new_type == 'income' else '📉 Расход'}\n"
+            f"┃ Категория: *{new_category_name}*\n"
+            f"┃ Сумма: *{transaction['amount']:,}* сум\n\n"
+            "🧠 _AI гЛубоко проанаЛизироваЛ ьту ошибку!_\n"
+            "_В сЛедуСЋщиЙ раз подобное сообщение будет обработано правиЛъно._"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9212,7 +9212,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Gemini bilan qayta tahlil qilish va AI'ni o'rgatish"""
     query = update.callback_query
-    await query.answer("рџ¤– Gemini tahlil qilmoqda..." if context.user_data.get("lang") == "uz" else "рџ¤– Gemini Р°РЅР°Р»РёР·РёСЂСѓРµС‚...")
+    await query.answer("🤖 Gemini tahlil qilmoqda..." if context.user_data.get("lang") == "uz" else "🤖 Gemini анаЛизирует...")
     
     telegram_id = update.effective_user.id
     lang = context.user_data.get("lang", "uz")
@@ -9222,7 +9222,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         transaction_id = int(callback_data.split("_")[-1])
     except:
-        await query.edit_message_text("Xatolik" if lang == "uz" else "РћС€РёР±РєР°")
+        await query.edit_message_text("Xatolik" if lang == "uz" else "Ошибка")
         return
     
     from app.ai_assistant import (
@@ -9247,7 +9247,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not original_text or not is_gemini_available():
         await query.edit_message_text(
-            "вќЊ Gemini mavjud emas yoki matn topilmadi" if lang == "uz" else "вќЊ Gemini РЅРµРґРѕСЃС‚СѓРїРµРЅ РёР»Рё С‚РµРєСЃС‚ РЅРµ РЅР°Р№РґРµРЅ"
+            "вќЊ Gemini mavjud emas yoki matn topilmadi" if lang == "uz" else "вќЊ Gemini недоступен иЛи текст не наЙден"
         )
         return
     
@@ -9257,7 +9257,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         if not gemini_result:
             await query.edit_message_text(
-                "вќЊ Gemini javob bermadi. Boshqa usulni tanlang." if lang == "uz" else "вќЊ Gemini РЅРµ РѕС‚РІРµС‚РёР». Р’С‹Р±РµСЂРёС‚Рµ РґСЂСѓРіРѕР№ СЃРїРѕСЃРѕР±."
+                "вќЊ Gemini javob bermadi. Boshqa usulni tanlang." if lang == "uz" else "вќЊ Gemini не ответиЛ. Выберите другоЙ способ."
             )
             return
         
@@ -9268,9 +9268,9 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Kategoriya nomini olish
         if new_type == "income":
-            new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "рџ“¦ Boshqa")
+            new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "📆 Boshqa")
         else:
-            new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "рџ“¦ Boshqa")
+            new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📆 Boshqa")
         
         # Database'ni yangilash
         try:
@@ -9290,7 +9290,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await db._connection.commit()
         except Exception as e:
             print(f"[AI-REANALYZE] DB error: {e}")
-            await query.edit_message_text("вќЊ Xatolik" if lang == "uz" else "вќЊ РћС€РёР±РєР°")
+            await query.edit_message_text("вќЊ Xatolik" if lang == "uz" else "вќЊ Ошибка")
             return
         
         # AI'ga o'rgatish - Gemini natijasini to'g'ri deb belgilash
@@ -9304,31 +9304,31 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         # Natijani ko'rsatish va tasdiqlash so'rash
         if lang == "uz":
             msg = (
-                "рџ¤– *GEMINI QAYTA TAHLILI*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                f"рџ“ќ Yangi natija:\n"
-                f"в”њ Turi: *{'рџ“Ґ Daromad' if new_type == 'income' else 'рџ“¤ Xarajat'}*\n"
-                f"в”њ Kategoriya: *{new_category_name}*\n"
-                f"в”њ Summa: *{new_amount:,}* so'm\n"
-                f"в”” Tavsif: _{new_description}_\n\n"
-                "вњ… _Yangilandi va AI o'rgandi!_"
+                "🤖 *GEMINI QAYTA TAHLILI*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                f"💡 Yangi natija:\n"
+                f"┃ Turi: *{'📈 Daromad' if new_type == 'income' else '📉 Xarajat'}*\n"
+                f"┃ Kategoriya: *{new_category_name}*\n"
+                f"┃ Summa: *{new_amount:,}* so'm\n"
+                f"┃ Tavsif: _{new_description}_\n\n"
+                "✅ _Yangilandi va AI o'rgandi!_"
             )
         else:
             msg = (
-                "рџ¤– *РџРћР’РўРћР РќР«Р™ РђРќРђР›РР— GEMINI*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                f"рџ“ќ РќРѕРІС‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚:\n"
-                f"в”њ РўРёРї: *{'рџ“Ґ Р”РѕС…РѕРґ' if new_type == 'income' else 'рџ“¤ Р Р°СЃС…РѕРґ'}*\n"
-                f"в”њ РљР°С‚РµРіРѕСЂРёСЏ: *{new_category_name}*\n"
-                f"в”њ РЎСѓРјРјР°: *{new_amount:,}* СЃСѓРј\n"
-                f"в”” РћРїРёСЃР°РЅРёРµ: _{new_description}_\n\n"
-                "вњ… _РћР±РЅРѕРІР»РµРЅРѕ Рё AI РѕР±СѓС‡РёР»СЃСЏ!_"
+                "🤖 *ПОВТОРМЫР™ АМАР›ИР— GEMINI*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                f"💡 МовыЙ резуЛътат:\n"
+                f"┃ Тип: *{'📈 Доход' if new_type == 'income' else '📉 Расход'}*\n"
+                f"┃ Категория: *{new_category_name}*\n"
+                f"┃ Сумма: *{new_amount:,}* сум\n"
+                f"┃ Описание: _{new_description}_\n\n"
+                "✅ _ОбновЛено и AI обуциЛся!_"
             )
         
         keyboard = [
             [
-                InlineKeyboardButton("вњ… To'g'ri" if lang == "uz" else "вњ… Р’РµСЂРЅРѕ", callback_data="ai_confirm_ok"),
-                InlineKeyboardButton("вќЊ Yana noto'g'ri" if lang == "uz" else "вќЊ Р’СЃС‘ РµС‰С‘ РЅРµРІРµСЂРЅРѕ", callback_data=f"ai_correct_{transaction_id}")
+                InlineKeyboardButton("✅ To'g'ri" if lang == "uz" else "✅ Верно", callback_data="ai_confirm_ok"),
+                InlineKeyboardButton("вќЊ Yana noto'g'ri" if lang == "uz" else "вќЊ ВсС‘ ещС‘ неверно", callback_data=f"ai_correct_{transaction_id}")
             ]
         ]
         
@@ -9339,7 +9339,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         import traceback
         traceback.print_exc()
         await query.edit_message_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°"
+            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка"
         )
 
 
@@ -9381,17 +9381,17 @@ async def ai_change_category_callback(update: Update, context: ContextTypes.DEFA
     
     if lang == "uz":
         msg = (
-            "рџ“‚ *KATEGORIYA TANLANG*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📝 *KATEGORIYA TANLANG*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"Joriy: *{transaction['category']}*\n\n"
             "Yangi kategoriya:"
         )
     else:
         msg = (
-            "рџ“‚ *Р’Р«Р‘Р•Р РРўР• РљРђРўР•Р“РћР РР®*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"РўРµРєСѓС‰Р°СЏ: *{transaction['category']}*\n\n"
-            "РќРѕРІР°СЏ РєР°С‚РµРіРѕСЂРёСЏ:"
+            "📝 *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"Текущая: *{transaction['category']}*\n\n"
+            "Мовая категория:"
         )
     
     keyboard = []
@@ -9403,12 +9403,12 @@ async def ai_change_category_callback(update: Update, context: ContextTypes.DEFA
     
     # Yangi kategoriya yaratish tugmasi
     keyboard.append([InlineKeyboardButton(
-        "вћ• Yangi kategoriya" if lang == "uz" else "вћ• РќРѕРІР°СЏ РєР°С‚РµРіРѕСЂРёСЏ",
+        "вћ• Yangi kategoriya" if lang == "uz" else "вћ• Мовая категория",
         callback_data=f"ai_new_category_{transaction_id}"
     )])
     
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
         callback_data=f"ai_correct_{transaction_id}"
     )])
     
@@ -9437,18 +9437,18 @@ async def ai_new_category_callback(update: Update, context: ContextTypes.DEFAULT
     if lang == "uz":
         msg = (
             "вћ• *YANGI KATEGORIYA*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Yangi kategoriya nomini kiriting:\n"
-            "_Masalan: рџЋ® O'yinlar, рџђ± Uy hayvonlari_\n\n"
+            "_Masalan: 🎮 O'yinlar, 🐱 Uy hayvonlari_\n\n"
             "вљ пёЏ Bekor qilish uchun /cancel"
         )
     else:
         msg = (
-            "вћ• *РќРћР’РђРЇ РљРђРўР•Р“РћР РРЇ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ РЅРѕРІРѕР№ РєР°С‚РµРіРѕСЂРёРё:\n"
-            "_РќР°РїСЂРёРјРµСЂ: рџЋ® РРіСЂС‹, рџђ± Р”РѕРјР°С€РЅРёРµ Р¶РёРІРѕС‚РЅС‹Рµ_\n\n"
-            "вљ пёЏ Р”Р»СЏ РѕС‚РјРµРЅС‹ /cancel"
+            "вћ• *МОВАРЇ КАТЕГОРИРЇ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "Введите название новоЙ категории:\n"
+            "_Мапример: 🎮 Игры, 🐱 Домашние животные_\n\n"
+            "вљ пёЏ ДЛя отмены /cancel"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9489,9 +9489,9 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     
     # Kategoriya nomini olish
     if tx_type == "income":
-        new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "рџ“¦ Boshqa")
+        new_category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(new_category, "📆 Boshqa")
     else:
-        new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "рџ“¦ Boshqa")
+        new_category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(new_category, "📆 Boshqa")
     
     # Database'ni yangilash
     try:
@@ -9511,7 +9511,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
             await db._connection.commit()
     except Exception as e:
         print(f"[AI-SET-CATEGORY] DB error: {e}")
-        await query.edit_message_text("вќЊ Xatolik" if lang == "uz" else "вќЊ РћС€РёР±РєР°")
+        await query.edit_message_text("вќЊ Xatolik" if lang == "uz" else "вќЊ Ошибка")
         return
     
     # AI'ga o'rgatish - XATOLARDAN O'RGANISH
@@ -9544,19 +9544,19 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     
     if lang == "uz":
         msg = (
-            "вњ… *KATEGORIYA O'ZGARTIRILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“‚ Yangi kategoriya: *{new_category_name}*\n"
+            "✅ *KATEGORIYA O'ZGARTIRILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📝 Yangi kategoriya: *{new_category_name}*\n"
             f"💰 Summa: *{transaction['amount']:,}* so'm\n\n"
             "🧠 _AI bu xatadan xulosa chiqardi va o'rgandi!_"
         )
     else:
         msg = (
-            "вњ… *РљРђРўР•Р“РћР РРЇ РР—РњР•РќР•РќРђ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“‚ РќРѕРІР°СЏ РєР°С‚РµРіРѕСЂРёСЏ: *{new_category_name}*\n"
-            f"💰 РЎСѓРјРјР°: *{transaction['amount']:,}* СЃСѓРј\n\n"
-            "🧠 _AI СЃРґРµР»Р°Р» РІС‹РІРѕРґС‹ РёР· СЌС‚РѕР№ РѕС€РёР±РєРё Рё Р·Р°РїРѕРјРЅРёР»!_"
+            "✅ *КАТЕГОРИРЇ ИР—РњЕМЕМА*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📝 Мовая категория: *{new_category_name}*\n"
+            f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
+            "🧠 _AI сдеЛаЛ выводы из ьтоЙ ошибки и запомниЛ!_"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9589,9 +9589,9 @@ async def ai_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data.pop("ai_correcting", None)
     
     if lang == "uz":
-        msg = "рџ—‘ *Yozuv o'chirildi*\n\nYangi yozuv qo'shish uchun ovozli yoki matnli xabar yuboring."
+        msg = "🚀 *Yozuv o'chirildi*\n\nYangi yozuv qo'shish uchun ovozli yoki matnli xabar yuboring."
     else:
-        msg = "рџ—‘ *Р—Р°РїРёСЃСЊ СѓРґР°Р»РµРЅР°*\n\nРћС‚РїСЂР°РІСЊС‚Рµ РіРѕР»РѕСЃРѕРІРѕРµ РёР»Рё С‚РµРєСЃС‚РѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ РґР»СЏ РЅРѕРІРѕР№ Р·Р°РїРёСЃРё."
+        msg = "🚀 *Р—аписъ удаЛена*\n\nОтправъте гоЛосовое иЛи текстовое сообщение дЛя новоЙ записи."
     
     await query.edit_message_text(msg, parse_mode="Markdown")
 
@@ -9624,8 +9624,8 @@ async def ai_rewrite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if lang == "uz":
         msg = (
-            "рџ”„ *QAYTA YOZISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🕐 *QAYTA YOZISH*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Eski yozuv o'chirildi.\n\n"
             "🋤 Ovozli xabar yoki\n"
             "вњЌпёЏ Matnli xabar yuboring.\n\n"
@@ -9633,12 +9633,12 @@ async def ai_rewrite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     else:
         msg = (
-            "рџ”„ *РџР•Р Р•Р—РђРџРРЎР¬*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "РЎС‚Р°СЂР°СЏ Р·Р°РїРёСЃСЊ СѓРґР°Р»РµРЅР°.\n\n"
-            "🋤 РћС‚РїСЂР°РІСЊС‚Рµ РіРѕР»РѕСЃРѕРІРѕРµ РёР»Рё\n"
-            "вњЌпёЏ С‚РµРєСЃС‚РѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ.\n\n"
-            "РќР°РїСЂРёРјРµСЂ: \"РќР° РµРґСѓ РїРѕС‚СЂР°С‚РёР» 50 С‚С‹СЃСЏС‡\""
+            "🕐 *ПЕРЕР—АПИСР¬*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "Старая записъ удаЛена.\n\n"
+            "🋤 Отправъте гоЛосовое иЛи\n"
+            "вњЌпёЏ текстовое сообщение.\n\n"
+            "Мапример: \"Ма еду потратиЛ 50 тысяц\""
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9664,20 +9664,20 @@ async def ai_edit_amount_callback(update: Update, context: ContextTypes.DEFAULT_
     if lang == "uz":
         msg = (
             "вњЏпёЏ *SUMMANI O'ZGARTIRISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Yangi summani yozing:\n\n"
             "Masalan: `50000` yoki `ellik ming`"
         )
     else:
         msg = (
-            "вњЏпёЏ *РР—РњР•РќРРўР¬ РЎРЈРњРњРЈ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "РќР°РїРёС€РёС‚Рµ РЅРѕРІСѓСЋ СЃСѓРјРјСѓ:\n\n"
-            "РќР°РїСЂРёРјРµСЂ: `50000` РёР»Рё `РїСЏС‚СЊРґРµСЃСЏС‚ С‚С‹СЃСЏС‡`"
+            "вњЏпёЏ *ИР—РњЕМИТР¬ СРЈРњРњРЈ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "Мапишите новуСЋ сумму:\n\n"
+            "Мапример: `50000` иЛи `пятъдесят тысяц`"
         )
     
     keyboard = [[InlineKeyboardButton(
-        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ РћС‚РјРµРЅР°",
+        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
         callback_data="ai_cancel_correct"
     )]]
     
@@ -9706,7 +9706,7 @@ async def ai_amount_input_handler(update: Update, context: ContextTypes.DEFAULT_
     if not new_amount:
         await update.message.reply_text(
             "вќЊ Summani aniqlab bo'lmadi. Qaytadan kiriting." if lang == "uz" else
-            "вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ СЃСѓРјРјСѓ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РµС‰С‘ СЂР°Р·.",
+            "вќЊ Ме удаЛосъ опредеЛитъ сумму. ПопробуЙте ещС‘ раз.",
             parse_mode="Markdown"
         )
         return
@@ -9729,9 +9729,9 @@ async def ai_amount_input_handler(update: Update, context: ContextTypes.DEFAULT_
     budget_msg = format_budget_warning(budget_status, lang) or ""
     
     if lang == "uz":
-        msg = f"вњ… *Summa yangilandi: {new_amount:,} so'm*\n\n{budget_msg}"
+        msg = f"✅ *Summa yangilandi: {new_amount:,} so'm*\n\n{budget_msg}"
     else:
-        msg = f"вњ… *РЎСѓРјРјР° РѕР±РЅРѕРІР»РµРЅР°: {new_amount:,} СЃСѓРј*\n\n{budget_msg}"
+        msg = f"✅ *Сумма обновЛена: {new_amount:,} сум*\n\n{budget_msg}"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -9750,7 +9750,7 @@ async def ai_cancel_correct_callback(update: Update, context: ContextTypes.DEFAU
     if lang == "uz":
         msg = "в†©пёЏ Bekor qilindi"
     else:
-        msg = "в†©пёЏ РћС‚РјРµРЅРµРЅРѕ"
+        msg = "в†©пёЏ Отменено"
     
     await query.edit_message_text(msg, parse_mode="Markdown")
 
@@ -9769,7 +9769,7 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
         return
     
     budget_status = await get_budget_status(db, user["id"])
@@ -9779,16 +9779,16 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if lang == "uz":
             msg = (
                 "💰 *BYUDJET*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "рџ“ќ Byudjetni hisoblash uchun avval daromad va xarajatlaringizni kiriting.\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "💡 Byudjetni hisoblash uchun avval daromad va xarajatlaringizni kiriting.\n\n"
                 "📉 *Hisoblash* tugmasini bosing."
             )
         else:
             msg = (
-                "💰 *Р‘Р®Р”Р–Р•Рў*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "рџ“ќ Р”Р»СЏ СЂР°СЃС‡С‘С‚Р° Р±СЋРґР¶РµС‚Р° СЃРЅР°С‡Р°Р»Р° РІРІРµРґРёС‚Рµ СЃРІРѕРё РґРѕС…РѕРґС‹ Рё СЂР°СЃС…РѕРґС‹.\n\n"
-                "📉 РќР°Р¶РјРёС‚Рµ РєРЅРѕРїРєСѓ *Р Р°СЃС‡С‘С‚*."
+                "💰 *БЮДР–ЕТ*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "💡 ДЛя расцС‘та бСЋджета снацаЛа введите свои доходы и расходы.\n\n"
+                "📉 Мажмите кнопку *РасцС‘т*."
             )
     else:
         msg = format_budget_warning(budget_status, lang)
@@ -9798,34 +9798,34 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if budget_info.get("has_data"):
             if lang == "uz":
                 msg += (
-                    f"\n\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                    f"рџ“‹ *TAQSIMLASH:*\n"
-                    f"в”њ 💰 Daromad: *{budget_info['total_income']:,.0f}* so'm\n"
-                    f"в”њ 📊 Majburiy: *{budget_info['mandatory_expenses']:,.0f}* so'm\n"
-                    f"в”њ 💵 Bo'sh pul: *{budget_info['free_cash']:,.0f}* so'm\n"
-                    f"в”њ 🏦 Boylik (10%): *{budget_info['savings_budget']:,.0f}* so'm\n"
-                    f"в”њ вљЎ Qarz (20%): *{budget_info['extra_debt_budget']:,.0f}* so'm\n"
-                    f"в”” 🏠 Yashash (70%): *{budget_info['living_budget']:,.0f}* so'm"
+                    f"\n\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                    f"📋 *TAQSIMLASH:*\n"
+                    f"┃ 💰 Daromad: *{budget_info['total_income']:,.0f}* so'm\n"
+                    f"┃ 📊 Majburiy: *{budget_info['mandatory_expenses']:,.0f}* so'm\n"
+                    f"┃ 💵 Bo'sh pul: *{budget_info['free_cash']:,.0f}* so'm\n"
+                    f"┃ 🏦 Boylik (10%): *{budget_info['savings_budget']:,.0f}* so'm\n"
+                    f"┃ вљЎ Qarz (20%): *{budget_info['extra_debt_budget']:,.0f}* so'm\n"
+                    f"┃ 🏠 Yashash (70%): *{budget_info['living_budget']:,.0f}* so'm"
                 )
             else:
                 msg += (
-                    f"\n\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-                    f"рџ“‹ *Р РђРЎРџР Р•Р”Р•Р›Р•РќРР•:*\n"
-                    f"в”њ 💰 Р”РѕС…РѕРґ: *{budget_info['total_income']:,.0f}* СЃСѓРј\n"
-                    f"в”њ 📊 РћР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ: *{budget_info['mandatory_expenses']:,.0f}* СЃСѓРј\n"
-                    f"в”њ 💵 РЎРІРѕР±РѕРґРЅС‹Рµ: *{budget_info['free_cash']:,.0f}* СЃСѓРј\n"
-                    f"в”њ 🏦 Р‘РѕРіР°С‚СЃС‚РІРѕ (10%): *{budget_info['savings_budget']:,.0f}* СЃСѓРј\n"
-                    f"в”њ вљЎ Р”РѕР»Рі (20%): *{budget_info['extra_debt_budget']:,.0f}* СЃСѓРј\n"
-                    f"в”” 🏠 Р–РёР·РЅСЊ (70%): *{budget_info['living_budget']:,.0f}* СЃСѓРј"
+                    f"\n\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+                    f"📋 *РАСПРЕДЕР›ЕМИЕ:*\n"
+                    f"┃ 💰 Доход: *{budget_info['total_income']:,.0f}* сум\n"
+                    f"┃ 📊 ОбязатеЛъные: *{budget_info['mandatory_expenses']:,.0f}* сум\n"
+                    f"┃ 💵 Свободные: *{budget_info['free_cash']:,.0f}* сум\n"
+                    f"┃ 🏦 Богатство (10%): *{budget_info['savings_budget']:,.0f}* сум\n"
+                    f"┃ вљЎ Долг (20%): *{budget_info['extra_debt_budget']:,.0f}* сум\n"
+                    f"┃ 🏠 Р–изнъ (70%): *{budget_info['living_budget']:,.0f}* сум"
                 )
     
     keyboard = [
         [InlineKeyboardButton(
-            "📉 Xarajatlar" if lang == "uz" else "📉 Р Р°СЃС…РѕРґС‹",
+            "📉 Xarajatlar" if lang == "uz" else "📉 Расходы",
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -9854,7 +9854,7 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
         return
     
     # Get real balance (including debts)
@@ -9867,20 +9867,20 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if lang == "uz":
             msg = (
                 "📉 *MOLIYAVIY HISOBOT*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "рџ“­ Hali hech qanday yozuv yo'q.\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "📄 Hali hech qanday yozuv yo'q.\n\n"
                 "🋤 Ovozli xabar yuboring:\n"
                 "\"Bugun ovqatga 50 ming berdim\"\n"
                 "\"Maosh tushdi 5 million\""
             )
         else:
             msg = (
-                "📉 *Р¤РРќРђРќРЎРћР’Р«Р™ РћРўР§РЃРў*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "рџ“­ Р—Р°РїРёСЃРµР№ РїРѕРєР° РЅРµС‚.\n\n"
-                "🋤 РћС‚РїСЂР°РІСЊС‚Рµ РіРѕР»РѕСЃРѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ:\n"
-                "\"РЎРµРіРѕРґРЅСЏ РЅР° РµРґСѓ РїРѕС‚СЂР°С‚РёР» 50 С‚С‹СЃСЏС‡\"\n"
-                "\"РџРѕР»СѓС‡РёР» Р·Р°СЂРїР»Р°С‚Сѓ 5 РјРёР»Р»РёРѕРЅРѕРІ\""
+                "📉 *Р¤ИМАМСОВЫР™ ОТЧРЃТ*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "📄 Р—аписеЙ пока нет.\n\n"
+                "🋤 Отправъте гоЛосовое сообщение:\n"
+                "\"Сегодня на еду потратиЛ 50 тысяц\"\n"
+                "\"ПоЛуциЛ зарпЛату 5 миЛЛионов\""
             )
     else:
         msg = format_transaction_summary(summary, lang)
@@ -9889,19 +9889,19 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     keyboard = [
         [InlineKeyboardButton(
-            "рџ“‹ Oxirgi yozuvlar" if lang == "uz" else "рџ“‹ РџРѕСЃР»РµРґРЅРёРµ Р·Р°РїРёСЃРё",
+            "📋 Oxirgi yozuvlar" if lang == "uz" else "📋 ПосЛедние записи",
             callback_data="ai_recent"
         )],
         [InlineKeyboardButton(
-            "💰 Haqiqiy balans" if lang == "uz" else "💰 Р РµР°Р»СЊРЅС‹Р№ Р±Р°Р»Р°РЅСЃ",
+            "💰 Haqiqiy balans" if lang == "uz" else "💰 РеаЛъныЙ баЛанс",
             callback_data="ai_real_balance"
         )],
         [InlineKeyboardButton(
-            "🋤 Yangi yozuv" if lang == "uz" else "🋤 РќРѕРІР°СЏ Р·Р°РїРёСЃСЊ",
+            "🋤 Yangi yozuv" if lang == "uz" else "🋤 Мовая записъ",
             callback_data="ai_assistant"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -9927,7 +9927,7 @@ async def ai_real_balance_callback(update: Update, context: ContextTypes.DEFAULT
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
         return
     
     # Get real balance
@@ -9936,15 +9936,15 @@ async def ai_real_balance_callback(update: Update, context: ContextTypes.DEFAULT
     
     keyboard = [
         [InlineKeyboardButton(
-            "📉 To'liq hisobot" if lang == "uz" else "📉 РџРѕР»РЅС‹Р№ РѕС‚С‡С‘С‚",
+            "📉 To'liq hisobot" if lang == "uz" else "📉 ПоЛныЙ отцС‘т",
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "рџ’і Qarzlarim" if lang == "uz" else "рџ’і РњРѕРё РґРѕР»РіРё",
+            "💵 Qarzlarim" if lang == "uz" else "💵 Рњои доЛги",
             callback_data="ai_debt_list"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="ai_assistant"
         )]
     ]
@@ -9970,7 +9970,7 @@ async def ai_recent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Р”Р°РЅРЅС‹Рµ РЅРµ РЅР°Р№РґРµРЅС‹")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
         return
     
     # Get last 10 transactions
@@ -9980,28 +9980,28 @@ async def ai_recent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not transactions:
         if lang == "uz":
             msg = (
-                "рџ“‹ *OXIRGI YOZUVLAR*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "рџ“­ Hali hech qanday yozuv yo'q."
+                "📋 *OXIRGI YOZUVLAR*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "📄 Hali hech qanday yozuv yo'q."
             )
         else:
             msg = (
-                "рџ“‹ *РџРћРЎР›Р•Р”РќРР• Р—РђРџРРЎР*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                "рџ“­ Р—Р°РїРёСЃРµР№ РїРѕРєР° РЅРµС‚."
+                "📋 *ПОСР›ЕДМИЕ Р—АПИСИ*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                "📄 Р—аписеЙ пока нет."
             )
     else:
         if lang == "uz":
-            msg = "рџ“‹ *OXIRGI YOZUVLAR*\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            msg = "📋 *OXIRGI YOZUVLAR*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         else:
-            msg = "рџ“‹ *РџРћРЎР›Р•Р”РќРР• Р—РђРџРРЎР*\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            msg = "📋 *ПОСР›ЕДМИЕ Р—АПИСИ*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         for t in transactions:
-            type_emoji = "💰" if t["type"] == "income" else "рџ’ё"
+            type_emoji = "💰" if t["type"] == "income" else "💳"
             if t["type"] == "income":
-                cat_name = INCOME_CATEGORIES[lang].get(t["category"], "рџ“¦ Boshqa")
+                cat_name = INCOME_CATEGORIES[lang].get(t["category"], "📆 Boshqa")
             else:
-                cat_name = EXPENSE_CATEGORIES[lang].get(t["category"], "рџ“¦ Boshqa")
+                cat_name = EXPENSE_CATEGORIES[lang].get(t["category"], "📆 Boshqa")
             
             date_str = t["created_at"][:10] if t["created_at"] else ""
             msg += f"{type_emoji} {cat_name}: *{t['amount']:,}* so'm\n"
@@ -10009,15 +10009,15 @@ async def ai_recent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     keyboard = [
         [InlineKeyboardButton(
-            "📉 Hisobot" if lang == "uz" else "📉 РћС‚С‡С‘С‚",
+            "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "🋤 Yangi yozuv" if lang == "uz" else "🋤 РќРѕРІР°СЏ Р·Р°РїРёСЃСЊ",
+            "🋤 Yangi yozuv" if lang == "uz" else "🋤 Мовая записъ",
             callback_data="ai_assistant"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -10052,94 +10052,94 @@ async def ai_debt_list_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     if lang == "uz":
         msg = (
-            "рџ“‹ *QARZLAR RO'YXATI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📋 *QARZLAR RO'YXATI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
         
         if not debts:
-            msg += "рџ“­ Hech qanday faol qarz yo'q.\n"
+            msg += "📄 Hech qanday faol qarz yo'q.\n"
         else:
             # Bergan qarzlar
             lent_debts = [d for d in debts if d["debt_type"] == "lent"]
             if lent_debts:
-                msg += "рџ“¤ *BERGAN QARZLAR:*\n"
+                msg += "📉 *BERGAN QARZLAR:*\n"
                 for d in lent_debts:
                     remaining = d["amount"] - d["returned_amount"]
                     due = f" (qaytarish: {d['due_date']})" if d["due_date"] else ""
-                    msg += f"в”њ {d['person_name']}: *{remaining:,.0f}* so'm{due}\n"
+                    msg += f"┃ {d['person_name']}: *{remaining:,.0f}* so'm{due}\n"
                 msg += "\n"
             
             # Olgan qarzlar
             borrowed_debts = [d for d in debts if d["debt_type"] == "borrowed"]
             if borrowed_debts:
-                msg += "рџ“Ґ *OLGAN QARZLAR:*\n"
+                msg += "📈 *OLGAN QARZLAR:*\n"
                 for d in borrowed_debts:
                     remaining = d["amount"] - d["returned_amount"]
                     due = f" (qaytarish: {d['due_date']})" if d["due_date"] else ""
-                    msg += f"в”њ {d['person_name']}: *{remaining:,.0f}* so'm{due}\n"
+                    msg += f"┃ {d['person_name']}: *{remaining:,.0f}* so'm{due}\n"
                 msg += "\n"
         
         msg += (
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"рџ“¤ Bergan jami: *{summary['total_lent']:,}* so'm\n"
-            f"рџ“Ґ Olgan jami: *{summary['total_borrowed']:,}* so'm\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"📉 Bergan jami: *{summary['total_lent']:,}* so'm\n"
+            f"📈 Olgan jami: *{summary['total_borrowed']:,}* so'm\n"
         )
         
         net = summary['net_balance']
         if net > 0:
-            msg += f"рџ’љ Sof balans: *+{net:,}* so'm"
+            msg += f"💸 Sof balans: *+{net:,}* so'm"
         elif net < 0:
-            msg += f"рџ”ґ Sof balans: *{net:,}* so'm"
+            msg += f"💰 Sof balans: *{net:,}* so'm"
         else:
             msg += f"вљЄ Sof balans: *0* so'm"
     else:
         msg = (
-            "рџ“‹ *РЎРџРРЎРћРљ Р”РћР›Р“РћР’*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📋 *СПИСОК ДОР›ГОВ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
         
         if not debts:
-            msg += "рџ“­ РќРµС‚ Р°РєС‚РёРІРЅС‹С… РґРѕР»РіРѕРІ.\n"
+            msg += "📄 Мет активных доЛгов.\n"
         else:
             lent_debts = [d for d in debts if d["debt_type"] == "lent"]
             if lent_debts:
-                msg += "рџ“¤ *Р”РђР› Р’ Р”РћР›Р“:*\n"
+                msg += "📉 *ДАР› В ДОР›Г:*\n"
                 for d in lent_debts:
                     remaining = d["amount"] - d["returned_amount"]
-                    due = f" (РІРѕР·РІСЂР°С‚: {d['due_date']})" if d["due_date"] else ""
-                    msg += f"в”њ {d['person_name']}: *{remaining:,.0f}* СЃСѓРј{due}\n"
+                    due = f" (возврат: {d['due_date']})" if d["due_date"] else ""
+                    msg += f"┃ {d['person_name']}: *{remaining:,.0f}* сум{due}\n"
                 msg += "\n"
             
             borrowed_debts = [d for d in debts if d["debt_type"] == "borrowed"]
             if borrowed_debts:
-                msg += "рџ“Ґ *Р’Р—РЇР› Р’ Р”РћР›Р“:*\n"
+                msg += "📈 *ВР—РЇР› В ДОР›Г:*\n"
                 for d in borrowed_debts:
                     remaining = d["amount"] - d["returned_amount"]
-                    due = f" (РІРѕР·РІСЂР°С‚: {d['due_date']})" if d["due_date"] else ""
-                    msg += f"в”њ {d['person_name']}: *{remaining:,.0f}* СЃСѓРј{due}\n"
+                    due = f" (возврат: {d['due_date']})" if d["due_date"] else ""
+                    msg += f"┃ {d['person_name']}: *{remaining:,.0f}* сум{due}\n"
                 msg += "\n"
         
         msg += (
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
-            f"рџ“¤ Р’СЃРµРіРѕ РґР°Р»: *{summary['total_lent']:,}* СЃСѓРј\n"
-            f"рџ“Ґ Р’СЃРµРіРѕ РІР·СЏР»: *{summary['total_borrowed']:,}* СЃСѓРј\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
+            f"📉 Всего даЛ: *{summary['total_lent']:,}* сум\n"
+            f"📈 Всего взяЛ: *{summary['total_borrowed']:,}* сум\n"
         )
         
         net = summary['net_balance']
         if net > 0:
-            msg += f"рџ’љ Р§РёСЃС‚С‹Р№ Р±Р°Р»Р°РЅСЃ: *+{net:,}* СЃСѓРј"
+            msg += f"💸 ЧистыЙ баЛанс: *+{net:,}* сум"
         elif net < 0:
-            msg += f"рџ”ґ Р§РёСЃС‚С‹Р№ Р±Р°Р»Р°РЅСЃ: *{net:,}* СЃСѓРј"
+            msg += f"💰 ЧистыЙ баЛанс: *{net:,}* сум"
         else:
-            msg += f"вљЄ Р§РёСЃС‚С‹Р№ Р±Р°Р»Р°РЅСЃ: *0* СЃСѓРј"
+            msg += f"вљЄ ЧистыЙ баЛанс: *0* сум"
     
     keyboard = [
         [InlineKeyboardButton(
-            "вњ… Qarz qaytarildi" if lang == "uz" else "вњ… Р”РѕР»Рі РІРѕР·РІСЂР°С‰С‘РЅ",
+            "✅ Qarz qaytarildi" if lang == "uz" else "✅ Долг возвращС‘н",
             callback_data="ai_debt_mark_returned"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -10171,34 +10171,34 @@ async def ai_debt_mark_returned_callback(update: Update, context: ContextTypes.D
     
     if not debts:
         if lang == "uz":
-            msg = "рџ“­ Faol qarzlar yo'q"
+            msg = "📄 Faol qarzlar yo'q"
         else:
-            msg = "рџ“­ РќРµС‚ Р°РєС‚РёРІРЅС‹С… РґРѕР»РіРѕРІ"
+            msg = "📄 Мет активных доЛгов"
         await query.edit_message_text(msg, parse_mode="Markdown")
         return
     
     if lang == "uz":
         msg = (
-            "вњ… *QARZ QAYTARILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "✅ *QARZ QAYTARILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Qaysi qarz qaytarilganini tanlang:"
         )
     else:
         msg = (
-            "вњ… *Р”РћР›Р“ Р’РћР—Р’Р РђР©РЃРќ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            "Р’С‹Р±РµСЂРёС‚Рµ РІРѕР·РІСЂР°С‰С‘РЅРЅС‹Р№ РґРѕР»Рі:"
+            "✅ *ДОР›Г ВОР—ВРАЩРЃМ*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "Выберите возвращС‘нныЙ доЛг:"
         )
     
     keyboard = []
     for d in debts[:10]:  # Limit to 10
-        type_emoji = "рџ“¤" if d["debt_type"] == "lent" else "рџ“Ґ"
+        type_emoji = "📉" if d["debt_type"] == "lent" else "📈"
         remaining = d["amount"] - d["returned_amount"]
         btn_text = f"{type_emoji} {d['person_name']}: {remaining:,.0f}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"ai_debt_return_{d['id']}")])
     
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
         callback_data="ai_debt_list"
     )])
     
@@ -10258,29 +10258,29 @@ async def ai_debt_return_callback(update: Update, context: ContextTypes.DEFAULT_
     if lang == "uz":
         type_text = "Bergan qarz" if debt["debt_type"] == "lent" else "Olgan qarz"
         msg = (
-            f"вњ… *{type_text} qaytarildi!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"✅ *{type_text} qaytarildi!*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"👤 {debt['person_name']}\n"
             f"💵 {debt['amount']:,.0f} so'm\n\n"
         )
     else:
-        type_text = "Р”Р°РЅРЅС‹Р№ РґРѕР»Рі" if debt["debt_type"] == "lent" else "Р’Р·СЏС‚С‹Р№ РґРѕР»Рі"
+        type_text = "ДанныЙ доЛг" if debt["debt_type"] == "lent" else "ВзятыЙ доЛг"
         msg = (
-            f"вњ… *{type_text} РІРѕР·РІСЂР°С‰С‘РЅ!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"✅ *{type_text} возвращС‘н!*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"👤 {debt['person_name']}\n"
-            f"💵 {debt['amount']:,.0f} СЃСѓРј\n\n"
+            f"💵 {debt['amount']:,.0f} сум\n\n"
         )
     
     msg += format_debt_summary_message(summary, lang)
     
     keyboard = [
         [InlineKeyboardButton(
-            "рџ“‹ Qarzlar ro'yxati" if lang == "uz" else "рџ“‹ РЎРїРёСЃРѕРє РґРѕР»РіРѕРІ",
+            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
             callback_data="ai_debt_list"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ РќР°Р·Р°Рґ",
+            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -10329,7 +10329,7 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
     
     if not debt:
         await query.edit_message_text(
-            "вќЊ Qarz topilmadi" if lang == "uz" else "вќЊ Р”РѕР»Рі РЅРµ РЅР°Р№РґРµРЅ"
+            "вќЊ Qarz topilmadi" if lang == "uz" else "вќЊ Долг не наЙден"
         )
         return
     
@@ -10337,34 +10337,34 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
         type_text = "Bergan qarz" if debt["debt_type"] == "lent" else "Olgan qarz"
         msg = (
             f"вњЏпёЏ *QARZNI TUZATISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“ќ Joriy yozuv:\n"
-            f"в”њ Turi: *{type_text}*\n"
-            f"в”њ Kim: *{debt['person_name']}*\n"
-            f"в”њ Summa: *{debt['amount']:,.0f}* so'm\n"
-            f"в”” Sana: *{debt['given_date']}*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"💡 Joriy yozuv:\n"
+            f"┃ Turi: *{type_text}*\n"
+            f"┃ Kim: *{debt['person_name']}*\n"
+            f"┃ Summa: *{debt['amount']:,.0f}* so'm\n"
+            f"┃ Sana: *{debt['given_date']}*\n\n"
             "Quyidagilardan birini tanlang:"
         )
     else:
-        type_text = "Р”Р°Р» РІ РґРѕР»Рі" if debt["debt_type"] == "lent" else "Р’Р·СЏР» РІ РґРѕР»Рі"
+        type_text = "ДаЛ в доЛг" if debt["debt_type"] == "lent" else "ВзяЛ в доЛг"
         msg = (
-            f"вњЏпёЏ *РРЎРџР РђР’РРўР¬ Р”РћР›Р“*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“ќ РўРµРєСѓС‰Р°СЏ Р·Р°РїРёСЃСЊ:\n"
-            f"в”њ РўРёРї: *{type_text}*\n"
-            f"в”њ РљС‚Рѕ: *{debt['person_name']}*\n"
-            f"в”њ РЎСѓРјРјР°: *{debt['amount']:,.0f}* СЃСѓРј\n"
-            f"в”” Р”Р°С‚Р°: *{debt['given_date']}*\n\n"
-            "Р’С‹Р±РµСЂРёС‚Рµ РґРµР№СЃС‚РІРёРµ:"
+            f"вњЏпёЏ *ИСПРАВИТР¬ ДОР›Г*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"💡 Текущая записъ:\n"
+            f"┃ Тип: *{type_text}*\n"
+            f"┃ Кто: *{debt['person_name']}*\n"
+            f"┃ Сумма: *{debt['amount']:,.0f}* сум\n"
+            f"┃ Дата: *{debt['given_date']}*\n\n"
+            "Выберите деЙствие:"
         )
     
     keyboard = [
         [InlineKeyboardButton(
-            "рџ—‘ O'chirish" if lang == "uz" else "рџ—‘ РЈРґР°Р»РёС‚СЊ",
+            "🚀 O'chirish" if lang == "uz" else "🚀 РЈдаЛитъ",
             callback_data=f"ai_debt_delete_{debt_id}"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ РћС‚РјРµРЅР°",
+            "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
             callback_data="ai_confirm_ok"
         )]
     ]
@@ -10411,9 +10411,9 @@ async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_
         await db._connection.commit()
     
     if lang == "uz":
-        msg = "рџ—‘ *Qarz yozuvi o'chirildi*"
+        msg = "🚀 *Qarz yozuvi o'chirildi*"
     else:
-        msg = "рџ—‘ *Р—Р°РїРёСЃСЊ Рѕ РґРѕР»РіРµ СѓРґР°Р»РµРЅР°*"
+        msg = "🚀 *Р—аписъ о доЛге удаЛена*"
     
     await query.edit_message_text(msg, parse_mode="Markdown")
 
@@ -10436,13 +10436,13 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not context.args or len(context.args) < 2:
         await update.message.reply_text(
             "вќЊ *Xato format!*\n\n"
-            "вњ… To'g'ri format:\n"
+            "✅ To'g'ri format:\n"
             "`/activate <telegram_id> <plan_id>`\n\n"
-            "рџ“‹ *Mavjud tariflar:*\n"
-            "в”њ `pro_weekly` - Haftalik (7 kun)\n"
-            "в”њ `pro_monthly` - Oylik (30 kun)\n"
-            "в”њ `pro_quarterly` - 3 oylik (90 kun)\n"
-            "в”” `pro_yearly` - Yillik (365 kun)\n\n"
+            "📋 *Mavjud tariflar:*\n"
+            "┃ `pro_weekly` - Haftalik (7 kun)\n"
+            "┃ `pro_monthly` - Oylik (30 kun)\n"
+            "┃ `pro_quarterly` - 3 oylik (90 kun)\n"
+            "┃ `pro_yearly` - Yillik (365 kun)\n\n"
             "📊 *Misol:*\n"
             "`/activate 123456789 pro_monthly`",
             parse_mode="Markdown"
@@ -10458,7 +10458,7 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if plan_id not in valid_plans:
             await update.message.reply_text(
                 f"вќЊ Noto'g'ri tarif: `{plan_id}`\n\n"
-                f"вњ… Mavjud tariflar: {', '.join(valid_plans)}",
+                f"✅ Mavjud tariflar: {', '.join(valid_plans)}",
                 parse_mode="Markdown"
             )
             return
@@ -10472,9 +10472,9 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         if result:
             await update.message.reply_text(
-                f"вњ… *PRO muvaffaqiyatli aktivlashtirildi!*\n\n"
+                f"✅ *PRO muvaffaqiyatli aktivlashtirildi!*\n\n"
                 f"👤 Foydalanuvchi: `{target_user_id}`\n"
-                f"рџ“¦ Tarif: `{plan_id}`\n\n"
+                f"📆 Tarif: `{plan_id}`\n\n"
                 f"в„№пёЏ Foydalanuvchiga xabar yuborildi.",
                 parse_mode="Markdown"
             )
@@ -10530,17 +10530,17 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         
         if not payments:
-            await update.message.reply_text("рџ“‹ Hech qanday to'lov topilmadi.")
+            await update.message.reply_text("📋 Hech qanday to'lov topilmadi.")
             return
         
-        message = "рџ“‹ *SO'NGI TO'LOVLAR*\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        message = "📋 *SO'NGI TO'LOVLAR*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         for p in payments:
-            status_emoji = {'completed': 'вњ…', 'pending': 'вЏі', 'failed': 'вќЊ'}.get(p.get('status'), 'вќ“')
+            status_emoji = {'completed': '✅', 'pending': 'вЏі', 'failed': 'вќЊ'}.get(p.get('status'), 'вќ“')
             message += (
                 f"{status_emoji} *{p.get('first_name', 'N/A')}* (`{p.get('telegram_id')}`)\n"
-                f"   рџ“¦ {p.get('plan_id')} | 💰 {p.get('amount_uzs'):,} so'm\n"
-                f"   рџ“… {p.get('created_at')}\n\n"
+                f"   📆 {p.get('plan_id')} | 💰 {p.get('amount_uzs'):,} so'm\n"
+                f"   📅 {p.get('created_at')}\n\n"
             )
         
         await update.message.reply_text(message, parse_mode="Markdown")
@@ -10576,28 +10576,28 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     """Admin panel asosiy menyusi"""
     
     message = (
-        "рџЋ› *HALOS ADMIN PANEL*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-        "рџ”ђ Xush kelibsiz, Admin!\n\n"
+        "👑 *HALOS ADMIN PANEL*\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        "🔑 Xush kelibsiz, Admin!\n\n"
         "Quyidagi bo'limlardan birini tanlang:"
     )
     
     keyboard = [
         [
             InlineKeyboardButton("📉 Statistika", callback_data="admin_stats"),
-            InlineKeyboardButton("рџ’Ћ PRO hisoboti", callback_data="admin_pro_report")
+            InlineKeyboardButton("💎 PRO hisoboti", callback_data="admin_pro_report")
         ],
         [
             InlineKeyboardButton("💰 Kotib.ai balans", callback_data="admin_kotib_balance"),
-            InlineKeyboardButton("рџ’і To'lovlar", callback_data="admin_payments_list")
+            InlineKeyboardButton("💵 To'lovlar", callback_data="admin_payments_list")
         ],
         [
             InlineKeyboardButton("👥 Foydalanuvchilar", callback_data="admin_users"),
-            InlineKeyboardButton("рџ“€ Faollik", callback_data="admin_activity")
+            InlineKeyboardButton("📝 Faollik", callback_data="admin_activity")
         ],
         [
             InlineKeyboardButton("🋃 TRIAL barchaga", callback_data="admin_trial_all"),
-            InlineKeyboardButton("рџ“¤ Broadcast", callback_data="admin_broadcast")
+            InlineKeyboardButton("📉 Broadcast", callback_data="admin_broadcast")
         ],
         # User boshqaruvi
         [
@@ -10651,34 +10651,34 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         message = (
             "📉 *UMUMIY STATISTIKA*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "👥 *FOYDALANUVCHILAR*\n"
-            f"в”Њ рџ“€ Jami: *{stats.get('total_users', 0):,}* ta\n"
-            f"в”њ рџ†• Bugun: *+{stats.get('today_users', 0):,}* ta\n"
-            f"в”њ рџ“… Haftalik: *+{stats.get('week_users', 0):,}* ta\n"
-            f"в”њ рџ“† Oylik: *+{stats.get('month_users', 0):,}* ta\n"
-            f"в”” 📉 O'sish: *{growth}%* (haftalik)\n\n"
+            f"в”Њ 📝 Jami: *{stats.get('total_users', 0):,}* ta\n"
+            f"┃ 📈 Bugun: *+{stats.get('today_users', 0):,}* ta\n"
+            f"┃ 📅 Haftalik: *+{stats.get('week_users', 0):,}* ta\n"
+            f"┃ 📊 Oylik: *+{stats.get('month_users', 0):,}* ta\n"
+            f"┃ 📉 O'sish: *{growth}%* (haftalik)\n\n"
             
-            "рџ“€ *FAOLLIK*\n"
-            f"в”Њ рџ’¬ Jami tranzaksiyalar: *{stats.get('total_transactions', 0):,}*\n"
-            f"в”њ вљЎ Bugungi: *{stats.get('today_transactions', 0):,}*\n"
-            f"в”њ рџ¤ќ Aktiv qarzlar: *{stats.get('active_debts', 0):,}*\n"
-            f"в”” 💵 Qarzlar summasi: *{int(stats.get('total_debt_amount', 0)):,}* so'm\n\n"
+            "📝 *FAOLLIK*\n"
+            f"в”Њ 💰 Jami tranzaksiyalar: *{stats.get('total_transactions', 0):,}*\n"
+            f"┃ вљЎ Bugungi: *{stats.get('today_transactions', 0):,}*\n"
+            f"┃ 💳 Aktiv qarzlar: *{stats.get('active_debts', 0):,}*\n"
+            f"┃ 💵 Qarzlar summasi: *{int(stats.get('total_debt_amount', 0)):,}* so'm\n\n"
             
             "🌐 *TILLAR*\n"
         )
         
         langs = stats.get("languages", {})
         for i, (lang, count) in enumerate(langs.items()):
-            prefix = "в””" if i == len(langs) - 1 else "в”њ"
-            flag = "🇺🇿" if lang == "uz" else "рџ‡·рџ‡є"
+            prefix = "┃" if i == len(langs) - 1 else "┃"
+            flag = "🇺🇿" if lang == "uz" else "✅✅"
             message += f"{prefix} {flag} {lang.upper()}: *{count:,}* ta\n"
         
         message += f"\nвЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
         
         keyboard = [
-            [InlineKeyboardButton("рџ”„ Yangilash", callback_data="admin_stats")],
+            [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_stats")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
@@ -10711,29 +10711,29 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         total_revenue = (weekly_count * weekly_price) + (monthly_count * monthly_price) + (yearly_count * yearly_price)
         
         message = (
-            "рџ’Ћ *PRO OBUNALAR HISOBOTI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "💎 *PRO OBUNALAR HISOBOTI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             f"📉 *UMUMIY*\n"
-            f"в”Њ вњ… Aktiv PRO: *{active_pro:,}* ta\n"
-            f"в”њ рџ“€ Konversiya: *{pro_percent}%*\n"
-            f"в”” вќЊ Muddati tugagan: *{stats.get('pro_expired', 0):,}* ta\n\n"
+            f"в”Њ ✅ Aktiv PRO: *{active_pro:,}* ta\n"
+            f"┃ 📝 Konversiya: *{pro_percent}%*\n"
+            f"┃ вќЊ Muddati tugagan: *{stats.get('pro_expired', 0):,}* ta\n\n"
             
-            "рџ“¦ *REJALAR BO'YICHA*\n"
-            f"в”Њ рџ“… Haftalik: *{weekly_count:,}* ta\n"
-            f"в”њ рџ“† Oylik: *{monthly_count:,}* ta\n"
-            f"в”њ рџ“… Yillik: *{yearly_count:,}* ta\n"
-            f"в”њ 🋃 Promo: *{stats.get('pro_promo', 0):,}* ta\n"
-            f"в”” рџ†“ Trial: *{stats.get('pro_trial', 0):,}* ta\n\n"
+            "📆 *REJALAR BO'YICHA*\n"
+            f"в”Њ 📅 Haftalik: *{weekly_count:,}* ta\n"
+            f"┃ 📊 Oylik: *{monthly_count:,}* ta\n"
+            f"┃ 📅 Yillik: *{yearly_count:,}* ta\n"
+            f"┃ 🋃 Promo: *{stats.get('pro_promo', 0):,}* ta\n"
+            f"┃ 🆓 Trial: *{stats.get('pro_trial', 0):,}* ta\n\n"
             
             f"💰 *DAROMAD (taxminiy)*\n"
-            f"в”” 💵 Jami: *{total_revenue:,}* so'm\n\n"
+            f"┃ 💵 Jami: *{total_revenue:,}* so'm\n\n"
             
             f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
         )
         
         keyboard = [
-            [InlineKeyboardButton("рџ”„ Yangilash", callback_data="admin_pro_report")],
+            [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_pro_report")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
@@ -10757,32 +10757,32 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             # Status aniqlash
             if balance > 100000:
-                status_emoji = "рџџў"
+                status_emoji = "🟡"
                 status_text = "Yaxshi"
             elif balance > 50000:
-                status_emoji = "рџџЎ"
+                status_emoji = "🟢"
                 status_text = "O'rtacha"
             elif balance > 10000:
-                status_emoji = "рџџ "
+                status_emoji = "🔴"
                 status_text = "Kam"
             else:
-                status_emoji = "рџ”ґ"
+                status_emoji = "💰"
                 status_text = "KRITIK!"
             
             message = (
                 "💰 *KOTIB.AI BALANS*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 
                 f"{status_emoji} *Status:* {status_text}\n\n"
                 
                 f"💵 *Balans:* *{balance:,}*\n"
-                f"рџЋ™ *Audio:* {duration}\n"
-                f"рџ“ќ *Tarjima:* {translation}\n\n"
+                f"🎙 *Audio:* {duration}\n"
+                f"💡 *Tarjima:* {translation}\n\n"
                 
                 "📉 *TAXMINIY ISHLATISH*\n"
-                f"в”Њ рџЋ™ 1 ovozli xabar: ~100-200 kredit\n"
-                f"в”њ рџ“€ Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n"
-                f"в”” рџ“… Taxminan: ~*{int(balance / 150 / 50)}* kun\n\n"
+                f"в”Њ 🎙 1 ovozli xabar: ~100-200 kredit\n"
+                f"┃ 📝 Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n"
+                f"┃ 📅 Taxminan: ~*{int(balance / 150 / 50)}* kun\n\n"
                 
                 "вљ пёЏ _Balans kamaysa @HalosPaybot ga ogohlantirish yuboriladi_\n\n"
                 
@@ -10791,7 +10791,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             message = (
                 "💰 *KOTIB.AI BALANS*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 
                 "вќЊ *Balansni olishda xatolik!*\n\n"
                 "_API bilan bog'lanishda muammo yoki_\n"
@@ -10801,7 +10801,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         
         keyboard = [
-            [InlineKeyboardButton("рџ”„ Yangilash", callback_data="admin_kotib_balance")],
+            [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_kotib_balance")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
@@ -10837,15 +10837,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     payments = await cursor.fetchall()
             
             message = (
-                "рџ’і *SO'NGI TO'LOVLAR*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "💵 *SO'NGI TO'LOVLAR*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             )
             
             if payments:
                 for p in payments:
                     p = dict(p)
                     status_emoji = {
-                        'completed': 'вњ…', 
+                        'completed': '✅', 
                         'pending': 'вЏі', 
                         'failed': 'вќЊ'
                     }.get(p.get('status'), 'вќ“')
@@ -10859,11 +10859,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     
                     message += (
                         f"{status_emoji} *{p.get('first_name', 'N/A')}*\n"
-                        f"   рџ“¦ {p.get('plan_id', '-')} | 💰 {amount:,} so'm\n"
-                        f"   рџ“… {created}\n\n"
+                        f"   📆 {p.get('plan_id', '-')} | 💰 {amount:,} so'm\n"
+                        f"   📅 {created}\n\n"
                     )
             else:
-                message += "рџ“­ _Hech qanday to'lov topilmadi_\n"
+                message += "📄 _Hech qanday to'lov topilmadi_\n"
             
             message += f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             
@@ -10872,7 +10872,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message = f"вќЊ Xatolik: {e}"
         
         keyboard = [
-            [InlineKeyboardButton("рџ”„ Yangilash", callback_data="admin_payments_list")],
+            [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_payments_list")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
@@ -10908,13 +10908,13 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             message = (
                 "👥 *SO'NGI FOYDALANUVCHILAR*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             )
             
             for u in users:
                 u = dict(u)
                 tier = u.get('subscription_tier', 'free')
-                tier_emoji = "рџ’Ћ" if tier == 'pro' else "рџ†“"
+                tier_emoji = "💎" if tier == 'pro' else "🆓"
                 username = u.get('username', '')
                 username_str = f"@{username}" if username else "-"
                 
@@ -10926,7 +10926,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 message += (
                     f"{tier_emoji} *{u.get('first_name', 'N/A')}*\n"
-                    f"   👤 {username_str} | рџ“… {created}\n\n"
+                    f"   👤 {username_str} | 📅 {created}\n\n"
                 )
             
             message += f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
@@ -10936,8 +10936,8 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message = f"вќЊ Xatolik: {e}"
         
         keyboard = [
-            [InlineKeyboardButton("рџ”„ Yangilash", callback_data="admin_users")],
-            [InlineKeyboardButton("рџ”Ќ ID bo'yicha qidirish", callback_data="admin_search_user")],
+            [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_users")],
+            [InlineKeyboardButton("🏷 ID bo'yicha qidirish", callback_data="admin_search_user")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
@@ -10975,16 +10975,16 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             vt = dict(voice_total) if voice_total else {}
             
             message = (
-                "рџ“€ *FAOLLIK HISOBOTI*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "📝 *FAOLLIK HISOBOTI*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 
                 "вљЎ *BUGUNGI FAOLLIK*\n"
-                f"в”Њ рџ’¬ Tranzaksiyalar: *{ts.get('today_tx', 0):,}*\n"
-                f"в”њ рџ¤ќ Yangi qarzlar: *{ts.get('today_debts', 0):,}*\n"
-                f"в”” рџЋ™ Ovoz ishlatganlar: *{ts.get('voice_users', 0):,}* ta\n\n"
+                f"в”Њ 💰 Tranzaksiyalar: *{ts.get('today_tx', 0):,}*\n"
+                f"┃ 💳 Yangi qarzlar: *{ts.get('today_debts', 0):,}*\n"
+                f"┃ 🎙 Ovoz ishlatganlar: *{ts.get('voice_users', 0):,}* ta\n\n"
                 
-                "рџЋ™ *OVOZLI YORDAMCHI*\n"
-                f"в”” 📉 Jami ovozli xabarlar: *{vt.get('total', 0):,}*\n\n"
+                "🎙 *OVOZLI YORDAMCHI*\n"
+                f"┃ 📉 Jami ovozli xabarlar: *{vt.get('total', 0):,}*\n\n"
                 
                 f"вЏ° _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
             )
@@ -10994,7 +10994,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message = f"вќЊ Xatolik: {e}"
         
         keyboard = [
-            [InlineKeyboardButton("рџ”„ Yangilash", callback_data="admin_activity")],
+            [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_activity")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
@@ -11018,9 +11018,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         message = (
             "🔔 *QARZ ESLATMALARI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
-            f"рџ“… *Bugungi qarzlar:* {len(today_debts)} ta\n"
+            f"📅 *Bugungi qarzlar:* {len(today_debts)} ta\n"
             f"вЏ° *Yaqinlashayotgan (3 kun):* {len(upcoming_debts)} ta\n\n"
         )
         
@@ -11028,9 +11028,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             message += "*Bugungi qarzlar:*\n"
             for d in today_debts[:5]:
                 d = dict(d)
-                message += f"в”њ {d.get('person_name')}: {d.get('amount'):,.0f} so'm\n"
+                message += f"┃ {d.get('person_name')}: {d.get('amount'):,.0f} so'm\n"
             if len(today_debts) > 5:
-                message += f"в”” _...va yana {len(today_debts) - 5} ta_\n"
+                message += f"┃ _...va yana {len(today_debts) - 5} ta_\n"
             message += "\n"
         
         message += "Eslatmalarni hozir yuborish uchun tugmani bosing:"
@@ -11085,63 +11085,63 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     if debt_type == "lent":
                         msg = (
                             "🔔 *BUGUN QARZ QAYTISH KUNI!*\n"
-                            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                             f"👤 *{person}* sizga qarz qaytarishi kerak\n\n"
                             f"💰 Summa: *{amount_str}*\n"
-                            f"рџ“… Sana: *Bugun*\n"
+                            f"📅 Sana: *Bugun*\n"
                         )
                     else:
                         msg = (
                             "вљ пёЏ *BUGUN QARZ QAYTARISH KUNI!*\n"
-                            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                             f"👤 *{person}*ga qarz qaytarishingiz kerak\n\n"
                             f"💰 Summa: *{amount_str}*\n"
-                            f"рџ“… Sana: *Bugun*\n"
+                            f"📅 Sana: *Bugun*\n"
                         )
                 else:
                     if debt_type == "lent":
                         msg = (
-                            "🔔 *РЎР•Р“РћР”РќРЇ Р”Р•РќР¬ Р’РћР—Р’Р РђРўРђ Р”РћР›Р“Рђ!*\n"
-                            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                            f"👤 *{person}* РґРѕР»Р¶РµРЅ РІРµСЂРЅСѓС‚СЊ РІР°Рј РґРѕР»Рі\n\n"
-                            f"💰 РЎСѓРјРјР°: *{amount_str}*\n"
-                            f"рџ“… Р”Р°С‚Р°: *РЎРµРіРѕРґРЅСЏ*\n"
+                            "🔔 *СЕГОДМРЇ ДЕМР¬ ВОР—ВРАТА ДОР›ГА!*\n"
+                            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                            f"👤 *{person}* доЛжен вернутъ вам доЛг\n\n"
+                            f"💰 Сумма: *{amount_str}*\n"
+                            f"📅 Дата: *Сегодня*\n"
                         )
                     else:
                         msg = (
-                            "вљ пёЏ *РЎР•Р“РћР”РќРЇ Р”Р•РќР¬ Р’РћР—Р’Р РђРўРђ Р”РћР›Р“Рђ!*\n"
-                            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-                            f"👤 Р’С‹ РґРѕР»Р¶РЅС‹ РІРµСЂРЅСѓС‚СЊ РґРѕР»Рі *{person}*\n\n"
-                            f"💰 РЎСѓРјРјР°: *{amount_str}*\n"
-                            f"рџ“… Р”Р°С‚Р°: *РЎРµРіРѕРґРЅСЏ*\n"
+                            "вљ пёЏ *СЕГОДМРЇ ДЕМР¬ ВОР—ВРАТА ДОР›ГА!*\n"
+                            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+                            f"👤 Вы доЛжны вернутъ доЛг *{person}*\n\n"
+                            f"💰 Сумма: *{amount_str}*\n"
+                            f"📅 Дата: *Сегодня*\n"
                         )
                 
                 if description:
                     if lang == "uz":
-                        msg += f"рџ“ќ Izoh: _{description}_\n"
+                        msg += f"💡 Izoh: _{description}_\n"
                     else:
-                        msg += f"рџ“ќ Р—Р°РјРµС‚РєР°: _{description}_\n"
+                        msg += f"💡 Р—аметка: _{description}_\n"
                 
-                msg += "\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n"
+                msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
                 if lang == "uz":
                     msg += "💎 _Qarz qaytarilsa, tugmani bosing_"
                 else:
-                    msg += "💎 _РќР°Р¶РјРёС‚Рµ РєРЅРѕРїРєСѓ РєРѕРіРґР° РґРѕР»Рі РІРµСЂРЅСѓС‚_"
+                    msg += "💎 _Мажмите кнопку когда доЛг вернут_"
                 
                 keyboard = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton(
-                            "вњ… Qaytarildi" if lang == "uz" else "вњ… Р’РѕР·РІСЂР°С‰С‘РЅ",
+                            "✅ Qaytarildi" if lang == "uz" else "✅ ВозвращС‘н",
                             callback_data=f"debt_reminder_returned:{debt_id}"
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            "вЏ° Ertaga eslatish" if lang == "uz" else "вЏ° РќР°РїРѕРјРЅРёС‚СЊ Р·Р°РІС‚СЂР°",
+                            "вЏ° Ertaga eslatish" if lang == "uz" else "вЏ° Мапомнитъ завтра",
                             callback_data=f"debt_reminder_snooze:{debt_id}"
                         ),
                         InlineKeyboardButton(
-                            "рџ“‹ Qarzlar" if lang == "uz" else "рџ“‹ Р”РѕР»РіРё",
+                            "📋 Qarzlar" if lang == "uz" else "📋 Долги",
                             callback_data="ai_debt_list"
                         )
                     ]
@@ -11161,9 +11161,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 failed_count += 1
         
         result_message = (
-            "вњ… *ESLATMALAR YUBORILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"вњ… Yuborildi: *{sent_count}* ta\n"
+            "✅ *ESLATMALAR YUBORILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"✅ Yuborildi: *{sent_count}* ta\n"
             f"вќЊ Xato: *{failed_count}* ta\n\n"
             f"вЏ° _{now_uz().strftime('%H:%M:%S')}_"
         )
@@ -11183,15 +11183,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if query.data == "admin_settings":
         message = (
             "вљ™пёЏ *ADMIN SOZLAMALARI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "🔔 *Ogohlantirish chegaralari:*\n"
-            "в”њ рџџЎ 50,000 so'm - O'rtacha\n"
-            "в”њ рџџ  20,000 so'm - Kam\n"
-            "в”” рџ”ґ 10,000 so'm - Kritik\n\n"
+            "┃ 🟢 50,000 so'm - O'rtacha\n"
+            "┃ 🔴 20,000 so'm - Kam\n"
+            "┃ 💰 10,000 so'm - Kritik\n\n"
             
-            "рџ“¤ *Ogohlantirish yuboriladi:*\n"
-            "в”” @HalosPaybot\n\n"
+            "📉 *Ogohlantirish yuboriladi:*\n"
+            "┃ @HalosPaybot\n\n"
             
             "_Sozlamalarni o'zgartirish hozircha mavjud emas_"
         )
@@ -11211,21 +11211,21 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if query.data == "admin_trial_all":
         keyboard = [
             [
-                InlineKeyboardButton("вњ… Ha, boshlayman", callback_data="admin_trial_confirm"),
+                InlineKeyboardButton("✅ Ha, boshlayman", callback_data="admin_trial_confirm"),
                 InlineKeyboardButton("вќЊ Yo'q", callback_data="admin_main")
             ]
         ]
         
         await query.edit_message_text(
             "🋃 *3 KUNLIK TRIAL YOQISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "вљ пёЏ Bu amalni bajarsangiz:\n\n"
-            "вЂў Barcha foydalanuvchilarga 3 kunlik\n"
+            "↳ Barcha foydalanuvchilarga 3 kunlik\n"
             "  TRIAL PRO obuna beriladi\n"
-            "вЂў 10 ta ovozli xabar limiti\n"
-            "вЂў 10 soniya audio limiti\n"
-            "вЂў Barcha PRO funksiyalar ochiladi\n\n"
-            "рџ“ў Keyin broadcast xabar yuborishingiz mumkin\n\n"
+            "↳ 10 ta ovozli xabar limiti\n"
+            "↳ 10 soniya audio limiti\n"
+            "↳ Barcha PRO funksiyalar ochiladi\n\n"
+            "📝 Keyin broadcast xabar yuborishingiz mumkin\n\n"
             "*Davom etasizmi?*",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -11291,18 +11291,18 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 error_count += 1
         
         keyboard = [
-            [InlineKeyboardButton("рџ“¤ Broadcast yuborish", callback_data="admin_trial_broadcast")],
+            [InlineKeyboardButton("📉 Broadcast yuborish", callback_data="admin_trial_broadcast")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
             "🋃 *TRIAL YOQILDI!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"вњ… Muvaffaqiyatli: *{success_count}* ta\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"✅ Muvaffaqiyatli: *{success_count}* ta\n"
             f"вЏ­ O'tkazib yuborildi: *{skip_count}* ta\n"
             f"вќЊ Xatolik: *{error_count}* ta\n\n"
-            f"рџ“… Trial tugash sanasi: *{trial_end_date}*\n\n"
-            "рџ“ў Endi foydalanuvchilarga xabar yuborasizmi?",
+            f"📅 Trial tugash sanasi: *{trial_end_date}*\n\n"
+            "📝 Endi foydalanuvchilarga xabar yuborasizmi?",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -11312,15 +11312,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Trial haqida tayyor xabar
         trial_message = (
             "🋃 *SIZGA SOVG'A!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Hurmatli foydalanuvchi!\n\n"
-            "Sizga *3 kunlik BEPUL PRO* obuna taqdim etildi! рџЋ‰\n\n"
+            "Sizga *3 kunlik BEPUL PRO* obuna taqdim etildi! 👍\n\n"
             "вњЁ *Sizda ochilgan imkoniyatlar:*\n"
-            "вЂў 🋤 10 ta ovozli xabar\n"
-            "вЂў вЏ± 10 soniyagacha audio\n"
-            "вЂў 📉 Hisobotlar va statistika\n"
-            "вЂў рџ’і Cheksiz kategoriyalar\n"
-            "вЂў рџ“€ Export va arxiv\n\n"
+            "↳ 🋤 10 ta ovozli xabar\n"
+            "↳ вЏ± 10 soniyagacha audio\n"
+            "↳ 📉 Hisobotlar va statistika\n"
+            "↳ 💵 Cheksiz kategoriyalar\n"
+            "↳ 📝 Export va arxiv\n\n"
             "вЏ° *Muddati:* 3 kun\n\n"
             "💎 _Bu imkoniyatlarni sinab ko'ring va\n"
             "moliyangizni oson boshqaring!_\n\n"
@@ -11331,15 +11331,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         keyboard = [
             [
-                InlineKeyboardButton("вњ… Yuborish", callback_data="admin_trial_broadcast_send"),
+                InlineKeyboardButton("✅ Yuborish", callback_data="admin_trial_broadcast_send"),
                 InlineKeyboardButton("вњЏпёЏ Tahrirlash", callback_data="admin_trial_broadcast_edit")
             ],
             [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
-            "рџ“¤ *TRIAL XABARI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📉 *TRIAL XABARI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Quyidagi xabar yuboriladi:\n\n"
             "в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ\n"
             f"{trial_message}\n"
@@ -11359,7 +11359,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         await query.edit_message_text(
             "вњЏпёЏ *XABARNI TAHRIRLASH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Yangi xabar matnini yozing:\n\n"
             "💎 _Markdown formatlash qo'llab-quvvatlanadi_",
             parse_mode="Markdown",
@@ -11374,7 +11374,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         
         await query.edit_message_text(
-            "рџ“¤ *XABAR YUBORILMOQDA...*\n\n"
+            "📉 *XABAR YUBORILMOQDA...*\n\n"
             "вЏі Iltimos kuting...",
             parse_mode="Markdown"
         )
@@ -11409,9 +11409,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         ]
         
         await query.edit_message_text(
-            "вњ… *XABAR YUBORILDI!*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“¤ Yuborildi: *{success_count}* ta\n"
+            "✅ *XABAR YUBORILDI!*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📉 Yuborildi: *{success_count}* ta\n"
             f"вќЊ Xatolik: *{error_count}* ta",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -11427,14 +11427,14 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         ]
         
         await query.edit_message_text(
-            "рџ“¤ *XABAR YUBORISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "📉 *XABAR YUBORISH*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Barcha foydalanuvchilarga yuboriladigan\n"
             "xabarni yozing yoki media yuboring:\n\n"
-            "вњ… Matn\n"
-            "вњ… рџ“· Rasm + matn (caption)\n"
-            "вњ… рџЋ¬ Video + matn (caption)\n"
-            "вњ… 📄 Fayl + matn (caption)\n\n"
+            "✅ Matn\n"
+            "✅ 📷 Rasm + matn (caption)\n"
+            "✅ 🎬 Video + matn (caption)\n"
+            "✅ 📄 Fayl + matn (caption)\n\n"
             "💎 _Markdown formatlash qo'llab-quvvatlanadi_",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -11450,8 +11450,8 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         ]
         
         await query.edit_message_text(
-            "рџ”Ќ *FOYDALANUVCHI QIDIRISH*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "🏷 *FOYDALANUVCHI QIDIRISH*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Telegram ID ni kiriting:",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -11559,24 +11559,24 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     
     if is_forwarded:
         media_type = "forward"
-        await message.reply_text(f"рџ“¤ в†—пёЏ Forward xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📉 в†—пёЏ Forward xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
     elif has_photo:
         media_type = "photo"
         file_id = message.photo[-1].file_id
-        await message.reply_text(f"рџ“¤ рџ“· Rasm {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📉 📷 Rasm {len(users)} ta foydalanuvchiga yuborilmoqda...")
     elif has_video:
         media_type = "video"
         file_id = message.video.file_id
-        await message.reply_text(f"рџ“¤ рџЋ¬ Video {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📉 🎬 Video {len(users)} ta foydalanuvchiga yuborilmoqda...")
     elif has_document:
         media_type = "document"
         file_id = message.document.file_id
-        await message.reply_text(f"рџ“¤ 📄 Fayl {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📉 📄 Fayl {len(users)} ta foydalanuvchiga yuborilmoqda...")
     elif has_text:
         media_type = "text"
         file_id = None
         broadcast_text = message.text
-        await message.reply_text(f"рџ“¤ Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📉 Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
     else:
         await message.reply_text("вќЊ Noto'g'ri format. Matn, rasm, video yoki fayl yuboring.")
         return
@@ -11624,10 +11624,10 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
         if (success + failed) % 30 == 0:
             await asyncio.sleep(1)
     
-    result_msg = f"вњ… Broadcast yakunlandi!\n\nвњ… Yuborildi: {success} ta\nвќЊ Xato: {failed} ta"
+    result_msg = f"✅ Broadcast yakunlandi!\n\n✅ Yuborildi: {success} ta\nвќЊ Xato: {failed} ta"
     
     if errors_log:
-        result_msg += f"\n\nрџ”Ќ Xato namunalari:\n" + "\n".join(errors_log)
+        result_msg += f"\n\n🏷 Xato namunalari:\n" + "\n".join(errors_log)
     
     await message.reply_text(result_msg)
 
@@ -11677,7 +11677,7 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
         if lang == "uz":
             msg = "вќЊ Qarz topilmadi"
         else:
-            msg = "вќЊ Р”РѕР»Рі РЅРµ РЅР°Р№РґРµРЅ"
+            msg = "вќЊ Долг не наЙден"
         await query.edit_message_text(msg)
         return
     
@@ -11709,24 +11709,24 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
         
         if lang == "uz":
             msg = (
-                "вњ… *QARZ QAYTARILDI!*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "✅ *QARZ QAYTARILDI!*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 f"👤 *{person}*\n"
                 f"💰 Summa: *{amount_str}*\n\n"
                 "📉 Qarz holati yangilandi!"
             )
         else:
             msg = (
-                "вњ… *Р”РћР›Р“ Р’РћР—Р’Р РђР©РЃРќ!*\n"
-                "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+                "✅ *ДОР›Г ВОР—ВРАЩРЃМ!*\n"
+                "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 f"👤 *{person}*\n"
-                f"💰 РЎСѓРјРјР°: *{amount_str}*\n\n"
-                "📉 РЎС‚Р°С‚СѓСЃ РґРѕР»РіР° РѕР±РЅРѕРІР»С‘РЅ!"
+                f"💰 Сумма: *{amount_str}*\n\n"
+                "📉 Статус доЛга обновЛС‘н!"
             )
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(
-                "рџ“‹ Qarzlar ro'yxati" if lang == "uz" else "рџ“‹ РЎРїРёСЃРѕРє РґРѕР»РіРѕРІ",
+                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
                 callback_data="ai_debt_list"
             )]
         ])
@@ -11740,7 +11740,7 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
         if lang == "uz":
             msg = "вќЊ Xatolik yuz berdi"
         else:
-            msg = "вќЊ РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР°"
+            msg = "вќЊ ПроизошЛа ошибка"
         await query.edit_message_text(msg)
 
 
@@ -11788,29 +11788,29 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
     day_num = tomorrow_dt.day
     months_uz = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 
                 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
-    months_ru = ['СЏРЅРІР°СЂСЏ', 'С„РµРІСЂР°Р»СЏ', 'РјР°СЂС‚Р°', 'Р°РїСЂРµР»СЏ', 'РјР°СЏ', 'РёСЋРЅСЏ',
-                'РёСЋР»СЏ', 'Р°РІРіСѓСЃС‚Р°', 'СЃРµРЅС‚СЏР±СЂСЏ', 'РѕРєС‚СЏР±СЂСЏ', 'РЅРѕСЏР±СЂСЏ', 'РґРµРєР°Р±СЂСЏ']
+    months_ru = ['января', 'С„евраЛя', 'марта', 'апреЛя', 'мая', 'иСЋня',
+                'иСЋЛя', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
     
     if lang == "uz":
         date_str = f"{day_num}-{months_uz[tomorrow_dt.month - 1]}"
         msg = (
             "вЏ° *ESLATMA KECHIKTIRILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“… Yangi sana: *{date_str}*\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📅 Yangi sana: *{date_str}*\n\n"
             "Ertaga soat 6:00 da yana eslatamiz!"
         )
     else:
         date_str = f"{day_num} {months_ru[tomorrow_dt.month - 1]}"
         msg = (
-            "вЏ° *РќРђРџРћРњРРќРђРќРР• РћРўР›РћР–Р•РќРћ*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ“… РќРѕРІР°СЏ РґР°С‚Р°: *{date_str}*\n\n"
-            "РќР°РїРѕРјРЅРёРј Р·Р°РІС‚СЂР° РІ 6:00!"
+            "вЏ° *МАПОРњИМАМИЕ ОТР›ОР–ЕМО*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📅 Мовая дата: *{date_str}*\n\n"
+            "Мапомним завтра в 6:00!"
         )
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(
-            "рџ“‹ Qarzlar ro'yxati" if lang == "uz" else "рџ“‹ РЎРїРёСЃРѕРє РґРѕР»РіРѕРІ",
+            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
             callback_data="ai_debt_list"
         )]
     ])
@@ -11838,8 +11838,8 @@ async def admin_manage_user_start(update: Update, context: ContextTypes.DEFAULT_
     
     await query.edit_message_text(
         "👤 *USER BOSHQARUVI*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-        "рџ“ќ Boshqarmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        "💡 Boshqarmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
         "_Bekor qilish uchun /cancel_",
         parse_mode="Markdown"
     )
@@ -11860,10 +11860,10 @@ async def admin_delete_user_start(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["awaiting_admin_input"] = True
     
     await query.edit_message_text(
-        "рџ—‘пёЏ *USER O'CHIRISH*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        "🚀пёЏ *USER O'CHIRISH*\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         "вљ пёЏ Bu amal foydalanuvchini va uning BARCHA ma'lumotlarini o'chiradi!\n\n"
-        "рџ“ќ O'chirmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
+        "💡 O'chirmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
         "_Bekor qilish uchun /cancel_",
         parse_mode="Markdown"
     )
@@ -11884,11 +11884,11 @@ async def admin_clear_user_tx_start(update: Update, context: ContextTypes.DEFAUL
     context.user_data["awaiting_admin_input"] = True
     
     await query.edit_message_text(
-        "рџ§№ *USER TRANZAKSIYALARINI TOZALASH*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        "🧹 *USER TRANZAKSIYALARINI TOZALASH*\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         "вљ пёЏ Bu amal foydalanuvchining BARCHA kirim-chiqimlarini o'chiradi!\n"
         "User o'zi o'chirilmaydi.\n\n"
-        "рџ“ќ Tozalamoqchi bo'lgan user telegram ID sini yuboring:\n\n"
+        "💡 Tozalamoqchi bo'lgan user telegram ID sini yuboring:\n\n"
         "_Bekor qilish uchun /cancel_",
         parse_mode="Markdown"
     )
@@ -11908,14 +11908,14 @@ async def admin_clear_all_tx_confirm(update: Update, context: ContextTypes.DEFAU
     context.user_data["admin_action"] = "clear_all_tx"
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("вњ… HA, BARCHASINI O'CHIR", callback_data="admin_confirm_clear_all")],
+        [InlineKeyboardButton("✅ HA, BARCHASINI O'CHIR", callback_data="admin_confirm_clear_all")],
         [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_close")],
     ])
     
     await query.edit_message_text(
         "вљ пёЏ *OGOHLANTIRISH!*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-        "рџљЁ Bu amal BARCHA foydalanuvchilarning\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        "⚠ Bu amal BARCHA foydalanuvchilarning\n"
         "BARCHA kirim-chiqim ma'lumotlarini o'chiradi!\n\n"
         "вќ— Bu amalni qaytarib bo'lmaydi!\n\n"
         "Davom etasizmi?",
@@ -11940,9 +11940,9 @@ async def admin_confirm_clear_all(update: Update, context: ContextTypes.DEFAULT_
     
     if result["success"]:
         await query.edit_message_text(
-            "вњ… *BARCHA TRANZAKSIYALAR O'CHIRILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-            f"рџ—‘пёЏ O'chirilgan tranzaksiyalar: *{result['deleted_count']}* ta",
+            "✅ *BARCHA TRANZAKSIYALAR O'CHIRILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"🚀пёЏ O'chirilgan tranzaksiyalar: *{result['deleted_count']}* ta",
             parse_mode="Markdown"
         )
     else:
@@ -11986,7 +11986,7 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not user_info:
         # User topilmadi - qayta kiritish imkoniyati
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("рџ”„ Qayta kiritish", callback_data="admin_manage_user")],
+            [InlineKeyboardButton("🕐 Qayta kiritish", callback_data="admin_manage_user")],
             [InlineKeyboardButton("в—ЂпёЏ Admin panelga", callback_data="admin_main")],
         ])
         await update.message.reply_text(
@@ -12012,15 +12012,15 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     user_summary = (
         f"👤 *User ma'lumotlari:*\n"
-        f"в”њ ID: `{target_id}`\n"
-        f"в”њ Username: @{username}\n"
-        f"в”њ Ism: {first_name}\n"
-        f"в”њ Telefon: {phone}\n"
-        f"в”њ Tarif: {sub_tier}\n"
-        f"в”њ Tranzaksiyalar: {tx_count} ta\n"
-        f"в”њ Qarzlar: {debt_count} ta\n"
-        f"в”њ Jami kirim: {total_income:,.0f}\n"
-        f"в”” Jami chiqim: {total_expense:,.0f}\n"
+        f"┃ ID: `{target_id}`\n"
+        f"┃ Username: @{username}\n"
+        f"┃ Ism: {first_name}\n"
+        f"┃ Telefon: {phone}\n"
+        f"┃ Tarif: {sub_tier}\n"
+        f"┃ Tranzaksiyalar: {tx_count} ta\n"
+        f"┃ Qarzlar: {debt_count} ta\n"
+        f"┃ Jami kirim: {total_income:,.0f}\n"
+        f"┃ Jami chiqim: {total_expense:,.0f}\n"
     )
     
     if action == "delete_user":
@@ -12028,13 +12028,13 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data["target_user_info"] = user_info
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("вњ… HA, O'CHIR", callback_data=f"admin_confirm_delete:{target_id}")],
+            [InlineKeyboardButton("✅ HA, O'CHIR", callback_data=f"admin_confirm_delete:{target_id}")],
             [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_close")],
         ])
         
         await update.message.reply_text(
-            f"рџ—‘пёЏ *USER O'CHIRILADI*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"🚀пёЏ *USER O'CHIRILADI*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{user_summary}\n"
             f"вљ пёЏ Bu user va uning BARCHA ma'lumotlari o'chiriladi!\n"
             f"Davom etasizmi?",
@@ -12046,13 +12046,13 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data["target_user_id"] = target_id
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("вњ… HA, TOZALA", callback_data=f"admin_confirm_clear_tx:{target_id}")],
+            [InlineKeyboardButton("✅ HA, TOZALA", callback_data=f"admin_confirm_clear_tx:{target_id}")],
             [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_close")],
         ])
         
         await update.message.reply_text(
-            f"рџ§№ *TRANZAKSIYALAR TOZALANADI*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"🧹 *TRANZAKSIYALAR TOZALANADI*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{user_summary}\n"
             f"вљ пёЏ Bu userning BARCHA kirim-chiqimlari o'chiriladi!\n"
             f"Davom etasizmi?",
@@ -12066,16 +12066,16 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data["target_user_info"] = user_info
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("рџ—‘пёЏ Userni o'chirish", callback_data=f"admin_confirm_delete:{target_id}")],
-            [InlineKeyboardButton("рџ§№ TX larini o'chirish", callback_data=f"admin_confirm_clear_tx:{target_id}")],
-            [InlineKeyboardButton("рџ’Ћ PRO berish", callback_data=f"admin_give_pro:{target_id}")],
-            [InlineKeyboardButton("рџљ« PRO olib qo'yish", callback_data=f"admin_remove_pro:{target_id}")],
+            [InlineKeyboardButton("🚀пёЏ Userni o'chirish", callback_data=f"admin_confirm_delete:{target_id}")],
+            [InlineKeyboardButton("🧹 TX larini o'chirish", callback_data=f"admin_confirm_clear_tx:{target_id}")],
+            [InlineKeyboardButton("💎 PRO berish", callback_data=f"admin_give_pro:{target_id}")],
+            [InlineKeyboardButton("❌ PRO olib qo'yish", callback_data=f"admin_remove_pro:{target_id}")],
             [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")],
         ])
         
         await update.message.reply_text(
             f"👤 *USER BOSHQARUVI*\n"
-            f"в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{user_summary}\n"
             f"Quyidagi amallardan birini tanlang:",
             parse_mode="Markdown",
@@ -12106,15 +12106,15 @@ async def admin_confirm_delete_user(update: Update, context: ContextTypes.DEFAUL
     if result["success"]:
         user_info = result.get("user_info", {})
         await query.edit_message_text(
-            "вњ… *USER O'CHIRILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "✅ *USER O'CHIRILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"👤 User: `{target_id}` (@{user_info.get('username', 'N/A')})\n\n"
             f"📉 *O'chirilgan ma'lumotlar:*\n"
-            f"в”њ Tranzaksiyalar: {result['transactions_deleted']} ta\n"
-            f"в”њ Qarzlar: {result['debts_deleted']} ta\n"
-            f"в”њ Voice usage: {result['voice_usage_deleted']} ta\n"
-            f"в”њ Feature usage: {result['feature_usage_deleted']} ta\n"
-            f"в”” Financial profile: {'вњ…' if result['financial_profile_deleted'] else 'вќЊ'}\n",
+            f"┃ Tranzaksiyalar: {result['transactions_deleted']} ta\n"
+            f"┃ Qarzlar: {result['debts_deleted']} ta\n"
+            f"┃ Voice usage: {result['voice_usage_deleted']} ta\n"
+            f"┃ Feature usage: {result['feature_usage_deleted']} ta\n"
+            f"┃ Financial profile: {'✅' if result['financial_profile_deleted'] else 'вќЊ'}\n",
             parse_mode="Markdown"
         )
     else:
@@ -12144,10 +12144,10 @@ async def admin_confirm_clear_tx(update: Update, context: ContextTypes.DEFAULT_T
     
     if result["success"]:
         await query.edit_message_text(
-            "вњ… *TRANZAKSIYALAR TOZALANDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "✅ *TRANZAKSIYALAR TOZALANDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"👤 User: `{target_id}`\n"
-            f"рџ—‘пёЏ O'chirilgan tranzaksiyalar: *{result['deleted_count']}* ta",
+            f"🚀пёЏ O'chirilgan tranzaksiyalar: *{result['deleted_count']}* ta",
             parse_mode="Markdown"
         )
     else:
@@ -12199,11 +12199,11 @@ async def admin_give_pro_to_user(update: Update, context: ContextTypes.DEFAULT_T
                 await conn.commit()
         
         await query.edit_message_text(
-            "вњ… *PRO BERILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "✅ *PRO BERILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"👤 User: `{target_id}`\n"
-            f"рџ’Ћ PRO muddati: 30 kun\n"
-            f"рџ“… Tugash sanasi: {expires_at.strftime('%Y-%m-%d')}",
+            f"💎 PRO muddati: 30 kun\n"
+            f"📅 Tugash sanasi: {expires_at.strftime('%Y-%m-%d')}",
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -12251,10 +12251,10 @@ async def admin_remove_pro_from_user(update: Update, context: ContextTypes.DEFAU
                 await conn.commit()
         
         await query.edit_message_text(
-            "вњ… *PRO OLIB QO'YILDI*\n"
-            "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+            "✅ *PRO OLIB QO'YILDI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"👤 User: `{target_id}`\n"
-            f"рџ“¦ Tarif: Free",
+            f"📆 Tarif: Free",
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -12281,23 +12281,23 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     
     msg = (
         "📉 *ADMIN STATISTIKA*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         f"👥 *Foydalanuvchilar:*\n"
-        f"в”њ Jami: {stats.get('total_users', 0)}\n"
-        f"в”њ Bugun: +{stats.get('today_users', 0)}\n"
-        f"в”њ Hafta: +{stats.get('week_users', 0)}\n"
-        f"в”” Oy: +{stats.get('month_users', 0)}\n\n"
-        f"рџ’Ћ *PRO obunalar:*\n"
-        f"в”њ Aktiv PRO: {stats.get('active_pro', 0)}\n"
-        f"в”њ Haftalik: {stats.get('pro_weekly', 0)}\n"
-        f"в”њ Oylik: {stats.get('pro_monthly', 0)}\n"
-        f"в”њ Yillik: {stats.get('pro_yearly', 0)}\n"
-        f"в”њ Promo: {stats.get('pro_promo', 0)}\n"
-        f"в”њ Trial: {stats.get('pro_trial', 0)}\n"
-        f"в”” Muddati tugagan: {stats.get('pro_expired', 0)}\n\n"
+        f"┃ Jami: {stats.get('total_users', 0)}\n"
+        f"┃ Bugun: +{stats.get('today_users', 0)}\n"
+        f"┃ Hafta: +{stats.get('week_users', 0)}\n"
+        f"┃ Oy: +{stats.get('month_users', 0)}\n\n"
+        f"💎 *PRO obunalar:*\n"
+        f"┃ Aktiv PRO: {stats.get('active_pro', 0)}\n"
+        f"┃ Haftalik: {stats.get('pro_weekly', 0)}\n"
+        f"┃ Oylik: {stats.get('pro_monthly', 0)}\n"
+        f"┃ Yillik: {stats.get('pro_yearly', 0)}\n"
+        f"┃ Promo: {stats.get('pro_promo', 0)}\n"
+        f"┃ Trial: {stats.get('pro_trial', 0)}\n"
+        f"┃ Muddati tugagan: {stats.get('pro_expired', 0)}\n\n"
         f"💰 *Tranzaksiyalar:*\n"
-        f"в”њ Jami: {stats.get('total_transactions', 0)}\n"
-        f"в”” Bugun: +{stats.get('today_transactions', 0)}\n"
+        f"┃ Jami: {stats.get('total_transactions', 0)}\n"
+        f"┃ Bugun: +{stats.get('today_transactions', 0)}\n"
     )
     
     keyboard = InlineKeyboardMarkup([
@@ -12321,12 +12321,12 @@ async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     db = await get_database()
     users = await db.admin_list_users(limit=20)
     
-    msg = "👥 *SO'NGI 20 TA USER*\nв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
+    msg = "👥 *SO'NGI 20 TA USER*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
     
     for i, user in enumerate(users, 1):
         username = user.get("username") or "N/A"
         first_name = user.get("first_name") or "N/A"
-        tier = "рџ’Ћ" if user.get("subscription_tier") == "pro" else "рџ†“"
+        tier = "💎" if user.get("subscription_tier") == "pro" else "🆓"
         tx_count = user.get("tx_count", 0)
         
         msg += f"{i}. {tier} `{user['telegram_id']}` @{username} ({tx_count} tx)\n"
@@ -12353,9 +12353,9 @@ async def admin_search_user_start(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["awaiting_admin_input"] = True
     
     await query.edit_message_text(
-        "рџ”Ќ *USER QIDIRISH*\n"
-        "в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ\n\n"
-        "рџ“ќ User telegram ID sini yuboring:\n\n"
+        "🏷 *USER QIDIRISH*\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        "💡 User telegram ID sini yuboring:\n\n"
         "_Bekor qilish uchun /cancel_",
         parse_mode="Markdown"
     )
@@ -12389,7 +12389,7 @@ async def admin_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     context.user_data.pop("admin_broadcast", None)
     context.user_data.pop("admin_search_user", None)
     
-    await query.edit_message_text("вњ… Admin panel yopildi.")
+    await query.edit_message_text("✅ Admin panel yopildi.")
     
     return ConversationHandler.END
 
