@@ -12315,29 +12315,109 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     db = await get_database()
     stats = await db.get_admin_statistics()
     
+    # Marketing statistikasini olish
+    from app.marketing import get_marketing_stats
+    marketing = await get_marketing_stats(days=30)
+    
     msg = (
-        "📉 *ADMIN STATISTIKA*\n"
-        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        "📊 *ADMIN STATISTIKA*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"👥 *Foydalanuvchilar:*\n"
-        f"┃ Jami: {stats.get('total_users', 0)}\n"
-        f"┃ Bugun: +{stats.get('today_users', 0)}\n"
-        f"┃ Hafta: +{stats.get('week_users', 0)}\n"
-        f"┃ Oy: +{stats.get('month_users', 0)}\n\n"
+        f"├ Jami: {stats.get('total_users', 0)}\n"
+        f"├ Bugun: +{stats.get('today_users', 0)}\n"
+        f"├ Hafta: +{stats.get('week_users', 0)}\n"
+        f"└ Oy: +{stats.get('month_users', 0)}\n\n"
         f"💎 *PRO obunalar:*\n"
-        f"┃ Aktiv PRO: {stats.get('active_pro', 0)}\n"
-        f"┃ Haftalik: {stats.get('pro_weekly', 0)}\n"
-        f"┃ Oylik: {stats.get('pro_monthly', 0)}\n"
-        f"┃ Yillik: {stats.get('pro_yearly', 0)}\n"
-        f"┃ Promo: {stats.get('pro_promo', 0)}\n"
-        f"┃ Trial: {stats.get('pro_trial', 0)}\n"
-        f"┃ Muddati tugagan: {stats.get('pro_expired', 0)}\n\n"
+        f"├ Aktiv PRO: {stats.get('active_pro', 0)}\n"
+        f"├ Haftalik: {stats.get('pro_weekly', 0)}\n"
+        f"├ Oylik: {stats.get('pro_monthly', 0)}\n"
+        f"├ Yillik: {stats.get('pro_yearly', 0)}\n"
+        f"├ Promo: {stats.get('pro_promo', 0)}\n"
+        f"├ Trial: {stats.get('pro_trial', 0)}\n"
+        f"└ Muddati tugagan: {stats.get('pro_expired', 0)}\n\n"
         f"💰 *Tranzaksiyalar:*\n"
-        f"┃ Jami: {stats.get('total_transactions', 0)}\n"
-        f"┃ Bugun: +{stats.get('today_transactions', 0)}\n"
+        f"├ Jami: {stats.get('total_transactions', 0)}\n"
+        f"└ Bugun: +{stats.get('today_transactions', 0)}\n\n"
     )
     
+    # Marketing statistikasi
+    if marketing.get("sources"):
+        msg += "📡 *TRAFFIC MANBALARI (30 kun):*\n"
+        for source, count in list(marketing["sources"].items())[:5]:
+            source_name = {
+                "tgads": "Telegram Ads",
+                "ch": "Kanallar",
+                "inf": "Influencer",
+                "direct": "Direct",
+                "organic": "Organic",
+            }.get(source, source)
+            msg += f"├ {source_name}: {count}\n"
+        msg += f"\n📈 *Konversiya:* {marketing.get('conversion_rate', 0)}%\n"
+    
     keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Batafsil Marketing", callback_data="admin_marketing_stats")],
         [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_back")],
+    ])
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+    
+    return ConversationHandler.END
+
+
+async def admin_marketing_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Batafsil marketing statistikasi"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    from app.marketing import get_marketing_stats, format_marketing_stats_message
+    
+    stats = await get_marketing_stats(days=30)
+    msg = format_marketing_stats_message(stats, lang="uz")
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 7 kun", callback_data="admin_marketing_7d"),
+         InlineKeyboardButton("📅 30 kun", callback_data="admin_marketing_30d"),
+         InlineKeyboardButton("📅 90 kun", callback_data="admin_marketing_90d")],
+        [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_stats")],
+    ])
+    
+    await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
+    
+    return ConversationHandler.END
+
+
+async def admin_marketing_period(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Admin: Marketing statistikasi ma'lum davr uchun"""
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    if telegram_id not in ADMIN_IDS:
+        return ConversationHandler.END
+    
+    # Parse period from callback
+    callback = query.data
+    if "7d" in callback:
+        days = 7
+    elif "90d" in callback:
+        days = 90
+    else:
+        days = 30
+    
+    from app.marketing import get_marketing_stats, format_marketing_stats_message
+    
+    stats = await get_marketing_stats(days=days)
+    msg = format_marketing_stats_message(stats, lang="uz")
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 7 kun", callback_data="admin_marketing_7d"),
+         InlineKeyboardButton("📅 30 kun", callback_data="admin_marketing_30d"),
+         InlineKeyboardButton("📅 90 kun", callback_data="admin_marketing_90d")],
+        [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_stats")],
     ])
     
     await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
