@@ -6,7 +6,7 @@ Supports both local SQLite and cloud PostgreSQL (Supabase/Railway)
 import os
 import asyncio
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import json
@@ -412,6 +412,28 @@ class Database:
                 )
             """)
             
+            # Marketing events table
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS marketing_events (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    event_data JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Add marketing columns to users table
+            try:
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_raw TEXT")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS used_promo_codes TEXT")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reengagement TIMESTAMP")
+            except Exception:
+                pass  # Columns already exist
+            
             # Create indexes
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON financial_profiles(user_id)")
@@ -421,6 +443,9 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_personal_debts_user_id ON personal_debts(user_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_personal_debts_status ON personal_debts(status)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_learning_pattern ON ai_learning(pattern)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_marketing_events_telegram_id ON marketing_events(telegram_id)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_marketing_events_type ON marketing_events(event_type)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)")
     
     async def _create_tables_sqlite(self):
         """Create all required tables for SQLite"""
@@ -623,6 +648,16 @@ class Database:
                 UNIQUE(pattern, correct_type, correct_category)
             );
             
+            -- Marketing events table
+            CREATE TABLE IF NOT EXISTS marketing_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                event_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+            );
+            
             -- Indexes for performance
             CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
             CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON financial_profiles(user_id);
@@ -654,6 +689,13 @@ class Database:
             ("users", "last_salary_message", "TIMESTAMP"),
             ("users", "last_weekly_message", "TIMESTAMP"),
             ("users", "last_monthly_message", "TIMESTAMP"),
+            # Marketing columns
+            ("users", "utm_source", "TEXT"),
+            ("users", "utm_campaign", "TEXT"),
+            ("users", "utm_medium", "TEXT"),
+            ("users", "utm_raw", "TEXT"),
+            ("users", "used_promo_codes", "TEXT"),
+            ("users", "last_reengagement", "TIMESTAMP"),
         ]
         
         for table, column, col_type in migrations:
@@ -2044,6 +2086,135 @@ class Database:
         except Exception as e:
             logger.error(f"[Admin] Userlar ro'yxati olishda xato: {e}")
             return []
+
+    # ==================== MARKETING OPERATIONS ====================
+    
+    async def log_marketing_event(
+        self, 
+        telegram_id: int, 
+        event_type: str, 
+        event_data: dict = None
+    ) -> bool:
+        """Log marketing event for analytics"""
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    await conn.execute("""
+                        INSERT INTO marketing_events (telegram_id, event_type, event_data)
+                        VALUES ($1, $2, $3)
+                    """, telegram_id, event_type, json.dumps(event_data or {}))
+            else:
+                await self._connection.execute("""
+                    INSERT INTO marketing_events (telegram_id, event_type, event_data)
+                    VALUES (?, ?, ?)
+                """, (telegram_id, event_type, json.dumps(event_data or {})))
+                await self._connection.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error logging marketing event: {e}")
+            return False
+    
+    async def get_inactive_users(self, days: int = 3) -> List[Dict[str, Any]]:
+        """Get users who have been inactive for X days"""
+        try:
+            cutoff_date = datetime.now() - timedelta(days=days)
+            
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    rows = await conn.fetch("""
+                        SELECT telegram_id, first_name, language, last_active, 
+                               subscription_tier, last_reengagement
+                        FROM users 
+                        WHERE last_active < $1 
+                        AND (last_reengagement IS NULL OR last_reengagement < $2)
+                        AND subscription_tier != 'free'
+                    """, cutoff_date, cutoff_date)
+                    return [dict(row) for row in rows]
+            else:
+                async with self._connection.execute("""
+                    SELECT telegram_id, first_name, language, last_active, 
+                           subscription_tier, last_reengagement
+                    FROM users 
+                    WHERE last_active < ? 
+                    AND (last_reengagement IS NULL OR last_reengagement < ?)
+                    AND subscription_tier != 'free'
+                """, (cutoff_date.isoformat(), cutoff_date.isoformat())) as cursor:
+                    rows = await cursor.fetchall()
+                    return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting inactive users: {e}")
+            return []
+    
+    async def get_expiring_trials(self, hours: int = 24) -> List[Dict[str, Any]]:
+        """Get users whose trial is expiring within X hours"""
+        try:
+            now = datetime.now()
+            cutoff = now + timedelta(hours=hours)
+            
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    rows = await conn.fetch("""
+                        SELECT telegram_id, first_name, language, subscription_expires
+                        FROM users 
+                        WHERE subscription_tier = 'trial'
+                        AND subscription_expires BETWEEN $1 AND $2
+                    """, now, cutoff)
+                    return [dict(row) for row in rows]
+            return []
+        except Exception as e:
+            logger.error(f"Error getting expiring trials: {e}")
+            return []
+    
+    async def get_expiring_pro(self, days: int = 3) -> List[Dict[str, Any]]:
+        """Get PRO users whose subscription is expiring within X days"""
+        try:
+            now = datetime.now()
+            cutoff = now + timedelta(days=days)
+            
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    rows = await conn.fetch("""
+                        SELECT telegram_id, first_name, language, subscription_expires
+                        FROM users 
+                        WHERE subscription_tier = 'pro'
+                        AND subscription_expires BETWEEN $1 AND $2
+                    """, now, cutoff)
+                    return [dict(row) for row in rows]
+            return []
+        except Exception as e:
+            logger.error(f"Error getting expiring pro users: {e}")
+            return []
+    
+    async def mark_reengagement_sent(self, telegram_id: int) -> bool:
+        """Mark that re-engagement message was sent to user"""
+        try:
+            return await self.update_user(telegram_id, last_reengagement=datetime.now())
+        except Exception as e:
+            logger.error(f"Error marking reengagement: {e}")
+            return False
+    
+    async def get_user_transaction_stats(self, user_id: int, days: int = 7) -> Dict[str, Any]:
+        """Get user's transaction statistics for period"""
+        try:
+            cutoff = datetime.now() - timedelta(days=days)
+            stats = {"income": 0, "expense": 0, "count": 0}
+            
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    row = await conn.fetchrow("""
+                        SELECT 
+                            COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
+                            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense,
+                            COUNT(*) as count
+                        FROM transactions 
+                        WHERE user_id = $1 AND created_at >= $2
+                    """, user_id, cutoff)
+                    if row:
+                        stats = dict(row)
+            return stats
+        except Exception as e:
+            logger.error(f"Error getting transaction stats: {e}")
+            return {"income": 0, "expense": 0, "count": 0}
 
 
 # Singleton database instance

@@ -15,7 +15,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from app.database import get_database
-from app.subscription import PRICING_PLANS
+from app.subscription import PRICING_PLANS, get_plan_price, is_discount_active, ORIGINAL_PRICES
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,12 @@ async def send_payment_invoice(
     
     plan = PRICING_PLANS[plan_id]
     
+    # Get discounted price
+    actual_price = get_plan_price(plan_id)
+    
     # Telegram Payments uses smallest currency unit (tiyin for UZS)
     # 1 UZS = 100 tiyin
-    amount_tiyin = int(plan.price_uzs * 100)
+    amount_tiyin = int(actual_price * 100)
     
     # Create short invoice payload: h_{user_id}_{plan_short}_{time}
     plan_short = plan_id.replace("pro_", "")[:3]  # weekly->wee, monthly->mon, yearly->yea

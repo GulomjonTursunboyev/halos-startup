@@ -20,6 +20,11 @@ from app.subscription import (
     SubscriptionTier,
     validate_promo_code,
     TRIAL_CONFIG,
+    is_discount_active,
+    get_plan_price,
+    get_discount_label,
+    ORIGINAL_PRICES,
+    DISCOUNT_CONFIG,
 )
 from app.click_payment import generate_click_payment_url
 from app.payme_payment import generate_payme_payment_url, PAYME_TEST_MODE
@@ -182,11 +187,32 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "💳 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ 1 hafta — *14,990* so'm\n"
-            "├ ⭐ 1 oy — *29,990* so'm _(tavsiya)_\n"
-            "└ 🏆 1 yil — *249,990* so'm _(-30%)_\n\n"
-            "💳 To'lov: Click orqali xavfsiz"
         )
+        
+        # Get dynamic prices
+        weekly_price = get_plan_price("pro_weekly")
+        monthly_price = get_plan_price("pro_monthly")
+        yearly_price = get_plan_price("pro_yearly")
+        
+        if is_discount_active():
+            discount_label = get_discount_label("uz")
+            orig_weekly = ORIGINAL_PRICES["pro_weekly"]
+            orig_monthly = ORIGINAL_PRICES["pro_monthly"]
+            orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+            msg += (
+                f"{discount_label}\n\n"
+                f"├ ⚡ 1 hafta — ~{orig_weekly:,}~ → *{weekly_price:,}* so'm\n"
+                f"├ ⭐ 1 oy — ~{orig_monthly:,}~ → *{monthly_price:,}* so'm _(tavsiya)_\n"
+                f"└ 🏆 1 yil — ~{orig_yearly:,}~ → *{yearly_price:,}* so'm\n\n"
+            )
+        else:
+            msg += (
+                f"├ ⚡ 1 hafta — *{weekly_price:,}* so'm\n"
+                f"├ ⭐ 1 oy — *{monthly_price:,}* so'm _(tavsiya)_\n"
+                f"└ 🏆 1 yil — *{yearly_price:,}* so'm _(-30%)_\n\n"
+            )
+        
+        msg += "💳 To'lov: Click orqali xavfsiz"
     else:
         msg = (
             "💎 *HALOS PRO*\n"
@@ -250,11 +276,32 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "💳 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ 1 неделя — *14,990* сум\n"
-            "├ ⭐ 1 месяц — *29,990* сум _(реком.)_\n"
-            "└ 🏆 1 год — *249,990* сум _(-30%)_\n\n"
-            "💳 Оплата: Payme / Click"
         )
+        
+        # Get dynamic prices
+        weekly_price = get_plan_price("pro_weekly")
+        monthly_price = get_plan_price("pro_monthly")
+        yearly_price = get_plan_price("pro_yearly")
+        
+        if is_discount_active():
+            discount_label = get_discount_label("ru")
+            orig_weekly = ORIGINAL_PRICES["pro_weekly"]
+            orig_monthly = ORIGINAL_PRICES["pro_monthly"]
+            orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+            msg += (
+                f"{discount_label}\n\n"
+                f"├ ⚡ 1 неделя — ~{orig_weekly:,}~ → *{weekly_price:,}* сум\n"
+                f"├ ⭐ 1 месяц — ~{orig_monthly:,}~ → *{monthly_price:,}* сум _(реком.)_\n"
+                f"└ 🏆 1 год — ~{orig_yearly:,}~ → *{yearly_price:,}* сум\n\n"
+            )
+        else:
+            msg += (
+                f"├ ⚡ 1 неделя — *{weekly_price:,}* сум\n"
+                f"├ ⭐ 1 месяц — *{monthly_price:,}* сум _(реком.)_\n"
+                f"└ 🏆 1 год — *{yearly_price:,}* сум _(-30%)_\n\n"
+            )
+        
+        msg += "💳 Оплата: Payme / Click"
     
     # Test mode label
     payme_test_label = " (test)" if PAYME_TEST_MODE else ""
@@ -396,14 +443,38 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *NARXLAR:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 hafta:* `14,990 so'm`\n"
-            "│   _Sinab ko'ring_\n"
-            "├ ⭐ *1 oy:* `29,990 so'm`\n"
-            "│   _Eng ommabop_\n"
-            "└ 🏆 *1 yil:* `249,990 so'm`\n"
-            "    _30% tejash!_\n\n"
-            "💳 *To'lov: Click orqali*"
         )
+        
+        # Get dynamic prices
+        weekly_price = get_plan_price("pro_weekly")
+        monthly_price = get_plan_price("pro_monthly")
+        yearly_price = get_plan_price("pro_yearly")
+        
+        if is_discount_active():
+            discount_label = get_discount_label("uz")
+            orig_weekly = ORIGINAL_PRICES["pro_weekly"]
+            orig_monthly = ORIGINAL_PRICES["pro_monthly"]
+            orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+            msg += (
+                f"{discount_label}\n\n"
+                f"├ ⚡ *1 hafta:* ~{orig_weekly:,}~ → `{weekly_price:,} so'm`\n"
+                f"│   _Sinab ko'ring_\n"
+                f"├ ⭐ *1 oy:* ~{orig_monthly:,}~ → `{monthly_price:,} so'm`\n"
+                f"│   _Eng ommabop_\n"
+                f"└ 🏆 *1 yil:* ~{orig_yearly:,}~ → `{yearly_price:,} so'm`\n"
+                "    _Ajoyib chegirma!_\n\n"
+            )
+        else:
+            msg += (
+                f"├ ⚡ *1 hafta:* `{weekly_price:,} so'm`\n"
+                "│   _Sinab ko'ring_\n"
+                f"├ ⭐ *1 oy:* `{monthly_price:,} so'm`\n"
+                "│   _Eng ommabop_\n"
+                f"└ 🏆 *1 yil:* `{yearly_price:,} so'm`\n"
+                "    _30% tejash!_\n\n"
+            )
+        
+        msg += "💳 *To'lov: Click orqali*"
     else:
         if simple_months > 0 and months_saved > 0:
             header = (
@@ -455,34 +526,83 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "━━━━━━━━━━━━━━━━━━━━\n"
             "💰 *ЦЕНЫ:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "├ ⚡ *1 неделя:* `14,990 сум`\n"
-            "│   _Попробуйте_\n"
-            "├ ⭐ *1 месяц:* `29,990 сум`\n"
-            "│   _Самый популярный_\n"
-            "└ 🏆 *1 год:* `249,990 сум`\n"
-            "    _Скидка 30%!_\n\n"
-            "💳 *Оплата: через Click*"
         )
+        
+        # Get dynamic prices for Russian
+        weekly_price_ru = get_plan_price("pro_weekly")
+        monthly_price_ru = get_plan_price("pro_monthly")
+        yearly_price_ru = get_plan_price("pro_yearly")
+        
+        if is_discount_active():
+            discount_label_ru = get_discount_label("ru")
+            orig_weekly_ru = ORIGINAL_PRICES["pro_weekly"]
+            orig_monthly_ru = ORIGINAL_PRICES["pro_monthly"]
+            orig_yearly_ru = ORIGINAL_PRICES["pro_yearly"]
+            msg += (
+                f"{discount_label_ru}\n\n"
+                f"├ ⚡ *1 неделя:* ~{orig_weekly_ru:,}~ → `{weekly_price_ru:,} сум`\n"
+                f"│   _Попробуйте_\n"
+                f"├ ⭐ *1 месяц:* ~{orig_monthly_ru:,}~ → `{monthly_price_ru:,} сум`\n"
+                f"│   _Самый популярный_\n"
+                f"└ 🏆 *1 год:* ~{orig_yearly_ru:,}~ → `{yearly_price_ru:,} сум`\n"
+                "    _Отличная скидка!_\n\n"
+            )
+        else:
+            msg += (
+                f"├ ⚡ *1 неделя:* `{weekly_price_ru:,} сум`\n"
+                "│   _Попробуйте_\n"
+                f"├ ⭐ *1 месяц:* `{monthly_price_ru:,} сум`\n"
+                "│   _Самый популярный_\n"
+                f"└ 🏆 *1 год:* `{yearly_price_ru:,} сум`\n"
+                "    _Скидка 30%!_\n\n"
+            )
+        
+        msg += "💳 *Оплата: через Click*"
     
-    # Click Payment buttons
-    keyboard = [
-        [InlineKeyboardButton(
-            "⚡ 1 hafta - 14,990 so'm" if lang == "uz" else "⚡ 1 нед - 14,990 сум",
-            callback_data="click_buy_pro_weekly"
-        )],
-        [InlineKeyboardButton(
-            "⭐ 1 oy - 29,990 so'm (tavsiya)" if lang == "uz" else "⭐ 1 мес - 29,990 сум (реком.)",
-            callback_data="click_buy_pro_monthly"
-        )],
-        [InlineKeyboardButton(
-            "🏆 1 yil - 249,990 so'm (-30%)" if lang == "uz" else "🏆 1 год - 249,990 сум (-30%)",
-            callback_data="click_buy_pro_yearly"
-        )],
-        [InlineKeyboardButton(
-            "🎁 Promo-kod" if lang == "uz" else "🎁 Промо-код",
-            callback_data="enter_promo"
-        )],
-    ]
+    # Get prices for buttons
+    btn_weekly = get_plan_price("pro_weekly")
+    btn_monthly = get_plan_price("pro_monthly")
+    btn_yearly = get_plan_price("pro_yearly")
+    
+    # Click Payment buttons with dynamic prices
+    if lang == "uz":
+        keyboard = [
+            [InlineKeyboardButton(
+                f"⚡ 1 hafta - {btn_weekly:,} so'm",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                f"⭐ 1 oy - {btn_monthly:,} so'm (tavsiya)",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                f"🏆 1 yil - {btn_yearly:,} so'm",
+                callback_data="click_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "🎁 Promo-kod",
+                callback_data="enter_promo"
+            )],
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(
+                f"⚡ 1 нед - {btn_weekly:,} сум",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                f"⭐ 1 мес - {btn_monthly:,} сум (реком.)",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                f"🏆 1 год - {btn_yearly:,} сум",
+                callback_data="click_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "🎁 Промо-код",
+                callback_data="enter_promo"
+            )],
+        ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -518,43 +638,96 @@ async def payment_method_payme_callback(update: Update, context: ContextTypes.DE
     # Test mode label
     payme_test_label = " (test)" if PAYME_TEST_MODE else ""
     
-    if lang == "uz":
-        msg = (
-            f"💳 *Payme{payme_test_label} orqali to'lov*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Tarifni tanlang:\n\n"
-            "├ ⚡ 1 hafta — *14,990* so'm\n"
-            "├ ⭐ 1 oy — *29,990* so'm _(tavsiya)_\n"
-            "└ 🏆 1 yil — *249,990* so'm _(-30%)_\n"
-        )
-    else:
-        msg = (
-            f"💳 *Payme{payme_test_label} оплата*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Выберите тариф:\n\n"
-            "├ ⚡ 1 неделя — *14,990* сум\n"
-            "├ ⭐ 1 месяц — *29,990* сум _(реком.)_\n"
-            "└ 🏆 1 год — *249,990* сум _(-30%)_\n"
-        )
+    # Get dynamic prices
+    weekly_price = get_plan_price("pro_weekly")
+    monthly_price = get_plan_price("pro_monthly")
+    yearly_price = get_plan_price("pro_yearly")
     
-    keyboard = [
-        [InlineKeyboardButton(
-            "⚡ 1 hafta — 14,990" if lang == "uz" else "⚡ 1 нед — 14,990",
-            callback_data="payme_buy_pro_weekly"
-        )],
-        [InlineKeyboardButton(
-            "⭐ 1 oy — 29,990 (tavsiya)" if lang == "uz" else "⭐ 1 мес — 29,990 (реком.)",
-            callback_data="payme_buy_pro_monthly"
-        )],
-        [InlineKeyboardButton(
-            "🏆 1 yil — 249,990 (-30%)" if lang == "uz" else "🏆 1 год — 249,990 (-30%)",
-            callback_data="payme_buy_pro_yearly"
-        )],
-        [InlineKeyboardButton(
-            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
-            callback_data="show_pricing"
-        )]
-    ]
+    if is_discount_active():
+        discount_label = get_discount_label(lang)
+        orig_weekly = ORIGINAL_PRICES["pro_weekly"]
+        orig_monthly = ORIGINAL_PRICES["pro_monthly"]
+        orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+        
+        if lang == "uz":
+            msg = (
+                f"💳 *Payme{payme_test_label} orqali to'lov*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{discount_label}\n\n"
+                "Tarifni tanlang:\n\n"
+                f"├ ⚡ 1 hafta — ~{orig_weekly:,}~ → *{weekly_price:,}* so'm\n"
+                f"├ ⭐ 1 oy — ~{orig_monthly:,}~ → *{monthly_price:,}* so'm _(tavsiya)_\n"
+                f"└ 🏆 1 yil — ~{orig_yearly:,}~ → *{yearly_price:,}* so'm\n"
+            )
+        else:
+            msg = (
+                f"💳 *Payme{payme_test_label} оплата*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{discount_label}\n\n"
+                "Выберите тариф:\n\n"
+                f"├ ⚡ 1 неделя — ~{orig_weekly:,}~ → *{weekly_price:,}* сум\n"
+                f"├ ⭐ 1 месяц — ~{orig_monthly:,}~ → *{monthly_price:,}* сум _(реком.)_\n"
+                f"└ 🏆 1 год — ~{orig_yearly:,}~ → *{yearly_price:,}* сум\n"
+            )
+    else:
+        if lang == "uz":
+            msg = (
+                f"💳 *Payme{payme_test_label} orqali to'lov*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Tarifni tanlang:\n\n"
+                f"├ ⚡ 1 hafta — *{weekly_price:,}* so'm\n"
+                f"├ ⭐ 1 oy — *{monthly_price:,}* so'm _(tavsiya)_\n"
+                f"└ 🏆 1 yil — *{yearly_price:,}* so'm _(-30%)_\n"
+            )
+        else:
+            msg = (
+                f"💳 *Payme{payme_test_label} оплата*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Выберите тариф:\n\n"
+                f"├ ⚡ 1 неделя — *{weekly_price:,}* сум\n"
+                f"├ ⭐ 1 месяц — *{monthly_price:,}* сум _(реком.)_\n"
+                f"└ 🏆 1 год — *{yearly_price:,}* сум _(-30%)_\n"
+            )
+    
+    # Dynamic buttons
+    if lang == "uz":
+        keyboard = [
+            [InlineKeyboardButton(
+                f"⚡ 1 hafta — {weekly_price:,}",
+                callback_data="payme_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                f"⭐ 1 oy — {monthly_price:,} (tavsiya)",
+                callback_data="payme_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                f"🏆 1 yil — {yearly_price:,}",
+                callback_data="payme_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "◀️ Orqaga",
+                callback_data="show_pricing"
+            )]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(
+                f"⚡ 1 нед — {weekly_price:,}",
+                callback_data="payme_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                f"⭐ 1 мес — {monthly_price:,} (реком.)",
+                callback_data="payme_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                f"🏆 1 год — {yearly_price:,}",
+                callback_data="payme_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "◀️ Назад",
+                callback_data="show_pricing"
+            )]
+        ]
     
     await query.edit_message_text(
         msg,
@@ -570,43 +743,96 @@ async def payment_method_click_callback(update: Update, context: ContextTypes.DE
     
     lang = context.user_data.get("lang", "uz")
     
-    if lang == "uz":
-        msg = (
-            "💳 *Click orqali to'lov*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Tarifni tanlang:\n\n"
-            "├ ⚡ 1 hafta — *14,990* so'm\n"
-            "├ ⭐ 1 oy — *29,990* so'm _(tavsiya)_\n"
-            "└ 🏆 1 yil — *249,990* so'm _(-30%)_\n"
-        )
-    else:
-        msg = (
-            "💳 *Click оплата*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Выберите тариф:\n\n"
-            "├ ⚡ 1 неделя — *14,990* сум\n"
-            "├ ⭐ 1 месяц — *29,990* сум _(реком.)_\n"
-            "└ 🏆 1 год — *249,990* сум _(-30%)_\n"
-        )
+    # Get dynamic prices
+    weekly_price = get_plan_price("pro_weekly")
+    monthly_price = get_plan_price("pro_monthly")
+    yearly_price = get_plan_price("pro_yearly")
     
-    keyboard = [
-        [InlineKeyboardButton(
-            "⚡ 1 hafta — 14,990" if lang == "uz" else "⚡ 1 нед — 14,990",
-            callback_data="click_buy_pro_weekly"
-        )],
-        [InlineKeyboardButton(
-            "⭐ 1 oy — 29,990 (tavsiya)" if lang == "uz" else "⭐ 1 мес — 29,990 (реком.)",
-            callback_data="click_buy_pro_monthly"
-        )],
-        [InlineKeyboardButton(
-            "🏆 1 yil — 249,990 (-30%)" if lang == "uz" else "🏆 1 год — 249,990 (-30%)",
-            callback_data="click_buy_pro_yearly"
-        )],
-        [InlineKeyboardButton(
-            "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
-            callback_data="show_pricing"
-        )]
-    ]
+    if is_discount_active():
+        discount_label = get_discount_label(lang)
+        orig_weekly = ORIGINAL_PRICES["pro_weekly"]
+        orig_monthly = ORIGINAL_PRICES["pro_monthly"]
+        orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+        
+        if lang == "uz":
+            msg = (
+                "💳 *Click orqali to'lov*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{discount_label}\n\n"
+                "Tarifni tanlang:\n\n"
+                f"├ ⚡ 1 hafta — ~{orig_weekly:,}~ → *{weekly_price:,}* so'm\n"
+                f"├ ⭐ 1 oy — ~{orig_monthly:,}~ → *{monthly_price:,}* so'm _(tavsiya)_\n"
+                f"└ 🏆 1 yil — ~{orig_yearly:,}~ → *{yearly_price:,}* so'm\n"
+            )
+        else:
+            msg = (
+                "💳 *Click оплата*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{discount_label}\n\n"
+                "Выберите тариф:\n\n"
+                f"├ ⚡ 1 неделя — ~{orig_weekly:,}~ → *{weekly_price:,}* сум\n"
+                f"├ ⭐ 1 месяц — ~{orig_monthly:,}~ → *{monthly_price:,}* сум _(реком.)_\n"
+                f"└ 🏆 1 год — ~{orig_yearly:,}~ → *{yearly_price:,}* сум\n"
+            )
+    else:
+        if lang == "uz":
+            msg = (
+                "💳 *Click orqali to'lov*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Tarifni tanlang:\n\n"
+                f"├ ⚡ 1 hafta — *{weekly_price:,}* so'm\n"
+                f"├ ⭐ 1 oy — *{monthly_price:,}* so'm _(tavsiya)_\n"
+                f"└ 🏆 1 yil — *{yearly_price:,}* so'm _(-30%)_\n"
+            )
+        else:
+            msg = (
+                "💳 *Click оплата*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Выберите тариф:\n\n"
+                f"├ ⚡ 1 неделя — *{weekly_price:,}* сум\n"
+                f"├ ⭐ 1 месяц — *{monthly_price:,}* сум _(реком.)_\n"
+                f"└ 🏆 1 год — *{yearly_price:,}* сум _(-30%)_\n"
+            )
+    
+    # Dynamic buttons
+    if lang == "uz":
+        keyboard = [
+            [InlineKeyboardButton(
+                f"⚡ 1 hafta — {weekly_price:,}",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                f"⭐ 1 oy — {monthly_price:,} (tavsiya)",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                f"🏆 1 yil — {yearly_price:,}",
+                callback_data="click_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "◀️ Orqaga",
+                callback_data="show_pricing"
+            )]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton(
+                f"⚡ 1 нед — {weekly_price:,}",
+                callback_data="click_buy_pro_weekly"
+            )],
+            [InlineKeyboardButton(
+                f"⭐ 1 мес — {monthly_price:,} (реком.)",
+                callback_data="click_buy_pro_monthly"
+            )],
+            [InlineKeyboardButton(
+                f"🏆 1 год — {yearly_price:,}",
+                callback_data="click_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "◀️ Назад",
+                callback_data="show_pricing"
+            )]
+        ]
     
     await query.edit_message_text(
         msg,
@@ -630,13 +856,16 @@ async def payme_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     plan = PRICING_PLANS[plan_id]
     
+    # Get discounted price
+    actual_price = get_plan_price(plan_id)
+    
     # Generate unique order ID
     import time
     order_id = f"halos_{telegram_id}_{plan_id}_{int(time.time())}"
     
-    # Generate Payme checkout URL
+    # Generate Payme checkout URL with discounted price
     payme_url = generate_payme_payment_url(
-        amount=plan.price_uzs,
+        amount=actual_price,
         order_id=order_id,
         return_url="https://t.me/HalosRobot",
         lang=lang
@@ -648,12 +877,21 @@ async def payme_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         from app.payme_payment import get_payme_test_card
         test_info = "\n\n" + get_payme_test_card()
     
+    # Prepare price display
+    if is_discount_active():
+        orig_price = ORIGINAL_PRICES.get(plan_id, plan.price_uzs)
+        price_display_uz = f"~{orig_price:,}~ → *{actual_price:,} so'm*"
+        price_display_ru = f"~{orig_price:,}~ → *{actual_price:,} сум*"
+    else:
+        price_display_uz = f"*{actual_price:,} so'm*"
+        price_display_ru = f"*{actual_price:,} сум*"
+    
     if lang == "uz":
         msg = (
             f"💳 *Payme orqali to'lov*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📦 Tarif: *{plan.description_uz}*\n"
-            f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
+            f"💰 Narx: {price_display_uz}\n\n"
             "👇 Quyidagi tugmani bosib Payme\n"
             "orqali xavfsiz to'lang.\n\n"
             "✅ Uzcard va Humo kartalari qabul qilinadi\n"
@@ -667,7 +905,7 @@ async def payme_buy_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"💳 *Оплата через Payme*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📦 Тариф: *{plan.description_ru}*\n"
-            f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
+            f"💰 Цена: {price_display_ru}\n\n"
             "👇 Нажмите кнопку и оплатите\n"
             "безопасно через Payme.\n\n"
             "✅ Принимаются карты Uzcard и Humo\n"
@@ -799,22 +1037,34 @@ async def pay_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     plan = PRICING_PLANS[plan_id]
     
-    # Generate Click payment URL
+    # Get discounted price
+    actual_price = get_plan_price(plan_id)
+    
+    # Generate Click payment URL with discounted price
     from app.click_payment import generate_click_payment_url
     
     order_id = f"halos_{update.effective_user.id}_{plan_id}"
     click_url = generate_click_payment_url(
-        amount=plan.price_uzs,
+        amount=actual_price,
         order_id=order_id,
         return_url="https://t.me/HalosRobot",
         description=plan.description_uz
     )
     
+    # Prepare price display
+    if is_discount_active():
+        orig_price = ORIGINAL_PRICES.get(plan_id, plan.price_uzs)
+        price_display_uz = f"~{orig_price:,}~ → *{actual_price:,} so'm*"
+        price_display_ru = f"~{orig_price:,}~ → *{actual_price:,} сум*"
+    else:
+        price_display_uz = f"*{actual_price:,} so'm*"
+        price_display_ru = f"*{actual_price:,} сум*"
+    
     if lang == "uz":
         msg = (
             f"🔗 *Click havola orqali to'lov*\n\n"
             f"📦 Tarif: *{plan.description_uz}*\n"
-            f"💰 Narx: *{plan.price_uzs:,} so'm*\n\n"
+            f"💰 Narx: {price_display_uz}\n\n"
             "👇 Quyidagi tugmani bosing va Click orqali to'lang.\n\n"
             "⚠️ To'lovdan keyin /start bosing."
         )
@@ -823,7 +1073,7 @@ async def pay_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         msg = (
             f"🔗 *Оплата по ссылке Click*\n\n"
             f"📦 Тариф: *{plan.description_ru}*\n"
-            f"💰 Цена: *{plan.price_uzs:,} сум*\n\n"
+            f"💰 Цена: {price_display_ru}\n\n"
             "👇 Нажмите кнопку и оплатите через Click.\n\n"
             "⚠️ После оплаты нажмите /start."
         )
@@ -854,22 +1104,38 @@ async def pay_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     plan = PRICING_PLANS[plan_id]
     
+    # Get discounted price
+    actual_price = get_plan_price(plan_id)
+    
     # P2P to'lov kartasi
     CARD_NUMBER = "9860 1701 0444 4616"  # O'zingizning karta raqamingiz
     CARD_HOLDER = "HALOS"
+    
+    # Prepare price display
+    if is_discount_active():
+        orig_price = ORIGINAL_PRICES.get(plan_id, plan.price_uzs)
+        price_display_uz = f"~{orig_price:,}~ → *{actual_price:,} so'm*"
+        price_display_ru = f"~{orig_price:,}~ → *{actual_price:,} сум*"
+        transfer_uz = f"*{actual_price:,} so'm*"
+        transfer_ru = f"*{actual_price:,} сум*"
+    else:
+        price_display_uz = f"*{actual_price:,} so'm*"
+        price_display_ru = f"*{actual_price:,} сум*"
+        transfer_uz = f"*{actual_price:,} so'm*"
+        transfer_ru = f"*{actual_price:,} сум*"
     
     if lang == "uz":
         msg = (
             f"💳 *Karta orqali to'lov (P2P)*\n\n"
             f"📦 Tarif: *{plan.description_uz}*\n"
-            f"💰 Summa: *{plan.price_uzs:,} so'm*\n\n"
+            f"💰 Summa: {price_display_uz}\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"💳 Karta: `{CARD_NUMBER}`\n"
             f"👤 Egasi: *{CARD_HOLDER}*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "📝 *Qadamlar:*\n"
             "1️⃣ Yuqoridagi karta raqamini nusxalang\n"
-            f"2️⃣ *{plan.price_uzs:,} so'm* o'tkazing\n"
+            f"2️⃣ {transfer_uz} o'tkazing\n"
             "3️⃣ Chekni rasmga olib yuboring\n\n"
             "⚠️ Chekni admin tekshirgach PRO ochiladi."
         )
@@ -877,14 +1143,14 @@ async def pay_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         msg = (
             f"💳 *Оплата картой (P2P)*\n\n"
             f"📦 Тариф: *{plan.description_ru}*\n"
-            f"💰 Сумма: *{plan.price_uzs:,} сум*\n\n"
+            f"💰 Сумма: {price_display_ru}\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"💳 Карта: `{CARD_NUMBER}`\n"
             f"👤 Владелец: *{CARD_HOLDER}*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "📝 *Шаги:*\n"
             "1️⃣ Скопируйте номер карты\n"
-            f"2️⃣ Переведите *{plan.price_uzs:,} сум*\n"
+            f"2️⃣ Переведите {transfer_ru}\n"
             "3️⃣ Отправьте фото чека\n\n"
             "⚠️ PRO откроется после проверки."
         )

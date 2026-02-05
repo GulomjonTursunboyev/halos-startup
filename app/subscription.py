@@ -53,12 +53,71 @@ class PricingPlan:
 
 # ==================== PRICING CONFIGURATION ====================
 
+# Asosiy (original) narxlar - hech qachon o'zgarmaydi
+ORIGINAL_PRICES = {
+    "pro_weekly": 14990,
+    "pro_monthly": 29990,
+    "pro_yearly": 249990,
+}
+
+# Skidka sozlamalari
+DISCOUNT_CONFIG = {
+    "enabled": True,           # Skidka yoqilganmi
+    "percentage": 50,          # Skidka foizi (50%)
+    "label_uz": "🔥 50% CHEGIRMA!",
+    "label_ru": "🔥 СКИДКА 50%!",
+}
+
+
+def get_discounted_price(original_price: int) -> int:
+    """Skidka qo'llanilgan narxni hisoblash"""
+    if DISCOUNT_CONFIG["enabled"]:
+        discount = DISCOUNT_CONFIG["percentage"]
+        return int(original_price * (100 - discount) / 100)
+    return original_price
+
+
+def get_current_prices() -> dict:
+    """Joriy narxlarni olish (skidka bilan yoki yo'q)"""
+    return {
+        plan_id: get_discounted_price(price)
+        for plan_id, price in ORIGINAL_PRICES.items()
+    }
+
+
+def is_discount_active() -> bool:
+    """Skidka faolmi"""
+    return DISCOUNT_CONFIG["enabled"]
+
+
+def set_discount(enabled: bool, percentage: int = 50):
+    """Skidkani yoqish/o'chirish"""
+    DISCOUNT_CONFIG["enabled"] = enabled
+    DISCOUNT_CONFIG["percentage"] = percentage
+
+
+def get_discount_label(lang: str = "uz") -> str:
+    """Skidka yorlig'ini olish"""
+    if not DISCOUNT_CONFIG["enabled"]:
+        return ""
+    if lang == "ru":
+        return DISCOUNT_CONFIG["label_ru"]
+    return DISCOUNT_CONFIG["label_uz"]
+
+
+# Narxlar skidka bilan hisoblanadi
+def _get_price(plan_id: str) -> int:
+    """Plan narxini olish (skidka bilan)"""
+    original = ORIGINAL_PRICES.get(plan_id, 0)
+    return get_discounted_price(original)
+
+
 PRICING_PLANS: Dict[str, PricingPlan] = {
     "pro_weekly": PricingPlan(
         id="pro_weekly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.WEEKLY,
-        price_uzs=14990,
+        price_uzs=14990,  # Dinamik ravishda yangilanadi
         description_uz="HALOS PRO - 1 haftalik",
         description_ru="HALOS PRO - 1 неделя",
         is_recommended=False,
@@ -76,12 +135,18 @@ PRICING_PLANS: Dict[str, PricingPlan] = {
         id="pro_yearly",
         tier=SubscriptionTier.PRO,
         period=SubscriptionPeriod.YEARLY,
-        price_uzs=249990,  # 30% discount
+        price_uzs=249990,
         description_uz="HALOS PRO - 1 yillik (30% tejash)",
         description_ru="HALOS PRO - 1 год (скидка 30%)",
         is_recommended=False,
     ),
 }
+
+
+def get_plan_price(plan_id: str) -> int:
+    """Plan narxini skidka bilan olish"""
+    original = ORIGINAL_PRICES.get(plan_id, 0)
+    return get_discounted_price(original)
 
 
 

@@ -10611,10 +10611,17 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit: bool = False):
     """Admin panel asosiy menyusi"""
     
+    # Skidka holatini tekshirish
+    from app.subscription import is_discount_active, DISCOUNT_CONFIG, get_current_prices, ORIGINAL_PRICES
+    discount_active = is_discount_active()
+    discount_emoji = "🟢" if discount_active else "🔴"
+    discount_text = f"{DISCOUNT_CONFIG['percentage']}% SKIDKA" if discount_active else "Skidka o'chiq"
+    
     message = (
         "👑 *HALOS ADMIN PANEL*\n"
         "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         "🔑 Xush kelibsiz, Admin!\n\n"
+        f"{discount_emoji} *PRO narxlar:* {discount_text}\n\n"
         "Quyidagi bo'limlardan birini tanlang:"
     )
     
@@ -10632,8 +10639,11 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("📝 Faollik", callback_data="admin_activity")
         ],
         [
-            InlineKeyboardButton("🋃 TRIAL barchaga", callback_data="admin_trial_all"),
-            InlineKeyboardButton("📉 Broadcast", callback_data="admin_broadcast")
+            InlineKeyboardButton(f"🏷️ PRO narxlar ({discount_text})", callback_data="admin_pricing")
+        ],
+        [
+            InlineKeyboardButton("🎁 TRIAL barchaga", callback_data="admin_trial_all"),
+            InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
         ],
         # User boshqaruvi
         [
@@ -10673,6 +10683,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # ==================== ASOSIY MENYU ====================
     if query.data == "admin_main":
         await show_admin_main_menu(update, context, edit=True)
+        return
+    
+    # ==================== MARKETING STATISTIKA ====================
+    if query.data == "admin_marketing_stats":
+        await admin_marketing_stats(update, context)
+        return
+    
+    if query.data.startswith("admin_marketing_"):
+        await admin_marketing_period(update, context)
         return
     
     # ==================== STATISTIKA ====================
@@ -11213,6 +11232,104 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        return
+    
+    # ==================== PRO NARXLAR BOSHQARUVI ====================
+    if query.data == "admin_pricing":
+        from app.subscription import (
+            is_discount_active, DISCOUNT_CONFIG, ORIGINAL_PRICES, 
+            get_current_prices, get_plan_price
+        )
+        
+        discount_active = is_discount_active()
+        discount_pct = DISCOUNT_CONFIG["percentage"]
+        current_prices = get_current_prices()
+        
+        status_emoji = "🟢" if discount_active else "🔴"
+        status_text = f"{discount_pct}% SKIDKA FAOL" if discount_active else "SKIDKA O'CHIQ"
+        
+        message = (
+            "🏷️ *PRO NARXLAR BOSHQARUVI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            
+            f"{status_emoji} *Status:* {status_text}\n\n"
+            
+            "💰 *ASOSIY NARXLAR:*\n"
+            f"┃ 📅 Haftalik: *{ORIGINAL_PRICES['pro_weekly']:,}* so'm\n"
+            f"┃ 📊 Oylik: *{ORIGINAL_PRICES['pro_monthly']:,}* so'm\n"
+            f"┃ 📅 Yillik: *{ORIGINAL_PRICES['pro_yearly']:,}* so'm\n\n"
+        )
+        
+        if discount_active:
+            message += (
+                f"🔥 *JORIY NARXLAR ({discount_pct}% skidka):*\n"
+                f"┃ 📅 Haftalik: *{current_prices['pro_weekly']:,}* so'm\n"
+                f"┃ 📊 Oylik: *{current_prices['pro_monthly']:,}* so'm\n"
+                f"┃ 📅 Yillik: *{current_prices['pro_yearly']:,}* so'm\n\n"
+                
+                "✅ Foydalanuvchilar skidka narxlarini ko'rmoqda"
+            )
+        else:
+            message += "ℹ️ Foydalanuvchilar asosiy narxlarni ko'rmoqda"
+        
+        # Tugmalar
+        if discount_active:
+            keyboard = [
+                [InlineKeyboardButton("🔴 Skidkani O'CHIRISH", callback_data="admin_discount_off")],
+                [InlineKeyboardButton("📊 25% ga o'zgartirish", callback_data="admin_discount_25")],
+                [InlineKeyboardButton("📊 30% ga o'zgartirish", callback_data="admin_discount_30")],
+                [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+            ]
+        else:
+            keyboard = [
+                [InlineKeyboardButton("🟢 50% SKIDKA YOQISH", callback_data="admin_discount_50")],
+                [InlineKeyboardButton("📊 25% skidka yoqish", callback_data="admin_discount_25")],
+                [InlineKeyboardButton("📊 30% skidka yoqish", callback_data="admin_discount_30")],
+                [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+            ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # Skidkani o'chirish
+    if query.data == "admin_discount_off":
+        from app.subscription import set_discount
+        set_discount(enabled=False)
+        await query.answer("✅ Skidka o'chirildi! Asosiy narxlar qaytdi.", show_alert=True)
+        # Refresh pricing page
+        query.data = "admin_pricing"
+        await admin_callback(update, context)
+        return
+    
+    # 50% skidka
+    if query.data == "admin_discount_50":
+        from app.subscription import set_discount
+        set_discount(enabled=True, percentage=50)
+        await query.answer("🔥 50% skidka yoqildi!", show_alert=True)
+        query.data = "admin_pricing"
+        await admin_callback(update, context)
+        return
+    
+    # 25% skidka
+    if query.data == "admin_discount_25":
+        from app.subscription import set_discount
+        set_discount(enabled=True, percentage=25)
+        await query.answer("✅ 25% skidka yoqildi!", show_alert=True)
+        query.data = "admin_pricing"
+        await admin_callback(update, context)
+        return
+    
+    # 30% skidka
+    if query.data == "admin_discount_30":
+        from app.subscription import set_discount
+        set_discount(enabled=True, percentage=30)
+        await query.answer("✅ 30% skidka yoqildi!", show_alert=True)
+        query.data = "admin_pricing"
+        await admin_callback(update, context)
         return
     
     # ==================== SOZLAMALAR ====================

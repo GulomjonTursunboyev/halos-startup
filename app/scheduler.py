@@ -59,9 +59,10 @@ class ProCareScheduler:
             asyncio.create_task(self._debt_reminder_job()),  # Qarz eslatmalari
             asyncio.create_task(self._subscription_expiry_job()),  # Obuna muddati nazorati
             asyncio.create_task(self._kotib_balance_job()),  # Kotib.ai balans nazorati
+            asyncio.create_task(self._marketing_reengagement_job()),  # Marketing re-engagement
         ]
         
-        logger.info("PRO Care Scheduler started with 7 jobs")
+        logger.info("PRO Care Scheduler started with 8 jobs")
     
     async def _check_missed_debt_reminders(self):
         """
@@ -637,6 +638,133 @@ class ProCareScheduler:
             
             # Check every hour
             await asyncio.sleep(60 * 60)
+    
+    async def _marketing_reengagement_job(self):
+        """
+        Job: Marketing re-engagement xabarlari
+        - 3 kun inaktiv userlar
+        - 7 kun inaktiv userlar  
+        - Trial tugayapti
+        - PRO tugayapti
+        Har 6 soatda tekshiradi
+        """
+        from app.marketing import send_reengagement_message
+        
+        while self._running:
+            try:
+                now = now_uz()
+                logger.info("Running marketing re-engagement check...")
+                db = await get_database()
+                
+                # ==================== 3 KUN INAKTIV USERLAR ====================
+                inactive_3_days = await db.get_inactive_users(days=3)
+                for user in inactive_3_days:
+                    try:
+                        telegram_id = user["telegram_id"]
+                        lang = user.get("language", "uz")
+                        name = user.get("first_name", "do'stim")
+                        
+                        success = await send_reengagement_message(
+                            bot=self.bot,
+                            telegram_id=telegram_id,
+                            message_type="inactive_3_days",
+                            lang=lang,
+                            name=name
+                        )
+                        
+                        if success:
+                            await db.mark_reengagement_sent(telegram_id)
+                        
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        logger.error(f"Error sending 3-day inactive message: {e}")
+                
+                # ==================== 7 KUN INAKTIV USERLAR ====================
+                inactive_7_days = await db.get_inactive_users(days=7)
+                for user in inactive_7_days:
+                    try:
+                        telegram_id = user["telegram_id"]
+                        lang = user.get("language", "uz")
+                        name = user.get("first_name", "do'stim")
+                        
+                        success = await send_reengagement_message(
+                            bot=self.bot,
+                            telegram_id=telegram_id,
+                            message_type="inactive_7_days",
+                            lang=lang,
+                            name=name
+                        )
+                        
+                        if success:
+                            await db.mark_reengagement_sent(telegram_id)
+                        
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        logger.error(f"Error sending 7-day inactive message: {e}")
+                
+                # ==================== TRIAL TUGAYAPTI (24 soat ichida) ====================
+                expiring_trials = await db.get_expiring_trials(hours=24)
+                for user in expiring_trials:
+                    try:
+                        telegram_id = user["telegram_id"]
+                        lang = user.get("language", "uz")
+                        name = user.get("first_name", "do'stim")
+                        
+                        # Get user stats
+                        db_user = await db.get_user(telegram_id)
+                        user_id = db_user.get("id") if db_user else telegram_id
+                        stats = await db.get_user_transaction_stats(user_id, days=3)
+                        
+                        success = await send_reengagement_message(
+                            bot=self.bot,
+                            telegram_id=telegram_id,
+                            message_type="trial_ending_soon",
+                            lang=lang,
+                            name=name,
+                            voice_count=stats.get("count", 0),
+                            tx_count=stats.get("count", 0)
+                        )
+                        
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        logger.error(f"Error sending trial expiring message: {e}")
+                
+                # ==================== PRO TUGAYAPTI (3 kun ichida) ====================
+                expiring_pro = await db.get_expiring_pro(days=3)
+                for user in expiring_pro:
+                    try:
+                        telegram_id = user["telegram_id"]
+                        lang = user.get("language", "uz")
+                        name = user.get("first_name", "do'stim")
+                        
+                        # Get user stats
+                        db_user = await db.get_user(telegram_id)
+                        user_id = db_user.get("id") if db_user else telegram_id
+                        stats = await db.get_user_transaction_stats(user_id, days=30)
+                        
+                        savings = stats.get("income", 0) - stats.get("expense", 0)
+                        
+                        success = await send_reengagement_message(
+                            bot=self.bot,
+                            telegram_id=telegram_id,
+                            message_type="pro_expiring_soon",
+                            lang=lang,
+                            name=name,
+                            savings=f"{savings:,.0f}",
+                            tx_count=stats.get("count", 0)
+                        )
+                        
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        logger.error(f"Error sending PRO expiring message: {e}")
+                
+                logger.info("Marketing re-engagement check complete")
+                
+            except Exception as e:
+                logger.error(f"Error in marketing re-engagement job: {e}")
+            
+            # Check every 6 hours
+            await asyncio.sleep(60 * 60 * 6)
     
     async def _debt_reminder_job(self):
         """

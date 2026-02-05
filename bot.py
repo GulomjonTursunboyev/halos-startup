@@ -138,6 +138,9 @@ from app.handlers import (
     admin_back,
     admin_close,
     admin_cancel,
+    # Admin marketing handlers
+    admin_marketing_stats,
+    admin_marketing_period,
 )
 from app.subscription_handlers import (
     subscription_command,
