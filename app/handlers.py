@@ -178,18 +178,37 @@ MENU_BUTTONS_SET = frozenset(
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle /start command - check if registered, if not request phone number"""
+    # Import marketing module
+    from app.marketing import (
+        parse_utm_from_start, 
+        track_user_source, 
+        get_welcome_message,
+        on_user_registered
+    )
+    
     # Check for app login deep link (login_xxx parameter)
+    start_param = ""
     if context.args and len(context.args) > 0:
         arg = context.args[0]
+        start_param = arg
         if arg.startswith("login_"):
             session_id = arg.replace("login_", "")
             await handle_app_login(update, context, session_id)
             return ConversationHandler.END
     
+    # Parse UTM data from start parameter
+    utm_data = parse_utm_from_start(start_param) if start_param else None
+    
     # Always clear context for new session/chat
     context.user_data.clear()
     user = update.effective_user
     telegram_id = user.id
+    
+    # Store UTM data in context for later use
+    if utm_data:
+        context.user_data["utm_source"] = utm_data.source
+        context.user_data["utm_campaign"] = utm_data.campaign
+        context.user_data["utm_raw"] = start_param
     
     # Check if user already registered in database
     db = await get_database()
@@ -198,6 +217,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if existing_user and existing_user.get("phone_number"):
         # Update user activity for PRO care scheduler
         await db.update_user_activity(telegram_id)
+        
+        # Track source if new (user came from ad but already registered)
+        if start_param and not existing_user.get("utm_source"):
+            await track_user_source(telegram_id, start_param)
         
         # User already registered - skip contact sharing
         lang = existing_user.get("language", "uz")
@@ -209,7 +232,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data["lang"] = lang
         
         # Show main menu for registered users
-        welcome_back = "👋 Xush kelibsiz!\n\nQuyidagi menyudan foydalaning:" if lang == "uz" else "👋 Добро пожаЛоватъ!\n\nИспоЛъзуЙте менСЋ ниже:"
+        welcome_back = "👋 Xush kelibsiz!\n\nQuyidagi menyudan foydalaning:" if lang == "uz" else "👋 Добро пожаловать!\n\nИспользуйте меню ниже:"
         
         await update.message.reply_text(
             welcome_back,
@@ -217,8 +240,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         )
         
         return ConversationHandler.END
-        
-        return States.MODE
     
     # New user - request phone number for registration
     lang = "uz"  # Default for new users
@@ -230,6 +251,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     context.user_data["username"] = user.username
     context.user_data["lang"] = lang
     context.user_data["in_conversation"] = True  # AI ni bloklash
+    
+    # Get personalized welcome message based on UTM source
+    welcome_message = get_welcome_message(lang, utm_data)
     
     # Request phone number
     keyboard = [
@@ -245,7 +269,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     )
     
     await update.message.reply_text(
-        get_message("welcome", lang),
+        welcome_message,
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -257,6 +281,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle shared contact - save to database immediately"""
+    from app.marketing import track_user_source, on_user_registered
+    
     contact = update.message.contact
     telegram_id = update.effective_user.id
     user = update.effective_user
@@ -288,6 +314,16 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             language=lang
         )
         logger.info(f"New user registered: {telegram_id} - {contact.phone_number} - {user.first_name}")
+        
+        # Track UTM source for new user
+        utm_raw = context.user_data.get("utm_raw", "")
+        if utm_raw:
+            await track_user_source(telegram_id, utm_raw)
+        
+        # Log marketing event
+        from app.marketing import parse_utm_from_start
+        utm_data = parse_utm_from_start(utm_raw) if utm_raw else None
+        await on_user_registered(telegram_id, utm_data)
     else:
         # Update existing user's phone if needed
         await db.update_user(
@@ -449,7 +485,7 @@ async def onboarding_credit_amount_handler(update: Update, context: ContextTypes
     
     if amount < 0:
         await update.message.reply_text(
-            "вќЊ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "вќЊ МеверныЙ С„ормат. Введите цисЛо.",
+            "❌ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "❌ МеверныЙ С„ормат. Введите цисЛо.",
             parse_mode="Markdown"
         )
         return States.ONBOARDING_CREDIT_AMOUNT
@@ -1162,14 +1198,14 @@ async def income_self_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                         return States.RENT
                 else:
                     await update.message.reply_text(
-                        "вќЊ Fayldan daromad topilmadi. Raqam kiriting.",
+                        "❌ Fayldan daromad topilmadi. Raqam kiriting.",
                         parse_mode="Markdown"
                     )
                     return States.INCOME_SELF
             except Exception as e:
                 await processing_msg.delete()
                 await update.message.reply_text(
-                    f"вќЊ Xatolik. Raqam kiriting.",
+                    f"❌ Xatolik. Raqam kiriting.",
                     parse_mode="Markdown"
                 )
                 return States.INCOME_SELF
@@ -1735,8 +1771,8 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             else:
                 # Rasmni o'qib bo'lmadi
                 await update.message.reply_text(
-                    "вќЊ Rasmdan ma'lumotni o'qib bo'lmadi. PDF yoki HTML faylni yuboring." if lang == "uz"
-                    else "вќЊ Ме удаЛосъ процитатъ данные с изображения. Отправъте PDF иЛи HTML С„аЙЛ."
+                    "❌ Rasmdan ma'lumotni o'qib bo'lmadi. PDF yoki HTML faylni yuboring." if lang == "uz"
+                    else "❌ Ме удаЛосъ процитатъ данные с изображения. Отправъте PDF иЛи HTML С„аЙЛ."
                 )
                 return States.KATM_UPLOAD
                 
@@ -1744,8 +1780,8 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             logger.error(f"Image processing error: {e}")
             await processing_msg.delete()
             await update.message.reply_text(
-                "вќЊ Rasmni qayta ishlashda xatolik. PDF/HTML faylni yuboring." if lang == "uz"
-                else "вќЊ Ошибка обработки изображения. Отправъте PDF/HTML С„аЙЛ."
+                "❌ Rasmni qayta ishlashda xatolik. PDF/HTML faylni yuboring." if lang == "uz"
+                else "❌ Ошибка обработки изображения. Отправъте PDF/HTML С„аЙЛ."
             )
             return States.KATM_UPLOAD
     
@@ -1948,7 +1984,7 @@ async def reg_credit_show_schedule_callback(update: Update, context: ContextType
     analysis = context.user_data.get("credit_analysis", {})
     
     if not analysis:
-        await query.edit_message_text("вќЊ Ma'lumot topilmadi")
+        await query.edit_message_text("❌ Ma'lumot topilmadi")
         return States.KATM_UPLOAD
     
     from app.pdf_parser import generate_payment_schedule
@@ -2793,7 +2829,7 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
         
         profile_text += (
             f"\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            f"📋 *РАСРҐОДЫ:*\n"
+            f"📋 *РАСХОДЫ:*\n"
             f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"┃ Аренда: *{format_number(rent)} сум*\n"
             f"┃ Обязат. пЛатежи: *{format_number(kindergarten)} сум*\n"
@@ -2802,7 +2838,7 @@ async def build_profile_content(user: dict, profile: dict, lang: str, telegram_i
             f"🏦 *КРЕДИТ:*\n"
             f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"┃ Ежемес. пЛатС‘ж: *{format_number(loan_payment)} сум*\n"
-            f"┃ ОбщиЙ доЛг: *{format_number(total_debt)} сум*\n"
+            f"┃ ОбщиЙ долг: *{format_number(total_debt)} сум*\n"
         )
     
     # Create keyboard - edit buttons for financial data
@@ -2920,7 +2956,7 @@ PROFILE_FIELDS = {
     "kindergarten": {"uz": "Majburiy to'lovlar", "ru": "Обязат. пЛатежи"},
     "utilities": {"uz": "Kommunal", "ru": "КоммунаЛъные"},
     "loan_payment": {"uz": "Oylik to'lov", "ru": "Ежемес. пЛатС‘ж"},
-    "total_debt": {"uz": "Umumiy qarz", "ru": "ОбщиЙ доЛг"},
+    "total_debt": {"uz": "Umumiy qarz", "ru": "ОбщиЙ долг"},
 }
 
 
@@ -3162,8 +3198,8 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Database timeout uchun maxsus xabar
         if isinstance(error, (TimeoutError, asyncio.TimeoutError)):
             await update.effective_message.reply_text(
-                "вЏі Server band. Iltimos, qayta urinib ko'ring." if lang == "uz" else 
-                "вЏі Сервер занят. ПопробуЙте ещС‘ раз."
+                "⏳ Server band. Iltimos, qayta urinib ko'ring." if lang == "uz" else 
+                "⏳ Сервер занят. ПопробуЙте ещС‘ раз."
             )
         else:
             await update.effective_message.reply_text(
@@ -3729,7 +3765,7 @@ async def menu_today_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             balance_line = f"💰 *{today_balance:,}* сум"
         
         msg = (
-            f"📉 *СЕГОДМРЇ* ↳ {today_date}\n"
+            f"📉 *СЕГОДНЯ* ↳ {today_date}\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{balance_line}\n"
             f"📈 +{today_income:,} | 📉 -{today_expense:,}\n"
@@ -4024,7 +4060,7 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
                 msg = (
                     "🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n"
                     "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-                    f"💵 ОбщиЙ доЛг: *{legacy_total_debt:,.0f}* сум\n"
+                    f"💵 ОбщиЙ долг: *{legacy_total_debt:,.0f}* сум\n"
                     f"📊 Ежемесяцно: *{legacy_loan_payment:,.0f}* сум\n\n"
                     "📄 _ДЛя детаЛъноЙ инС„ормафии загрузите KATM PDF_"
                 )
@@ -4035,7 +4071,7 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
                 msg = "🏦 Банковских кредитов не найдено.\n\n📄 _Р—агрузите KATM PDF_"
         
         keyboard = [[InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_debts_menu"
         )]]
         
@@ -4064,10 +4100,10 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
             # Progress bar
             if original > 0:
                 paid_percent = int(((original - balance) / original) * 100)
-                progress = "в–€" * (paid_percent // 10) + "в–‘" * (10 - paid_percent // 10)
+                progress = "█" * (paid_percent // 10) + "░" * (10 - paid_percent // 10)
             else:
                 paid_percent = 0
-                progress = "в–‘" * 10
+                progress = "░" * 10
             
             msg += f"*{i}. {bank}*\n"
             if loan_type:
@@ -4102,10 +4138,10 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
             
             if original > 0:
                 paid_percent = int(((original - balance) / original) * 100)
-                progress = "в–€" * (paid_percent // 10) + "в–‘" * (10 - paid_percent // 10)
+                progress = "█" * (paid_percent // 10) + "░" * (10 - paid_percent // 10)
             else:
                 paid_percent = 0
-                progress = "в–‘" * 10
+                progress = "░" * 10
             
             msg += f"*{i}. {bank}*\n"
             if loan_type:
@@ -4122,7 +4158,7 @@ async def show_katm_credits_callback(update: Update, context: ContextTypes.DEFAU
         msg += f"   📊 Ежемесяцно: *{total_monthly:,.0f}* сум"
     
     keyboard = [[InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+        "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
         callback_data="back_to_debts_menu"
     )]]
     
@@ -4196,9 +4232,9 @@ async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFA
         elif total_debt_burden > 0:
             msg += f"📉 *Balans:* 💰 -{total_debt_burden:,.0f} so'm\n\n"
         else:
-            msg += "📉 *Balans:* вљЄ Qarz yo'q\n\n"
+            msg += "📉 *Balans:* ⚪ Qarz yo'q\n\n"
         
-        msg += "👥 *SHAXSIY QARZLAR*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
+        msg += "👥 *SHAXSIY QARZLAR*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
         if total_lent > 0 or total_borrowed > 0:
             if total_lent > 0:
                 msg += f"📉 Berdingiz: *{total_lent:,.0f}* ({lent_count})\n"
@@ -4207,7 +4243,7 @@ async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFA
         else:
             msg += "✅ Shaxsiy qarz yo'q\n"
         
-        msg += "\n🏦 *BANK KREDITLARI*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
+        msg += "\n🏦 *BANK KREDITLARI*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
         if credit_count > 0:
             msg += f"💵 Kreditlar: *{credit_count}* ta\n"
             msg += f"👛 Qoldiq: *{total_credit_balance:,.0f}* so'm\n"
@@ -4218,7 +4254,7 @@ async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFA
         msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         msg += "💎 _Qarz: \"Ali 100k berdi\"_"
     else:
-        msg = "💰 *DASHBOARD ДОР›ГОВ*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        msg = "💰 *DASHBOARD ДОЛГОВ*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         if total_receivable > 0 and total_debt_burden > 0:
             diff = total_receivable - total_debt_burden
@@ -4231,18 +4267,18 @@ async def back_to_debts_menu_callback(update: Update, context: ContextTypes.DEFA
         elif total_debt_burden > 0:
             msg += f"📉 *Баланс:* 💰 -{total_debt_burden:,.0f} сум\n\n"
         else:
-            msg += "📉 *Баланс:* вљЄ Долгов нет\n\n"
+            msg += "📉 *Баланс:* ⚪ Долгов нет\n\n"
         
-        msg += "👥 *Р›ИЧМЫЕ ДОР›ГИ*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
+        msg += "👥 *Р›ИЧМЫЕ ДОЛГИ*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
         if total_lent > 0 or total_borrowed > 0:
             if total_lent > 0:
                 msg += f"📉 Вы даЛи: *{total_lent:,.0f}* ({lent_count})\n"
             if total_borrowed > 0:
                 msg += f"📈 Вы взяЛи: *{total_borrowed:,.0f}* ({borrowed_count})\n"
         else:
-            msg += "✅ Р›ицных доЛгов нет\n"
+            msg += "✅ Р›ицных долгов нет\n"
         
-        msg += "\n🏦 *БАНКОВСКИЕ КРЕДИТЫ*\nв”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„в”„\n"
+        msg += "\n🏦 *БАНКОВСКИЕ КРЕДИТЫ*\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"
         if credit_count > 0:
             msg += f"💵 Кредитов: *{credit_count}* шт\n"
             msg += f"👛 Остаток: *{total_credit_balance:,.0f}* сум\n"
@@ -4393,7 +4429,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             for cat, amount in sorted_expenses[:5]:  # Top 5
                 cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 percentage = (amount / today_expense * 100) if today_expense > 0 else 0
-                bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
                 msg += f"   {cat_name}\n   {bar} {amount:,} ({percentage:.0f}%)\n"
             msg += "\n"
         
@@ -4424,7 +4460,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 f"   🏠 *Yashash*\n"
                 f"      {living_70:,.0f} so'm/oy\n"
                 f"      {living_70/30:,.0f} so'm/kun\n\n"
-                f"   вљЎ *Qarz to'lash*\n"
+                f"   ⚡ *Qarz to'lash*\n"
                 f"      {debt_20:,.0f} so'm/oy\n"
             )
             if total_debt > 0:
@@ -4456,12 +4492,12 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             elif net < 0:
                 msg += f"   💰 Siz qaytarasiz: {net:,} so'm\n"
             else:
-                msg += "   вљЄ Qarz yo'q\n"
+                msg += "   ⚪ Qarz yo'q\n"
     
     else:
         # Russian version
         msg = (
-            f"📉 *ОТЧРЃТ Р—А СЕГОДМРЇ* ↳ {today_date}\n"
+            f"📉 *ОТЧРЃТ Р—А СЕГОДНЯ* ↳ {today_date}\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
         
@@ -4481,7 +4517,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             for cat, amount in sorted_expenses[:5]:
                 cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 percentage = (amount / today_expense * 100) if today_expense > 0 else 0
-                bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
                 msg += f"   {cat_name}\n   {bar} {amount:,} ({percentage:.0f}%)\n"
             msg += "\n"
         
@@ -4510,7 +4546,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 f"   🏠 *Р–изнъ (70%)*\n"
                 f"      {living_70:,.0f} сум/мес\n"
                 f"      {living_70/30:,.0f} сум/денъ\n\n"
-                f"   вљЎ *Погашение доЛга (20%)*\n"
+                f"   ⚡ *Погашение долга (20%)*\n"
                 f"      {debt_20:,.0f} сум/мес\n"
             )
             if total_debt > 0:
@@ -4518,7 +4554,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 from dateutil.relativedelta import relativedelta
                 months_to_pay = math.ceil(total_debt / (loan_payment + debt_20)) if (loan_payment + debt_20) > 0 else 0
                 exit_date = datetime.now() + relativedelta(months=months_to_pay)
-                msg += f"      📊 Выход из доЛга: {exit_date.strftime('%B %Y')}\n"
+                msg += f"      📊 Выход из долга: {exit_date.strftime('%B %Y')}\n"
             
             msg += (
                 f"\n   💰 *МакопЛения (10%)*\n"
@@ -4535,13 +4571,13 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
             net = debt_summary['net_balance']
-            msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n💳 *ДОР›ГИ*\n"
+            msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n💳 *ДОЛГИ*\n"
             if net > 0:
                 msg += f"   💸 Вернут вам: +{net:,} сум\n"
             elif net < 0:
                 msg += f"   💰 ВернС‘те вы: {net:,} сум\n"
             else:
-                msg += "   вљЄ Долгов нет\n"
+                msg += "   ⚪ Долгов нет\n"
     
     # ==================== TUGMALAR (YANGI UX) ====================
     if is_pro:
@@ -4574,7 +4610,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     callback_data="ai_debt_list"
                 ),
                 InlineKeyboardButton(
-                    "вњЏпёЏ Tahrirlash" if lang == "uz" else "вњЏпёЏ Изменитъ",
+                    "✏️пёЏ Tahrirlash" if lang == "uz" else "✏️пёЏ Изменитъ",
                     callback_data="recalculate"
                 )
             ]
@@ -4595,7 +4631,7 @@ async def menu_plan_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     callback_data="ai_debt_list"
                 ),
                 InlineKeyboardButton(
-                    "вњЏпёЏ Tahrirlash" if lang == "uz" else "вњЏпёЏ Изменитъ",
+                    "✏️пёЏ Tahrirlash" if lang == "uz" else "✏️пёЏ Изменитъ",
                     callback_data="recalculate"
                 )
             ]
@@ -5115,7 +5151,7 @@ async def credit_show_schedule_callback(update: Update, context: ContextTypes.DE
     analysis = context.user_data.get("credit_analysis", {})
     
     if not analysis:
-        await query.edit_message_text("вќЊ Ma'lumot topilmadi")
+        await query.edit_message_text("❌ Ma'lumot topilmadi")
         return
     
     from app.pdf_parser import generate_payment_schedule
@@ -5272,10 +5308,10 @@ async def save_and_show_menu_results(message, context: ContextTypes.DEFAULT_TYPE
                         f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                         f"📉 *Aqlli taqsimlash:*\n"
                         f"┃ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
-                        f"┃ вљЎ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
+                        f"┃ ⚡ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
                         f"┃ 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
                         f"📅 *Natija:*\n"
-                        f"┃ вЏ± *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
+                        f"┃ ⏱ *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
                         f"┃ 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
                         f"🋃 *PRO imkoniyatlari:*\n"
                         f"┃ 📝 Haftalik/oylik statistika\n"
@@ -5302,14 +5338,14 @@ async def save_and_show_menu_results(message, context: ContextTypes.DEFAULT_TYPE
                 if months_saved > 0:
                     msg += (
                         f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-                        f"💎 *PRO РЕЁЕМИЕ:*\n"
+                        f"💎 *PRO РЕШЕНИЕ:*\n"
                         f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                         f"📉 *РЈмное распредеЛение:*\n"
                         f"┃ 🏦 ДЛя богатства: *{format_number(int(savings_monthly))} сум*\n"
-                        f"┃ вљЎ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
+                        f"┃ ⚡ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
                         f"┃ 🏠 Р–изнъ: *{format_number(int(free_cash * 0.7))} сум*\n\n"
                         f"📅 *РезуЛътат:*\n"
-                        f"┃ вЏ± Ма *{months_saved} мес* ранъше вЂ” *{pro_exit_str}*\n"
+                        f"┃ ⏱ Ма *{months_saved} мес* ранъше вЂ” *{pro_exit_str}*\n"
                         f"┃ 💰 *{format_number(int(savings_at_exit))} сум* богатства\n\n"
                         f"🋃 *Возможности PRO:*\n"
                         f"┃ 📝 ЕженедеЛъная/месяцная статистика\n"
@@ -5477,10 +5513,10 @@ async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_
                         f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                         f"📉 *Aqlli taqsimlash:*\n"
                         f"┃ 🏦 Boylik uchun: *{format_number(int(savings_monthly))} so'm*\n"
-                        f"┃ вљЎ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
+                        f"┃ ⚡ Kredit to'lovi: *{format_number(int(extra_payment))} so'm*\n"
                         f"┃ 🏠 Yashash: *{format_number(int(free_cash * 0.7))} so'm*\n\n"
                         f"📅 *Natija:*\n"
-                        f"┃ вЏ± *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
+                        f"┃ ⏱ *{months_saved} oy* ertaroq вЂ” *{pro_exit_str}*\n"
                         f"┃ 💰 *{format_number(int(savings_at_exit))} so'm* boylik\n\n"
                         f"🋃 *PRO imkoniyatlari:*\n"
                         f"┃ 📝 Haftalik/oylik statistika\n"
@@ -5507,14 +5543,14 @@ async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_
                 if months_saved > 0:
                     msg += (
                         f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-                        f"💎 *PRO РЕЁЕМИЕ:*\n"
+                        f"💎 *PRO РЕШЕНИЕ:*\n"
                         f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                         f"📉 *РЈмное распредеЛение:*\n"
                         f"┃ 🏦 ДЛя богатства: *{format_number(int(savings_monthly))} сум*\n"
-                        f"┃ вљЎ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
+                        f"┃ ⚡ Платёж по кредиту: *{format_number(int(extra_payment))} сум*\n"
                         f"┃ 🏠 Р–изнъ: *{format_number(int(free_cash * 0.7))} сум*\n\n"
                         f"📅 *РезуЛътат:*\n"
-                        f"┃ вЏ± Ма *{months_saved} мес* ранъше вЂ” *{pro_exit_str}*\n"
+                        f"┃ ⏱ Ма *{months_saved} мес* ранъше вЂ” *{pro_exit_str}*\n"
                         f"┃ 💰 *{format_number(int(savings_at_exit))} сум* богатства\n\n"
                         f"🋃 *Возможности PRO:*\n"
                         f"┃ 📝 ЕженедеЛъная/месяцная статистика\n"
@@ -5631,7 +5667,7 @@ async def menu_language_handler(update: Update, context: ContextTypes.DEFAULT_TY
 # ==================== TEXT EXPENSE INPUT HANDLER ====================
 
 async def menu_expense_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle вњЌпёЏ Xarajat button - enable text expense input mode"""
+    """Handle ✍пёЏ Xarajat button - enable text expense input mode"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -5652,7 +5688,7 @@ async def menu_expense_input_handler(update: Update, context: ContextTypes.DEFAU
     
     if lang == "uz":
         msg = (
-            "вњЌпёЏ *MATN ORQALI XARAJAT KIRITISH*\n"
+            "✍пёЏ *MATN ORQALI XARAJAT KIRITISH*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "🤖 *AI yordamchi matndan avtomatik aniqlaydi:*\n"
             "↳ 💰 Summalarni\n"
@@ -5676,7 +5712,7 @@ async def menu_expense_input_handler(update: Update, context: ContextTypes.DEFAU
         )
     else:
         msg = (
-            "вњЌпёЏ *ВВОД РАСРҐОДОВ ТЕКСТОРњ*\n"
+            "✍пёЏ *ВВОД РАСХОДОВ ТЕКСТОРњ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "🤖 *AI помощник автоматицески опредеЛит:*\n"
             "↳ 💰 Суммы\n"
@@ -5701,7 +5737,7 @@ async def menu_expense_input_handler(update: Update, context: ContextTypes.DEFAU
     
     keyboard = [
         [InlineKeyboardButton(
-            "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
+            "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
             callback_data="cancel_expense_mode"
         )]
     ]
@@ -5841,7 +5877,7 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             msg += "\n"
             msg += "🙋 *To'g'rimi?*"
         else:
-            msg = "🤖 *РЕР—РЈР›Р¬ТАТ AI АМАР›ИР—А*\n"
+            msg = "🤖 *РЕГУЛЯРТАТ AI АНАЛ›ИР—А*\n"
             msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             total_expense = 0
@@ -5880,7 +5916,7 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     callback_data="confirm_transaction_save"
                 ),
                 InlineKeyboardButton(
-                    "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ",
+                    "✏️пёЏ O'zgartirish" if lang == "uz" else "✏️пёЏ Изменитъ",
                     callback_data="edit_pending_transaction"
                 )
             ],
@@ -5892,7 +5928,7 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             ],
             [
                 InlineKeyboardButton(
-                    "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
+                    "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
                     callback_data="cancel_pending_transaction"
                 )
             ]
@@ -5923,7 +5959,7 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
     transactions = context.user_data.get("pending_transactions")
     if not transactions:
         await query.edit_message_text(
-            "вќЊ Ma'lumot topilmadi" if lang == "uz" else "вќЊ Данные не наЙдены"
+            "❌ Ma'lumot topilmadi" if lang == "uz" else "❌ Данные не найдены"
         )
         return
     
@@ -5971,9 +6007,9 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
             msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* so'm\n"
         
         msg += "\n"
-        msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
-        msg += "в”‚    📉 *BUGUNGI HISOBOT*    в”‚\n"
-        msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+        msg += "┌┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n"
+        msg += "│    📉 *BUGUNGI HISOBOT*    │\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n\n"
         
         msg += f"💰 Daromad: *{format_number(today_income)}* so'm\n"
         msg += f"💳 Xarajat: *{format_number(today_expense)}* so'm\n"
@@ -5982,10 +6018,10 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
         if today_balance >= 0:
             msg += f"📝 Balans: *+{format_number(today_balance)}* so'm ✅"
         else:
-            msg += f"👛 Balans: *{format_number(today_balance)}* so'm вљ пёЏ"
+            msg += f"👛 Balans: *{format_number(today_balance)}* so'm ⚠️"
         
     else:
-        msg = "✅ *СОРҐРАМЕМО!*\n"
+        msg = "✅ *СОХРАНЕНО!*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         for tx in transactions:
@@ -5993,9 +6029,9 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
             msg += f"{emoji} {tx['category_name']}: *{format_number(tx['amount'])}* сум\n"
         
         msg += "\n"
-        msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
-        msg += "в”‚    📉 *ОТЧРЃТ Р—А ДЕМР¬*    в”‚\n"
-        msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+        msg += "┌┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n"
+        msg += "│    📉 *ОТЧРЃТ Р—А ДЕНЬ*    │\n"
+        msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n\n"
         
         msg += f"💰 Доход: *{format_number(today_income)}* сум\n"
         msg += f"💳 Расход: *{format_number(today_expense)}* сум\n"
@@ -6004,7 +6040,7 @@ async def confirm_transaction_save_callback(update: Update, context: ContextType
         if today_balance >= 0:
             msg += f"📝 Баланс: *+{format_number(today_balance)}* сум ✅"
         else:
-            msg += f"👛 Баланс: *{format_number(today_balance)}* сум вљ пёЏ"
+            msg += f"👛 Баланс: *{format_number(today_balance)}* сум ⚠️"
     
     # Add quick action buttons
     keyboard = [[
@@ -6037,7 +6073,7 @@ async def cancel_pending_transaction_callback(update: Update, context: ContextTy
     context.user_data.pop("pending_original_text", None)
     
     await query.edit_message_text(
-        "вќЊ Bekor qilindi" if lang == "uz" else "вќЊ Отменено"
+        "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
     )
 
 
@@ -6096,7 +6132,7 @@ async def swap_pending_type_callback(update: Update, context: ContextTypes.DEFAU
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
         msg += "🙋 *To'g'rimi?*"
     else:
-        msg = "🕐 *ТИП ИР—РњЕМРЃМ*\n"
+        msg = "🕐 *ТИП ИЗМЕМРЃМ*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_expense = 0
@@ -6126,7 +6162,7 @@ async def swap_pending_type_callback(update: Update, context: ContextTypes.DEFAU
                 callback_data="confirm_transaction_save"
             ),
             InlineKeyboardButton(
-                "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ",
+                "✏️пёЏ O'zgartirish" if lang == "uz" else "✏️пёЏ Изменитъ",
                 callback_data="edit_pending_transaction"
             )
         ],
@@ -6138,7 +6174,7 @@ async def swap_pending_type_callback(update: Update, context: ContextTypes.DEFAU
         ],
         [
             InlineKeyboardButton(
-                "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
+                "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
                 callback_data="cancel_pending_transaction"
             )
         ]
@@ -6164,11 +6200,11 @@ async def edit_pending_transaction_callback(update: Update, context: ContextType
     
     # Show edit options
     if lang == "uz":
-        msg = "вњЏпёЏ *TAHRIRLASH*\n"
+        msg = "✏️пёЏ *TAHRIRLASH*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         msg += "Qaysi tranzaksiyani tahrirlash kerak?\n\n"
     else:
-        msg = "вњЏпёЏ *РЕДАКТИРОВАМИЕ*\n"
+        msg = "✏️пёЏ *РЕДАКТИРОВАМИЕ*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         msg += "КакуСЋ транзакфиСЋ редактироватъ?\n\n"
     
@@ -6181,7 +6217,7 @@ async def edit_pending_transaction_callback(update: Update, context: ContextType
     
     keyboard.append([
         InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_pending_preview"
         )
     ])
@@ -6214,11 +6250,11 @@ async def edit_single_tx_callback(update: Update, context: ContextTypes.DEFAULT_
     
     # Show category selection
     if lang == "uz":
-        msg = f"вњЏпёЏ *KATEGORIYA TANLANG*\n"
+        msg = f"✏️пёЏ *KATEGORIYA TANLANG*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         msg += f"💰 Summa: *{format_number(tx['amount'])} so'm*\n\n"
     else:
-        msg = f"вњЏпёЏ *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
+        msg = f"✏️пёЏ *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         msg += f"💰 Сумма: *{format_number(tx['amount'])} сум*\n\n"
     
@@ -6262,7 +6298,7 @@ async def edit_single_tx_callback(update: Update, context: ContextTypes.DEFAULT_
     
     keyboard.append([
         InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="edit_pending_transaction"
         )
     ])
@@ -6354,7 +6390,7 @@ async def back_to_pending_preview_callback(update: Update, context: ContextTypes
             msg += f"📉 Jami xarajat: *{format_number(total_expense)} so'm*\n"
         msg += "\n🙋 *To'g'rimi?*"
     else:
-        msg = "🤖 *РЕР—РЈР›Р¬ТАТ AI АМАР›ИР—А*\n"
+        msg = "🤖 *РЕГУЛЯРТАТ AI АНАЛ›ИР—А*\n"
         msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         total_expense = 0
@@ -6391,7 +6427,7 @@ async def back_to_pending_preview_callback(update: Update, context: ContextTypes
                 callback_data="confirm_transaction_save"
             ),
             InlineKeyboardButton(
-                "вњЏпёЏ O'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ",
+                "✏️пёЏ O'zgartirish" if lang == "uz" else "✏️пёЏ Изменитъ",
                 callback_data="edit_pending_transaction"
             )
         ],
@@ -6403,7 +6439,7 @@ async def back_to_pending_preview_callback(update: Update, context: ContextTypes
         ],
         [
             InlineKeyboardButton(
-                "вќЊ Bekor qilish" if lang == "uz" else "вќЊ Отмена",
+                "❌ Bekor qilish" if lang == "uz" else "❌ Отмена",
                 callback_data="cancel_pending_transaction"
             )
         ]
@@ -6455,7 +6491,7 @@ async def show_halos_status_callback(update: Update, context: ContextTypes.DEFAU
         if lang == "uz":
             msg = "🌟 *HALOS USULI* PRO obunachilarga ochiq.\n\n💎 PRO ga o'ting va HALOS usuli bilan qarzdan tezroq chiqing!"
         else:
-            msg = "🌟 *РњЕТОД HALOS* доступен PRO подписцикам.\n\n💎 ПереЙдите на PRO и выходите из доЛга быстрее с методом HALOS!"
+            msg = "🌟 *РњЕТОД HALOS* доступен PRO подписцикам.\n\n💎 ПереЙдите на PRO и выходите из долга быстрее с методом HALOS!"
         
         keyboard = [[InlineKeyboardButton(
             "💎 PRO olish" if lang == "uz" else "💎 ПоЛуцитъ PRO",
@@ -6613,7 +6649,7 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
                     "👑 *HALOS PRO usuli:*\n"
                     f"┃ Muddat: *{pro_exit_months}* oy\n"
                     f"┃ Sana: *{pro_exit_formatted}*\n"
-                    f"┃ вЏ± {months_saved} oy tezroq!\n"
+                    f"┃ ⏱ {months_saved} oy tezroq!\n"
                     f"┃ 💎 Jamg'arma: {savings_at_exit:,.0f} so'm\n"
                     f"┃ Oylik qo'shimcha: {extra_debt:,.0f} so'm\n\n"
                 )
@@ -6660,12 +6696,12 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
             elif net < 0:
                 msg += f"┃ 💰 Sof: {net:,} so'm\n"
             else:
-                msg += "┃ вљЄ Sof: 0 so'm\n"
+                msg += "┃ ⚪ Sof: 0 so'm\n"
     
     else:
         # Russian version
         msg = (
-            "📝 *ПОДРОБМЫР™ ОТЧРЃТ*\n"
+            "📝 *ПОДРОБНЫЙ ОТЧРЃТ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "💰 *ДОРҐОДЫ:*\n"
@@ -6689,8 +6725,8 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
         if total_debt > 0:
             msg += (
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-                "💵 *СОСТОРЇМИЕ ДОР›ГА:*\n"
-                f"┃ ОбщиЙ доЛг: *{total_debt:,}* сум\n"
+                "💵 *СОСТОРЇМИЕ ДОЛГА:*\n"
+                f"┃ ОбщиЙ долг: *{total_debt:,}* сум\n"
                 f"┃ ЕжемесяцныЙ пЛатС‘ж: *{loan_payment:,}* сум\n\n"
                 
                 "🔗 *ОбыцныЙ способ:*\n"
@@ -6703,7 +6739,7 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
                     "👑 *Способ HALOS PRO:*\n"
                     f"┃ Срок: *{pro_exit_months}* мес\n"
                     f"┃ Дата: *{pro_exit_formatted}*\n"
-                    f"┃ вЏ± Ма {months_saved} мес быстрее!\n"
+                    f"┃ ⏱ Ма {months_saved} мес быстрее!\n"
                     f"┃ 💎 МакопЛения: {savings_at_exit:,.0f} сум\n"
                     f"┃ Доп. пЛатС‘ж: {extra_debt:,.0f} сум\n\n"
                 )
@@ -6729,7 +6765,7 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
         if debt_summary["total_lent"] > 0 or debt_summary["total_borrowed"] > 0:
             msg += (
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-                "💳 *Р›ИЧМЫЕ ДОР›ГИ:*\n"
+                "💳 *Р›ИЧМЫЕ ДОЛГИ:*\n"
                 f"┃ 📉 ДаЛ: {debt_summary['total_lent']:,} сум ({debt_summary['lent_count']})\n"
                 f"┃ 📈 ВзяЛ: {debt_summary['total_borrowed']:,} сум ({debt_summary['borrowed_count']})\n"
             )
@@ -6739,11 +6775,11 @@ async def detailed_report_callback(update: Update, context: ContextTypes.DEFAULT
             elif net < 0:
                 msg += f"┃ 💰 ЧистыЙ: {net:,} сум\n"
             else:
-                msg += "┃ вљЄ ЧистыЙ: 0 сум\n"
+                msg += "┃ ⚪ ЧистыЙ: 0 сум\n"
     
     keyboard = [
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_report"
         )]
     ]
@@ -6812,7 +6848,7 @@ async def report_weekly_callback(update: Update, context: ContextTypes.DEFAULT_T
             for cat, amount in sorted_expenses[:7]:
                 cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 percentage = (amount / week_expense * 100) if week_expense > 0 else 0
-                bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     else:
         msg = (
@@ -6830,23 +6866,23 @@ async def report_weekly_callback(update: Update, context: ContextTypes.DEFAULT_T
             msg += f"┃ 💰 Баланс: {week_balance:,} сум\n\n"
         
         msg += (
-            f"📉 *СРЕДМЕЕ В ДЕМР¬:*\n"
+            f"📉 *СРЕДНЕЕ В ДЕНЬ:*\n"
             f"┃ Приход: ~{avg_income:,.0f} сум\n"
             f"┃ Расход: ~{avg_expense:,.0f} сум\n\n"
         )
         
         if week_summary.get("expense_by_category"):
-            msg += "💳 *РАСРҐОДЫ:*\n"
+            msg += "💳 *РАСХОДЫ:*\n"
             sorted_expenses = sorted(week_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses[:7]:
                 cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 percentage = (amount / week_expense * 100) if week_expense > 0 else 0
-                bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     
     keyboard = [
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_report"
         )]
     ]
@@ -6914,7 +6950,7 @@ async def report_monthly_callback(update: Update, context: ContextTypes.DEFAULT_
             for cat, amount in sorted_expenses:
                 cat_name = EXPENSE_CATEGORIES["uz"].get(cat, "📆 Boshqa")
                 percentage = (amount / month_expense * 100) if month_expense > 0 else 0
-                bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     else:
         msg = (
@@ -6932,23 +6968,23 @@ async def report_monthly_callback(update: Update, context: ContextTypes.DEFAULT_
             msg += f"┃ 💰 Баланс: {month_balance:,} сум\n\n"
         
         msg += (
-            f"📉 *СРЕДМЕЕ В ДЕМР¬:*\n"
+            f"📉 *СРЕДНЕЕ В ДЕНЬ:*\n"
             f"┃ Приход: ~{avg_income:,.0f} сум\n"
             f"┃ Расход: ~{avg_expense:,.0f} сум\n\n"
         )
         
         if month_summary.get("expense_by_category"):
-            msg += "💳 *РАСПРЕДЕР›ЕМИЕ РАСРҐОДОВ:*\n"
+            msg += "💳 *РАСПРЕДЕЛЕНИЕ РАСХОДОВ:*\n"
             sorted_expenses = sorted(month_summary["expense_by_category"].items(), key=lambda x: x[1], reverse=True)
             for cat, amount in sorted_expenses:
                 cat_name = EXPENSE_CATEGORIES["ru"].get(cat, "📆 Процее")
                 percentage = (amount / month_expense * 100) if month_expense > 0 else 0
-                bar = "в–€" * int(percentage / 10) + "в–‘" * (10 - int(percentage / 10))
+                bar = "█" * int(percentage / 10) + "░" * (10 - int(percentage / 10))
                 msg += f"{cat_name}\n{bar} {amount:,} ({percentage:.0f}%)\n"
     
     keyboard = [
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_report"
         )]
     ]
@@ -7019,7 +7055,7 @@ async def show_expense_report_callback(update: Update, context: ContextTypes.DEF
         )
     else:
         msg = (
-            "📉 *ОТЧРЃТ Р—А СЕГОДМРЇ*\n"
+            "📉 *ОТЧРЃТ Р—А СЕГОДНЯ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"📈 Доход: *{format_number(budget_status.get('today_income', 0))} сум*\n"
             f"📉 Расход: *{format_number(budget_status.get('today_expense', 0))} сум*\n"
@@ -7090,7 +7126,7 @@ async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_
     profile = await db.get_financial_profile(user["id"]) if user else None
     
     if not profile:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
     
     import math
@@ -7137,18 +7173,18 @@ async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "📅 *NATIJA:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            f"вЏ± Chiqish muddati: *{simple_exit_months} oy*\n"
+            f"⏱ Chiqish muddati: *{simple_exit_months} oy*\n"
             f"📊 Sana: *{simple_exit_formatted}*\n"
             f"💰 Yig'ilgan boylik: *0 so'm*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "вљ пёЏ *Eslatma:* Bu usulda faqat qarz to'lanadi.\n"
+            "⚠️ *Eslatma:* Bu usulda faqat qarz to'lanadi.\n"
             "Boylik yig'ilmaydi. PRO bilan tezroq chiqasiz\n"
             "va boylik ham ortirasiz!"
         )
     else:
         msg = (
-            "🆓 *БЕСПР›АТМЫР™ ПР›АМ ВЫРҐОДА ИР— ДОР›ГА*\n"
+            "🆓 *БЕСПР›АТМЫР™ ПР›АМ ВЫРҐОДА ИР— ДОЛГА*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "📋 *РњЕТОД:* ТоЛъко минимаЛъныЙ пЛатС‘ж\n\n"
@@ -7161,20 +7197,20 @@ async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_
             f"┃ Свободные: *{format_number(free_cash)} сум*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "📉 *ДОР›Г:*\n"
+            "📉 *ДОЛГ:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            f"┃ ОбщиЙ доЛг: *{format_number(total_debt)} сум*\n"
+            f"┃ ОбщиЙ долг: *{format_number(total_debt)} сум*\n"
             f"┃ Ежемесяцно: *{format_number(loan_payment)} сум*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "📅 *РЕР—РЈР›Р¬ТАТ:*\n"
+            "📅 *РЕГУЛЯРТАТ:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            f"вЏ± Срок выхода: *{simple_exit_months} мес*\n"
+            f"⏱ Срок выхода: *{simple_exit_months} мес*\n"
             f"📊 Дата: *{simple_exit_formatted}*\n"
             f"💰 МакопЛенное богатство: *0 сум*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "вљ пёЏ *Примецание:* Этот способ тоЛъко погашает доЛг.\n"
+            "⚠️ *Примецание:* Этот способ тоЛъко погашает долг.\n"
             "Богатство не копится. С PRO выЙдете быстрее\n"
             "и накопите богатство!"
         )
@@ -7185,7 +7221,7 @@ async def debt_plan_free_callback(update: Update, context: ContextTypes.DEFAULT_
             callback_data="show_pricing"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -7216,7 +7252,7 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
     profile = await db.get_financial_profile(user["id"]) if user else None
     
     if not profile:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
     
     import math
@@ -7276,15 +7312,15 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
             "📉 *AQLLI TAQSIMLASH:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"┃ 🏦 Boylik uchun: *{format_number(int(savings))} so'm*\n"
-            f"┃ вљЎ Kredit to'lovi: *{format_number(int(extra_debt))} so'm*\n"
+            f"┃ ⚡ Kredit to'lovi: *{format_number(int(extra_debt))} so'm*\n"
             f"┃ 🏠 Yashash: *{format_number(int(living))} so'm*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             "📅 *NATIJA:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            f"вЏ± Chiqish muddati: *{pro_exit_months} oy*\n"
+            f"⏱ Chiqish muddati: *{pro_exit_months} oy*\n"
             f"📊 Sana: *{pro_exit_formatted}*\n"
-            f"вЏ± Tejash: *{months_saved} oy tezroq!*\n"
+            f"⏱ Tejash: *{months_saved} oy tezroq!*\n"
             f"💰 Yig'ilgan boylik: *{format_number(int(savings_at_exit))} so'm*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
@@ -7293,7 +7329,7 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
         )
     else:
         msg = (
-            "💎 *PRO ПР›АМ ВЫРҐОДА ИР— ДОР›ГА*\n"
+            "💎 *PRO ПР›АМ ВЫРҐОДА ИР— ДОЛГА*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "📋 *РњЕТОД:* РЈмное распредеЛение\n\n"
@@ -7303,22 +7339,22 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"┃ Доход: *{format_number(total_income)} сум*\n"
             f"┃ ОбязатеЛъные: *{format_number(mandatory)} сум*\n"
-            f"┃ ПЛатС‘ж по доЛгу: *{format_number(loan_payment)} сум*\n"
+            f"┃ ПЛатС‘ж по долгу: *{format_number(loan_payment)} сум*\n"
             f"┃ Свободные: *{format_number(free_cash)} сум*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "📉 *РЈРњМОЕ РАСПРЕДЕР›ЕМИЕ:*\n"
+            "📉 *РЈРњМОЕ РАСПРЕДЕЛЕНИЕ:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"┃ 🏦 ДЛя богатства: *{format_number(int(savings))} сум*\n"
-            f"┃ вљЎ Платёж по кредиту: *{format_number(int(extra_debt))} сум*\n"
+            f"┃ ⚡ Платёж по кредиту: *{format_number(int(extra_debt))} сум*\n"
             f"┃ 🏠 Р–изнъ: *{format_number(int(living))} сум*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "📅 *РЕР—РЈР›Р¬ТАТ:*\n"
+            "📅 *РЕГУЛЯРТАТ:*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            f"вЏ± Срок выхода: *{pro_exit_months} мес*\n"
+            f"⏱ Срок выхода: *{pro_exit_months} мес*\n"
             f"📊 Дата: *{pro_exit_formatted}*\n"
-            f"вЏ± Экономия: *{months_saved} мес быстрее!*\n"
+            f"⏱ Экономия: *{months_saved} мес быстрее!*\n"
             f"💰 МакопЛенное богатство: *{format_number(int(savings_at_exit))} сум*\n\n"
             
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
@@ -7332,7 +7368,7 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
             callback_data="pro_statistics"
         )],
         [InlineKeyboardButton(
-            "📋 Qarz nazorati" if lang == "uz" else "📋 КонтроЛъ доЛгов",
+            "📋 Qarz nazorati" if lang == "uz" else "📋 КонтроЛъ долгов",
             callback_data="pro_debt_monitor"
         )],
         [InlineKeyboardButton(
@@ -7340,7 +7376,7 @@ async def debt_plan_pro_callback(update: Update, context: ContextTypes.DEFAULT_T
             callback_data="pro_export_excel"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -7430,7 +7466,7 @@ async def ai_assistant_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "┃ 📉 ДобавЛСЋ в категориСЋ\n"
             "┃ 📝 Покажу в отцС‘те\n\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-            "📊 *ПРИРњЕР:*\n"
+            "📊 *ПРИМЕР:*\n"
             "\"Сегодня на еду потратиЛ 50 тысяц\"\n"
             "\"ПоЛуциЛ зарпЛату 5 миЛЛионов\"\n\n"
             "🙋 Отправъте гоЛосовое иЛи нажмите кнопку:"
@@ -7446,7 +7482,7 @@ async def ai_assistant_callback(update: Update, context: ContextTypes.DEFAULT_TY
             callback_data="ai_recent"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -7681,8 +7717,8 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not text:
             logger.warning(f"[VOICE] Transcription returned None/empty")
             await processing_msg.edit_text(
-                "вќЊ Ovozni aniqlab bo'lmadi. Qaytadan urinib ko'ring." if lang == "uz" else 
-                "вќЊ Ме удаЛосъ распознатъ гоЛос. ПопробуЙте ещС‘ раз.",
+                "❌ Ovozni aniqlab bo'lmadi. Qaytadan urinib ko'ring." if lang == "uz" else 
+                "❌ Ме удаЛосъ распознатъ гоЛос. ПопробуЙте ещС‘ раз.",
                 parse_mode="Markdown"
             )
             return
@@ -7791,7 +7827,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                             callback_data="ai_confirm_learn"
                         ),
                         InlineKeyboardButton(
-                            "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
+                            "❌ Noto'g'ri" if lang == "uz" else "❌ Меверно",
                             callback_data=f"ai_correct_{transaction_id}"
                         )
                     ])
@@ -7850,7 +7886,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                             callback_data="ai_confirm_learn"  # O'rganish bilan tasdiqlash
                         ),
                         InlineKeyboardButton(
-                            "вњЏпёЏ Tuzatish" if lang == "uz" else "вњЏпёЏ Исправитъ",
+                            "✏️пёЏ Tuzatish" if lang == "uz" else "✏️пёЏ Исправитъ",
                             callback_data=f"ai_correct_multi_{ids_str}"
                         )
                     ])
@@ -7917,12 +7953,12 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         callback_data="ai_confirm_ok"
                     ),
                     InlineKeyboardButton(
-                        "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
+                        "❌ Noto'g'ri" if lang == "uz" else "❌ Меверно",
                         callback_data=f"ai_debt_correct_{debt_id}"
                     )
                 ],
                 [InlineKeyboardButton(
-                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
+                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
                     callback_data="ai_debt_list"
                 )]
             ]
@@ -7941,9 +7977,9 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not transactions:
             await processing_msg.edit_text(
                 f"💡 *Aniqlangan matn:* {text}\n\n"
-                f"вќЊ Summa topilmadi. Summani aniq ayting." if lang == "uz" else
+                f"❌ Summa topilmadi. Summani aniq ayting." if lang == "uz" else
                 f"💡 *РаспознанныЙ текст:* {text}\n\n"
-                f"вќЊ Сумма не наЙдена. Мазовите сумму цС‘тко.",
+                f"❌ Сумма не найдена. Мазовите сумму цС‘тко.",
                 parse_mode="Markdown"
             )
             return
@@ -7990,7 +8026,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     callback_data="ai_confirm_learn"
                 ),
                 InlineKeyboardButton(
-                    "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
+                    "❌ Noto'g'ri" if lang == "uz" else "❌ Меверно",
                     callback_data=f"ai_correct_{transaction_id}"
                 )
             ]
@@ -8019,7 +8055,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         import traceback
         traceback.print_exc()
         await update.message.reply_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка",
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка",
             parse_mode="Markdown"
         )
 
@@ -8131,9 +8167,9 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "📉", "👤", "💎", "🌐", "вќ“", "/", "Hisobotlarim", "Рњои отцС‘ты",
         "Profil", "ПроС„иЛъ", "PRO", "Til", "РЇзык", "Yordam", "Помощъ",
         # Menu tugmalari - yangi qo'shildi
-        "вњЌпёЏ", "Xarajat", "Расход", "💰", "Daromad", "Доход",
+        "✍пёЏ", "Xarajat", "Расход", "💰", "Daromad", "Доход",
         "📋", "Qarzlar", "Долги", "🕐", "Transfer", "Перевод",
-        "вљ™пёЏ", "Sozlamalar", "Настройки", "📝", "Statistika", "Статистика",
+        "⚙️", "Sozlamalar", "Настройки", "📝", "Statistika", "Статистика",
         "🏠", "Bosh sahifa", "ГЛавная", "в¬…пёЏ", "Orqaga", "Мазад"
     ]
     for pattern in menu_patterns:
@@ -8208,7 +8244,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                             )
                         else:
                             msg = (
-                                "✅ *МОВАРЇ КАТЕГОРИРЇ СОР—ДАМА*\n"
+                                "✅ *МОВАРЇ КАТЕГОРИЯ СОЗДАМА*\n"
                                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                                 f"📝 Категория: *{new_category_name}*\n"
                                 f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
@@ -8219,7 +8255,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                         
                     except Exception as e:
                         print(f"[NEW-CATEGORY] Error: {e}")
-                        await update.message.reply_text("вќЊ Xatolik" if lang == "uz" else "вќЊ Ошибка")
+                        await update.message.reply_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
             
             # Flaglarni tozalash
             context.user_data["awaiting_new_category"] = False
@@ -8289,12 +8325,12 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                             callback_data="ai_confirm_ok"
                         ),
                         InlineKeyboardButton(
-                            "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
+                            "❌ Noto'g'ri" if lang == "uz" else "❌ Меверно",
                             callback_data=f"ai_debt_correct_{debt_id}"
                         )
                     ],
                     [InlineKeyboardButton(
-                        "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
+                        "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
                         callback_data="ai_debt_list"
                     )]
                 ]
@@ -8399,7 +8435,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     callback_data="ai_confirm_learn"  # O'rganish bilan
                 ),
                 InlineKeyboardButton(
-                    "вќЊ Noto'g'ri" if lang == "uz" else "вќЊ Меверно",
+                    "❌ Noto'g'ri" if lang == "uz" else "❌ Меверно",
                     callback_data=f"ai_correct_{transaction_id}"
                 )
             ])
@@ -8437,7 +8473,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                         callback_data="ai_confirm_learn"
                     ),
                     InlineKeyboardButton(
-                        "вњЏпёЏ Tuzatish" if lang == "uz" else "вњЏпёЏ Исправитъ",
+                        "✏️пёЏ Tuzatish" if lang == "uz" else "✏️пёЏ Исправитъ",
                         callback_data=f"ai_correct_multi_{ids_str}"
                     )
                 ])
@@ -8452,7 +8488,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
             else:
                 await update.message.reply_text(
-                    "вќЊ AI tranzaksiya aniqlay olmadi.",
+                    "❌ AI tranzaksiya aniqlay olmadi.",
                     parse_mode="Markdown"
                 )
         
@@ -8537,9 +8573,9 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
         if lang == "uz":
             msg = "✅ *TASDIQLANDI!*\n"
             msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
-            msg += "в”‚    📉 *BUGUNGI HISOBOT*    в”‚\n"
-            msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+            msg += "┌┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n"
+            msg += "│    📉 *BUGUNGI HISOBOT*    │\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n\n"
             msg += f"💰 Daromad: *{format_number(today_income)}* so'm\n"
             msg += f"💳 Xarajat: *{format_number(today_expense)}* so'm\n"
             msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
@@ -8547,13 +8583,13 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
             if today_balance >= 0:
                 msg += f"📝 Balans: *+{format_number(today_balance)}* so'm ✅"
             else:
-                msg += f"👛 Balans: *{format_number(today_balance)}* so'm вљ пёЏ"
+                msg += f"👛 Balans: *{format_number(today_balance)}* so'm ⚠️"
         else:
-            msg = "✅ *ПОДТВЕРР–ДЕМО!*\n"
+            msg = "✅ *ПОДТВЕРЖДЕНО!*\n"
             msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            msg += "в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ\n"
-            msg += "в”‚    📉 *ОТЧРЃТ Р—А ДЕМР¬*    в”‚\n"
-            msg += "┃в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”\n\n"
+            msg += "┌┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n"
+            msg += "│    📉 *ОТЧРЃТ Р—А ДЕНЬ*    │\n"
+            msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃│\n\n"
             msg += f"💰 Доход: *{format_number(today_income)}* сум\n"
             msg += f"💳 Расход: *{format_number(today_expense)}* сум\n"
             msg += "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
@@ -8561,7 +8597,7 @@ async def ai_confirm_learn_callback(update: Update, context: ContextTypes.DEFAUL
             if today_balance >= 0:
                 msg += f"📝 Баланс: *+{format_number(today_balance)}* сум ✅"
             else:
-                msg += f"👛 Баланс: *{format_number(today_balance)}* сум вљ пёЏ"
+                msg += f"👛 Баланс: *{format_number(today_balance)}* сум ⚠️"
         
         # Quick action buttons
         keyboard = [[
@@ -8608,7 +8644,7 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
         ids_str = callback_data.replace("ai_correct_multi_", "")
         transaction_ids = [int(x) for x in ids_str.split(",")]
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
@@ -8628,19 +8664,19 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
     
     if not transactions:
         await query.edit_message_text(
-            "вќЊ Tranzaksiyalar topilmadi" if lang == "uz" else "вќЊ Транзакфии не наЙдены"
+            "❌ Tranzaksiyalar topilmadi" if lang == "uz" else "❌ Транзакфии не найдены"
         )
         return
     
     # Show list of transactions to correct
     if lang == "uz":
         msg = (
-            "вњЏпёЏ *QAYSI YOZUVNI TUZATISH KERAK?*\n"
+            "✏️пёЏ *QAYSI YOZUVNI TUZATISH KERAK?*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
     else:
         msg = (
-            "вњЏпёЏ *КАКРЈЮ Р—АПИСР¬ ИСПРАВИТР¬?*\n"
+            "✏️пёЏ *КАКРЈЮ Р—АПИСР¬ ИСПРАВИТЬ?*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
     
@@ -8653,7 +8689,7 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
         msg += f"{i}. {tx_type}: *{tx['amount']:,}* - {tx.get('description', '')[:30]}\n"
         
         keyboard.append([InlineKeyboardButton(
-            f"вњЏпёЏ #{i} - {tx['amount']:,}",
+            f"✏️пёЏ #{i} - {tx['amount']:,}",
             callback_data=f"ai_correct_{tx['id']}"
         )])
     
@@ -8662,7 +8698,7 @@ async def ai_correct_multi_callback(update: Update, context: ContextTypes.DEFAUL
         callback_data=f"ai_delete_all_{ids_str}"
     )])
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
+        "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
         callback_data="ai_cancel_correct"
     )])
     
@@ -8687,7 +8723,7 @@ async def ai_clarify_multi_callback(update: Update, context: ContextTypes.DEFAUL
         ids_str = callback_data.replace("ai_clarify_multi_", "")
         transaction_ids = [int(x) for x in ids_str.split(",")]
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id
@@ -8736,7 +8772,7 @@ async def ai_clarify_multi_callback(update: Update, context: ContextTypes.DEFAUL
         )])
     
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+        "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
         callback_data="ai_cancel_correct"
     )])
     
@@ -8760,7 +8796,7 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     try:
         transaction_id = int(callback_data.split("_")[-1])
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
@@ -8775,7 +8811,7 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     
     if not transaction or transaction["user_id"] != user["id"]:
         await query.edit_message_text(
-            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ Транзакция не наЙдена"
+            "❌ Tranzaksiya topilmadi" if lang == "uz" else "❌ Транзакция не найдена"
         )
         return
     
@@ -8819,7 +8855,7 @@ async def ai_clarify_category_callback(update: Update, context: ContextTypes.DEF
     
     # Bekor qilish tugmasi
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
+        "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
         callback_data="ai_cancel_correct"
     )])
     
@@ -8846,7 +8882,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         transaction_id = int(parts[0])
         new_category = parts[1] if len(parts) > 1 else "boshqa"
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES, learn_from_correction
@@ -8861,7 +8897,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     
     if not transaction or transaction["user_id"] != user["id"]:
         await query.edit_message_text(
-            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ Транзакция не наЙдена"
+            "❌ Tranzaksiya topilmadi" if lang == "uz" else "❌ Транзакция не найдена"
         )
         return
     
@@ -8918,7 +8954,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         else:
             msg = (
                 "✅ *Категория обновЛена!*\n\n"
-                f"📃 Мовая категория: *{new_category_name}*\n\n"
+                f"📃 Новая категория: *{new_category_name}*\n\n"
                 "_🧠 AI запомнит ьто дЛя сЛедуСЋщих разов._"
             )
         
@@ -8927,7 +8963,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         logger.error(f"Error updating category: {e}")
         await query.edit_message_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка"
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
         )
 
 
@@ -8981,7 +9017,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         transaction_id = int(callback_data.split("_")[-1])
     except:
-        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "ПроизошЛа ошибка")
+        await query.edit_message_text("Xatolik yuz berdi" if lang == "uz" else "Произошла ошибка")
         return
     
     from app.ai_assistant import get_transaction_by_id, EXPENSE_CATEGORIES, INCOME_CATEGORIES
@@ -8996,7 +9032,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if not transaction or transaction["user_id"] != user["id"]:
         await query.edit_message_text(
-            "вќЊ Tranzaksiya topilmadi" if lang == "uz" else "вќЊ Транзакция не наЙдена"
+            "❌ Tranzaksiya topilmadi" if lang == "uz" else "❌ Транзакция не найдена"
         )
         return
     
@@ -9018,7 +9054,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if lang == "uz":
         msg = (
-            "вњЏпёЏ *TUZATISH*\n"
+            "✏️пёЏ *TUZATISH*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"💡 Joriy yozuv:\n"
             f"┃ Turi: *{'Daromad' if transaction['type'] == 'income' else 'Xarajat'}*\n"
@@ -9029,7 +9065,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
     else:
         msg = (
-            "вњЏпёЏ *ИСПРАВР›ЕМИЕ*\n"
+            "✏️пёЏ *ИСПРАВЛЕНИЕ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"💡 Текущая записъ:\n"
             f"┃ Тип: *{'Доход' if transaction['type'] == 'income' else 'Расход'}*\n"
@@ -9054,7 +9090,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             callback_data=f"ai_change_category_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            "вњЏпёЏ Summani o'zgartirish" if lang == "uz" else "вњЏпёЏ Изменитъ сумму",
+            "✏️пёЏ Summani o'zgartirish" if lang == "uz" else "✏️пёЏ Изменитъ сумму",
             callback_data=f"ai_edit_amount_{transaction_id}"
         )],
         [InlineKeyboardButton(
@@ -9062,7 +9098,7 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             callback_data=f"ai_delete_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
+            "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
             callback_data="ai_cancel_correct"
         )]
     ]
@@ -9175,7 +9211,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         print(f"[AI-CORRECT] Error updating transaction: {e}")
         await query.edit_message_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка"
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
         )
         return
     
@@ -9186,7 +9222,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "✅ *Tuzatildi va AI xatadan xulosa chiqardi!*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"🕐 Turi o'zgartirildi:\n"
-            f"┃ {'📈 Daromad' if old_type == 'income' else '📉 Xarajat'} в†’ "
+            f"┃ {'📈 Daromad' if old_type == 'income' else '📉 Xarajat'} ↳ "
             f"{'📈 Daromad' if new_type == 'income' else '📉 Xarajat'}\n"
             f"┃ Kategoriya: *{new_category_name}*\n"
             f"┃ Summa: *{transaction['amount']:,}* so'm\n\n"
@@ -9198,7 +9234,7 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "✅ *ИсправЛено! AI сдеЛаЛ выводы!*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"🕐 Тип изменС‘н:\n"
-            f"┃ {'📈 Доход' if old_type == 'income' else '📉 Расход'} в†’ "
+            f"┃ {'📈 Доход' if old_type == 'income' else '📉 Расход'} ↳ "
             f"{'📈 Доход' if new_type == 'income' else '📉 Расход'}\n"
             f"┃ Категория: *{new_category_name}*\n"
             f"┃ Сумма: *{transaction['amount']:,}* сум\n\n"
@@ -9247,7 +9283,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not original_text or not is_gemini_available():
         await query.edit_message_text(
-            "вќЊ Gemini mavjud emas yoki matn topilmadi" if lang == "uz" else "вќЊ Gemini недоступен иЛи текст не наЙден"
+            "❌ Gemini mavjud emas yoki matn topilmadi" if lang == "uz" else "❌ Gemini недоступен иЛи текст не найден"
         )
         return
     
@@ -9257,7 +9293,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         if not gemini_result:
             await query.edit_message_text(
-                "вќЊ Gemini javob bermadi. Boshqa usulni tanlang." if lang == "uz" else "вќЊ Gemini не ответиЛ. Выберите другоЙ способ."
+                "❌ Gemini javob bermadi. Boshqa usulni tanlang." if lang == "uz" else "❌ Gemini не ответиЛ. Выберите другоЙ способ."
             )
             return
         
@@ -9290,7 +9326,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await db._connection.commit()
         except Exception as e:
             print(f"[AI-REANALYZE] DB error: {e}")
-            await query.edit_message_text("вќЊ Xatolik" if lang == "uz" else "вќЊ Ошибка")
+            await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
             return
         
         # AI'ga o'rgatish - Gemini natijasini to'g'ri deb belgilash
@@ -9315,7 +9351,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
             )
         else:
             msg = (
-                "🤖 *ПОВТОРМЫР™ АМАР›ИР— GEMINI*\n"
+                "🤖 *ПОВТОРНЫЙ АНАЛ›ИР— GEMINI*\n"
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 f"💡 МовыЙ резуЛътат:\n"
                 f"┃ Тип: *{'📈 Доход' if new_type == 'income' else '📉 Расход'}*\n"
@@ -9328,7 +9364,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = [
             [
                 InlineKeyboardButton("✅ To'g'ri" if lang == "uz" else "✅ Верно", callback_data="ai_confirm_ok"),
-                InlineKeyboardButton("вќЊ Yana noto'g'ri" if lang == "uz" else "вќЊ ВсС‘ ещС‘ неверно", callback_data=f"ai_correct_{transaction_id}")
+                InlineKeyboardButton("❌ Yana noto'g'ri" if lang == "uz" else "❌ ВсС‘ ещС‘ неверно", callback_data=f"ai_correct_{transaction_id}")
             ]
         ]
         
@@ -9339,7 +9375,7 @@ async def ai_reanalyze_callback(update: Update, context: ContextTypes.DEFAULT_TY
         import traceback
         traceback.print_exc()
         await query.edit_message_text(
-            "вќЊ Xatolik yuz berdi" if lang == "uz" else "вќЊ ПроизошЛа ошибка"
+            "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
         )
 
 
@@ -9391,7 +9427,7 @@ async def ai_change_category_callback(update: Update, context: ContextTypes.DEFA
             "📝 *ВЫБЕРИТЕ КАТЕГОРИЮ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"Текущая: *{transaction['category']}*\n\n"
-            "Мовая категория:"
+            "Новая категория:"
         )
     
     keyboard = []
@@ -9403,12 +9439,12 @@ async def ai_change_category_callback(update: Update, context: ContextTypes.DEFA
     
     # Yangi kategoriya yaratish tugmasi
     keyboard.append([InlineKeyboardButton(
-        "вћ• Yangi kategoriya" if lang == "uz" else "вћ• Мовая категория",
+        "вћ• Yangi kategoriya" if lang == "uz" else "вћ• Новая категория",
         callback_data=f"ai_new_category_{transaction_id}"
     )])
     
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+        "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
         callback_data=f"ai_correct_{transaction_id}"
     )])
     
@@ -9440,15 +9476,15 @@ async def ai_new_category_callback(update: Update, context: ContextTypes.DEFAULT
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Yangi kategoriya nomini kiriting:\n"
             "_Masalan: 🎮 O'yinlar, 🐱 Uy hayvonlari_\n\n"
-            "вљ пёЏ Bekor qilish uchun /cancel"
+            "⚠️ Bekor qilish uchun /cancel"
         )
     else:
         msg = (
-            "вћ• *МОВАРЇ КАТЕГОРИРЇ*\n"
+            "вћ• *МОВАРЇ КАТЕГОРИЯ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Введите название новоЙ категории:\n"
             "_Мапример: 🎮 Игры, 🐱 Домашние животные_\n\n"
-            "вљ пёЏ ДЛя отмены /cancel"
+            "⚠️ ДЛя отмены /cancel"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9511,7 +9547,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
             await db._connection.commit()
     except Exception as e:
         print(f"[AI-SET-CATEGORY] DB error: {e}")
-        await query.edit_message_text("вќЊ Xatolik" if lang == "uz" else "вќЊ Ошибка")
+        await query.edit_message_text("❌ Xatolik" if lang == "uz" else "❌ Ошибка")
         return
     
     # AI'ga o'rgatish - XATOLARDAN O'RGANISH
@@ -9552,9 +9588,9 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
         )
     else:
         msg = (
-            "✅ *КАТЕГОРИРЇ ИР—РњЕМЕМА*\n"
+            "✅ *КАТЕГОРИЯ ИЗМЕМЕМА*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            f"📝 Мовая категория: *{new_category_name}*\n"
+            f"📝 Новая категория: *{new_category_name}*\n"
             f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
             "🧠 _AI сдеЛаЛ выводы из ьтоЙ ошибки и запомниЛ!_"
         )
@@ -9628,16 +9664,16 @@ async def ai_rewrite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Eski yozuv o'chirildi.\n\n"
             "🋤 Ovozli xabar yoki\n"
-            "вњЌпёЏ Matnli xabar yuboring.\n\n"
+            "✍пёЏ Matnli xabar yuboring.\n\n"
             "Masalan: \"Ovqatga 50 ming berdim\""
         )
     else:
         msg = (
-            "🕐 *ПЕРЕР—АПИСР¬*\n"
+            "🕐 *ПЕРЕЗАПИСЬ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Старая записъ удаЛена.\n\n"
             "🋤 Отправъте гоЛосовое иЛи\n"
-            "вњЌпёЏ текстовое сообщение.\n\n"
+            "✍пёЏ текстовое сообщение.\n\n"
             "Мапример: \"Ма еду потратиЛ 50 тысяц\""
         )
     
@@ -9663,21 +9699,21 @@ async def ai_edit_amount_callback(update: Update, context: ContextTypes.DEFAULT_
     
     if lang == "uz":
         msg = (
-            "вњЏпёЏ *SUMMANI O'ZGARTIRISH*\n"
+            "✏️пёЏ *SUMMANI O'ZGARTIRISH*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Yangi summani yozing:\n\n"
             "Masalan: `50000` yoki `ellik ming`"
         )
     else:
         msg = (
-            "вњЏпёЏ *ИР—РњЕМИТР¬ СРЈРњРњРЈ*\n"
+            "✏️пёЏ *ИЗМЕМИТР¬ СРЈРњРњРЈ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Мапишите новуСЋ сумму:\n\n"
             "Мапример: `50000` иЛи `пятъдесят тысяц`"
         )
     
     keyboard = [[InlineKeyboardButton(
-        "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
+        "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
         callback_data="ai_cancel_correct"
     )]]
     
@@ -9705,8 +9741,8 @@ async def ai_amount_input_handler(update: Update, context: ContextTypes.DEFAULT_
     
     if not new_amount:
         await update.message.reply_text(
-            "вќЊ Summani aniqlab bo'lmadi. Qaytadan kiriting." if lang == "uz" else
-            "вќЊ Ме удаЛосъ опредеЛитъ сумму. ПопробуЙте ещС‘ раз.",
+            "❌ Summani aniqlab bo'lmadi. Qaytadan kiriting." if lang == "uz" else
+            "❌ Ме удаЛосъ опредеЛитъ сумму. ПопробуЙте ещС‘ раз.",
             parse_mode="Markdown"
         )
         return
@@ -9748,9 +9784,9 @@ async def ai_cancel_correct_callback(update: Update, context: ContextTypes.DEFAU
     context.user_data.pop("ai_editing_amount", None)
     
     if lang == "uz":
-        msg = "в†©пёЏ Bekor qilindi"
+        msg = "↩️ Bekor qilindi"
     else:
-        msg = "в†©пёЏ Отменено"
+        msg = "↩️ Отменено"
     
     await query.edit_message_text(msg, parse_mode="Markdown")
 
@@ -9769,7 +9805,7 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
     
     budget_status = await get_budget_status(db, user["id"])
@@ -9788,7 +9824,7 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 "💰 *БЮДР–ЕТ*\n"
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 "💡 ДЛя расцС‘та бСЋджета снацаЛа введите свои доходы и расходы.\n\n"
-                "📉 Мажмите кнопку *РасцС‘т*."
+                "📉 Нажмите кнопку *РасцС‘т*."
             )
     else:
         msg = format_budget_warning(budget_status, lang)
@@ -9804,18 +9840,18 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"┃ 📊 Majburiy: *{budget_info['mandatory_expenses']:,.0f}* so'm\n"
                     f"┃ 💵 Bo'sh pul: *{budget_info['free_cash']:,.0f}* so'm\n"
                     f"┃ 🏦 Boylik (10%): *{budget_info['savings_budget']:,.0f}* so'm\n"
-                    f"┃ вљЎ Qarz (20%): *{budget_info['extra_debt_budget']:,.0f}* so'm\n"
+                    f"┃ ⚡ Qarz (20%): *{budget_info['extra_debt_budget']:,.0f}* so'm\n"
                     f"┃ 🏠 Yashash (70%): *{budget_info['living_budget']:,.0f}* so'm"
                 )
             else:
                 msg += (
                     f"\n\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
-                    f"📋 *РАСПРЕДЕР›ЕМИЕ:*\n"
+                    f"📋 *РАСПРЕДЕЛЕНИЕ:*\n"
                     f"┃ 💰 Доход: *{budget_info['total_income']:,.0f}* сум\n"
                     f"┃ 📊 ОбязатеЛъные: *{budget_info['mandatory_expenses']:,.0f}* сум\n"
                     f"┃ 💵 Свободные: *{budget_info['free_cash']:,.0f}* сум\n"
                     f"┃ 🏦 Богатство (10%): *{budget_info['savings_budget']:,.0f}* сум\n"
-                    f"┃ вљЎ Долг (20%): *{budget_info['extra_debt_budget']:,.0f}* сум\n"
+                    f"┃ ⚡ Долг (20%): *{budget_info['extra_debt_budget']:,.0f}* сум\n"
                     f"┃ 🏠 Р–изнъ (70%): *{budget_info['living_budget']:,.0f}* сум"
                 )
     
@@ -9825,7 +9861,7 @@ async def ai_budget_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -9854,7 +9890,7 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
     
     # Get real balance (including debts)
@@ -9897,11 +9933,11 @@ async def ai_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             callback_data="ai_real_balance"
         )],
         [InlineKeyboardButton(
-            "🋤 Yangi yozuv" if lang == "uz" else "🋤 Мовая записъ",
+            "🋤 Yangi yozuv" if lang == "uz" else "🋤 Новая записъ",
             callback_data="ai_assistant"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -9927,7 +9963,7 @@ async def ai_real_balance_callback(update: Update, context: ContextTypes.DEFAULT
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
     
     # Get real balance
@@ -9940,11 +9976,11 @@ async def ai_real_balance_callback(update: Update, context: ContextTypes.DEFAULT
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "💵 Qarzlarim" if lang == "uz" else "💵 Рњои доЛги",
+            "💵 Qarzlarim" if lang == "uz" else "💵 Рњои долги",
             callback_data="ai_debt_list"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="ai_assistant"
         )]
     ]
@@ -9970,7 +10006,7 @@ async def ai_recent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = await db.get_user(telegram_id)
     
     if not user:
-        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не наЙдены")
+        await query.edit_message_text("Ma'lumot topilmadi" if lang == "uz" else "Данные не найдены")
         return
     
     # Get last 10 transactions
@@ -10013,11 +10049,11 @@ async def ai_recent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             callback_data="ai_report"
         )],
         [InlineKeyboardButton(
-            "🋤 Yangi yozuv" if lang == "uz" else "🋤 Мовая записъ",
+            "🋤 Yangi yozuv" if lang == "uz" else "🋤 Новая записъ",
             callback_data="ai_assistant"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -10091,19 +10127,19 @@ async def ai_debt_list_callback(update: Update, context: ContextTypes.DEFAULT_TY
         elif net < 0:
             msg += f"💰 Sof balans: *{net:,}* so'm"
         else:
-            msg += f"вљЄ Sof balans: *0* so'm"
+            msg += f"⚪ Sof balans: *0* so'm"
     else:
         msg = (
-            "📋 *СПИСОК ДОР›ГОВ*\n"
+            "📋 *СПИСОК ДОЛГОВ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         )
         
         if not debts:
-            msg += "📄 Мет активных доЛгов.\n"
+            msg += "📄 Мет активных долгов.\n"
         else:
             lent_debts = [d for d in debts if d["debt_type"] == "lent"]
             if lent_debts:
-                msg += "📉 *ДАР› В ДОР›Г:*\n"
+                msg += "📉 *ДАР› В ДОЛГ:*\n"
                 for d in lent_debts:
                     remaining = d["amount"] - d["returned_amount"]
                     due = f" (возврат: {d['due_date']})" if d["due_date"] else ""
@@ -10112,7 +10148,7 @@ async def ai_debt_list_callback(update: Update, context: ContextTypes.DEFAULT_TY
             
             borrowed_debts = [d for d in debts if d["debt_type"] == "borrowed"]
             if borrowed_debts:
-                msg += "📈 *ВР—РЇР› В ДОР›Г:*\n"
+                msg += "📈 *ВР—РЇР› В ДОЛГ:*\n"
                 for d in borrowed_debts:
                     remaining = d["amount"] - d["returned_amount"]
                     due = f" (возврат: {d['due_date']})" if d["due_date"] else ""
@@ -10131,7 +10167,7 @@ async def ai_debt_list_callback(update: Update, context: ContextTypes.DEFAULT_TY
         elif net < 0:
             msg += f"💰 ЧистыЙ баЛанс: *{net:,}* сум"
         else:
-            msg += f"вљЄ ЧистыЙ баЛанс: *0* сум"
+            msg += f"⚪ ЧистыЙ баЛанс: *0* сум"
     
     keyboard = [
         [InlineKeyboardButton(
@@ -10139,7 +10175,7 @@ async def ai_debt_list_callback(update: Update, context: ContextTypes.DEFAULT_TY
             callback_data="ai_debt_mark_returned"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -10173,7 +10209,7 @@ async def ai_debt_mark_returned_callback(update: Update, context: ContextTypes.D
         if lang == "uz":
             msg = "📄 Faol qarzlar yo'q"
         else:
-            msg = "📄 Мет активных доЛгов"
+            msg = "📄 Мет активных долгов"
         await query.edit_message_text(msg, parse_mode="Markdown")
         return
     
@@ -10185,9 +10221,9 @@ async def ai_debt_mark_returned_callback(update: Update, context: ContextTypes.D
         )
     else:
         msg = (
-            "✅ *ДОР›Г ВОР—ВРАЩРЃМ*\n"
+            "✅ *ДОЛГ ВОЗВРАЩЁН*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            "Выберите возвращС‘нныЙ доЛг:"
+            "Выберите возвращС‘нныЙ долг:"
         )
     
     keyboard = []
@@ -10198,7 +10234,7 @@ async def ai_debt_mark_returned_callback(update: Update, context: ContextTypes.D
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"ai_debt_return_{d['id']}")])
     
     keyboard.append([InlineKeyboardButton(
-        "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+        "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
         callback_data="ai_debt_list"
     )])
     
@@ -10264,7 +10300,7 @@ async def ai_debt_return_callback(update: Update, context: ContextTypes.DEFAULT_
             f"💵 {debt['amount']:,.0f} so'm\n\n"
         )
     else:
-        type_text = "ДанныЙ доЛг" if debt["debt_type"] == "lent" else "ВзятыЙ доЛг"
+        type_text = "ДанныЙ долг" if debt["debt_type"] == "lent" else "ВзятыЙ долг"
         msg = (
             f"✅ *{type_text} возвращС‘н!*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
@@ -10276,11 +10312,11 @@ async def ai_debt_return_callback(update: Update, context: ContextTypes.DEFAULT_
     
     keyboard = [
         [InlineKeyboardButton(
-            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
+            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
             callback_data="ai_debt_list"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Orqaga" if lang == "uz" else "в—ЂпёЏ Мазад",
+            "◀️ Orqaga" if lang == "uz" else "◀️ Мазад",
             callback_data="back_to_main"
         )]
     ]
@@ -10329,14 +10365,14 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
     
     if not debt:
         await query.edit_message_text(
-            "вќЊ Qarz topilmadi" if lang == "uz" else "вќЊ Долг не наЙден"
+            "❌ Qarz topilmadi" if lang == "uz" else "❌ Долг не найден"
         )
         return
     
     if lang == "uz":
         type_text = "Bergan qarz" if debt["debt_type"] == "lent" else "Olgan qarz"
         msg = (
-            f"вњЏпёЏ *QARZNI TUZATISH*\n"
+            f"✏️пёЏ *QARZNI TUZATISH*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"💡 Joriy yozuv:\n"
             f"┃ Turi: *{type_text}*\n"
@@ -10346,9 +10382,9 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
             "Quyidagilardan birini tanlang:"
         )
     else:
-        type_text = "ДаЛ в доЛг" if debt["debt_type"] == "lent" else "ВзяЛ в доЛг"
+        type_text = "ДаЛ в долг" if debt["debt_type"] == "lent" else "ВзяЛ в долг"
         msg = (
-            f"вњЏпёЏ *ИСПРАВИТР¬ ДОР›Г*\n"
+            f"✏️пёЏ *ИСПРАВИТЬ ДОЛГ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"💡 Текущая записъ:\n"
             f"┃ Тип: *{type_text}*\n"
@@ -10364,7 +10400,7 @@ async def ai_debt_correct_callback(update: Update, context: ContextTypes.DEFAULT
             callback_data=f"ai_debt_delete_{debt_id}"
         )],
         [InlineKeyboardButton(
-            "в—ЂпёЏ Bekor qilish" if lang == "uz" else "в—ЂпёЏ Отмена",
+            "◀️ Bekor qilish" if lang == "uz" else "◀️ Отмена",
             callback_data="ai_confirm_ok"
         )]
     ]
@@ -10413,7 +10449,7 @@ async def ai_debt_delete_callback(update: Update, context: ContextTypes.DEFAULT_
     if lang == "uz":
         msg = "🚀 *Qarz yozuvi o'chirildi*"
     else:
-        msg = "🚀 *Р—аписъ о доЛге удаЛена*"
+        msg = "🚀 *Р—аписъ о долге удаЛена*"
     
     await query.edit_message_text(msg, parse_mode="Markdown")
 
@@ -10435,7 +10471,7 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Parse arguments
     if not context.args or len(context.args) < 2:
         await update.message.reply_text(
-            "вќЊ *Xato format!*\n\n"
+            "❌ *Xato format!*\n\n"
             "✅ To'g'ri format:\n"
             "`/activate <telegram_id> <plan_id>`\n\n"
             "📋 *Mavjud tariflar:*\n"
@@ -10457,13 +10493,13 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
         valid_plans = ['pro_weekly', 'pro_monthly', 'pro_quarterly', 'pro_yearly']
         if plan_id not in valid_plans:
             await update.message.reply_text(
-                f"вќЊ Noto'g'ri tarif: `{plan_id}`\n\n"
+                f"❌ Noto'g'ri tarif: `{plan_id}`\n\n"
                 f"✅ Mavjud tariflar: {', '.join(valid_plans)}",
                 parse_mode="Markdown"
             )
             return
         
-        await update.message.reply_text("вЏі PRO aktivatsiya qilinmoqda...")
+        await update.message.reply_text("⏳ PRO aktivatsiya qilinmoqda...")
         
         # Import and call manual activation
         from app.payment_webhook import verify_payment_manually
@@ -10475,12 +10511,12 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 f"✅ *PRO muvaffaqiyatli aktivlashtirildi!*\n\n"
                 f"👤 Foydalanuvchi: `{target_user_id}`\n"
                 f"📆 Tarif: `{plan_id}`\n\n"
-                f"в„№пёЏ Foydalanuvchiga xabar yuborildi.",
+                f"№ Foydalanuvchiga xabar yuborildi.",
                 parse_mode="Markdown"
             )
         else:
             await update.message.reply_text(
-                f"вќЊ *Aktivatsiya muvaffaqiyatsiz!*\n\n"
+                f"❌ *Aktivatsiya muvaffaqiyatsiz!*\n\n"
                 f"Foydalanuvchi topilmadi yoki xatolik yuz berdi.\n"
                 f"Telegram ID: `{target_user_id}`",
                 parse_mode="Markdown"
@@ -10488,12 +10524,12 @@ async def admin_activate_pro(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
     except ValueError:
         await update.message.reply_text(
-            "вќЊ Telegram ID raqam bo'lishi kerak!",
+            "❌ Telegram ID raqam bo'lishi kerak!",
             parse_mode="Markdown"
         )
     except Exception as e:
         logger.error(f"Admin activate error: {e}")
-        await update.message.reply_text(f"вќЊ Xatolik: {e}")
+        await update.message.reply_text(f"❌ Xatolik: {e}")
 
 
 async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -10536,7 +10572,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         message = "📋 *SO'NGI TO'LOVLAR*\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         
         for p in payments:
-            status_emoji = {'completed': '✅', 'pending': 'вЏі', 'failed': 'вќЊ'}.get(p.get('status'), 'вќ“')
+            status_emoji = {'completed': '✅', 'pending': '⏳', 'failed': '❌'}.get(p.get('status'), 'вќ“')
             message += (
                 f"{status_emoji} *{p.get('first_name', 'N/A')}* (`{p.get('telegram_id')}`)\n"
                 f"   📆 {p.get('plan_id')} | 💰 {p.get('amount_uzs'):,} so'm\n"
@@ -10547,7 +10583,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     except Exception as e:
         logger.error(f"Admin payments error: {e}")
-        await update.message.reply_text(f"вќЊ Xatolik: {e}")
+        await update.message.reply_text(f"❌ Xatolik: {e}")
 
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -10566,7 +10602,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # AI ni o'chirish - admin panelda AI tranzaksiya deb qabul qilmasin
     context.user_data["in_admin_panel"] = True
     
-    await update.message.reply_text("вЏі Admin panel yuklanmoqda...")
+    await update.message.reply_text("⏳ Admin panel yuklanmoqda...")
     
     # Admin panel asosiy menyusini ko'rsatish
     await show_admin_main_menu(update, context)
@@ -10605,7 +10641,7 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("👥 Userlar", callback_data="admin_list_users")
         ],
         [
-            InlineKeyboardButton("вљ™пёЏ Sozlamalar", callback_data="admin_settings")
+            InlineKeyboardButton("⚙️ Sozlamalar", callback_data="admin_settings")
         ]
     ]
     
@@ -10654,15 +10690,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "👥 *FOYDALANUVCHILAR*\n"
-            f"в”Њ 📝 Jami: *{stats.get('total_users', 0):,}* ta\n"
+            f"┌ 📝 Jami: *{stats.get('total_users', 0):,}* ta\n"
             f"┃ 📈 Bugun: *+{stats.get('today_users', 0):,}* ta\n"
             f"┃ 📅 Haftalik: *+{stats.get('week_users', 0):,}* ta\n"
             f"┃ 📊 Oylik: *+{stats.get('month_users', 0):,}* ta\n"
             f"┃ 📉 O'sish: *{growth}%* (haftalik)\n\n"
             
             "📝 *FAOLLIK*\n"
-            f"в”Њ 💰 Jami tranzaksiyalar: *{stats.get('total_transactions', 0):,}*\n"
-            f"┃ вљЎ Bugungi: *{stats.get('today_transactions', 0):,}*\n"
+            f"┌ 💰 Jami tranzaksiyalar: *{stats.get('total_transactions', 0):,}*\n"
+            f"┃ ⚡ Bugungi: *{stats.get('today_transactions', 0):,}*\n"
             f"┃ 💳 Aktiv qarzlar: *{stats.get('active_debts', 0):,}*\n"
             f"┃ 💵 Qarzlar summasi: *{int(stats.get('total_debt_amount', 0)):,}* so'm\n\n"
             
@@ -10675,11 +10711,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             flag = "🇺🇿" if lang == "uz" else "✅✅"
             message += f"{prefix} {flag} {lang.upper()}: *{count:,}* ta\n"
         
-        message += f"\nвЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
+        message += f"\n⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
         
         keyboard = [
             [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_stats")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -10715,12 +10751,12 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             f"📉 *UMUMIY*\n"
-            f"в”Њ ✅ Aktiv PRO: *{active_pro:,}* ta\n"
+            f"┌ ✅ Aktiv PRO: *{active_pro:,}* ta\n"
             f"┃ 📝 Konversiya: *{pro_percent}%*\n"
-            f"┃ вќЊ Muddati tugagan: *{stats.get('pro_expired', 0):,}* ta\n\n"
+            f"┃ ❌ Muddati tugagan: *{stats.get('pro_expired', 0):,}* ta\n\n"
             
             "📆 *REJALAR BO'YICHA*\n"
-            f"в”Њ 📅 Haftalik: *{weekly_count:,}* ta\n"
+            f"┌ 📅 Haftalik: *{weekly_count:,}* ta\n"
             f"┃ 📊 Oylik: *{monthly_count:,}* ta\n"
             f"┃ 📅 Yillik: *{yearly_count:,}* ta\n"
             f"┃ 🋃 Promo: *{stats.get('pro_promo', 0):,}* ta\n"
@@ -10729,12 +10765,12 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"💰 *DAROMAD (taxminiy)*\n"
             f"┃ 💵 Jami: *{total_revenue:,}* so'm\n\n"
             
-            f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
+            f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
         )
         
         keyboard = [
             [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_pro_report")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -10780,29 +10816,29 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 f"💡 *Tarjima:* {translation}\n\n"
                 
                 "📉 *TAXMINIY ISHLATISH*\n"
-                f"в”Њ 🎙 1 ovozli xabar: ~100-200 kredit\n"
+                f"┌ 🎙 1 ovozli xabar: ~100-200 kredit\n"
                 f"┃ 📝 Qolgan xabarlar: ~*{int(balance / 150):,}* ta\n"
                 f"┃ 📅 Taxminan: ~*{int(balance / 150 / 50)}* kun\n\n"
                 
-                "вљ пёЏ _Balans kamaysa @HalosPaybot ga ogohlantirish yuboriladi_\n\n"
+                "⚠️ _Balans kamaysa @HalosPaybot ga ogohlantirish yuboriladi_\n\n"
                 
-                f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
+                f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             )
         else:
             message = (
                 "💰 *KOTIB.AI BALANS*\n"
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 
-                "вќЊ *Balansni olishda xatolik!*\n\n"
+                "❌ *Balansni olishda xatolik!*\n\n"
                 "_API bilan bog'lanishda muammo yoki_\n"
                 "_API kaliti noto'g'ri._\n\n"
                 
-                f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
+                f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             )
         
         keyboard = [
             [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_kotib_balance")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -10846,8 +10882,8 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     p = dict(p)
                     status_emoji = {
                         'completed': '✅', 
-                        'pending': 'вЏі', 
-                        'failed': 'вќЊ'
+                        'pending': '⏳', 
+                        'failed': '❌'
                     }.get(p.get('status'), 'вќ“')
                     
                     amount = p.get('amount_uzs', 0) or 0
@@ -10865,15 +10901,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             else:
                 message += "📄 _Hech qanday to'lov topilmadi_\n"
             
-            message += f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
+            message += f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             
         except Exception as e:
             logger.error(f"Admin payments list error: {e}")
-            message = f"вќЊ Xatolik: {e}"
+            message = f"❌ Xatolik: {e}"
         
         keyboard = [
             [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_payments_list")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -10929,16 +10965,16 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     f"   👤 {username_str} | 📅 {created}\n\n"
                 )
             
-            message += f"вЏ° _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
+            message += f"⏰ _Yangilangan: {now_uz().strftime('%H:%M:%S')}_"
             
         except Exception as e:
             logger.error(f"Admin users error: {e}")
-            message = f"вќЊ Xatolik: {e}"
+            message = f"❌ Xatolik: {e}"
         
         keyboard = [
             [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_users")],
             [InlineKeyboardButton("🏷 ID bo'yicha qidirish", callback_data="admin_search_user")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -10978,24 +11014,24 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "📝 *FAOLLIK HISOBOTI*\n"
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 
-                "вљЎ *BUGUNGI FAOLLIK*\n"
-                f"в”Њ 💰 Tranzaksiyalar: *{ts.get('today_tx', 0):,}*\n"
+                "⚡ *BUGUNGI FAOLLIK*\n"
+                f"┌ 💰 Tranzaksiyalar: *{ts.get('today_tx', 0):,}*\n"
                 f"┃ 💳 Yangi qarzlar: *{ts.get('today_debts', 0):,}*\n"
                 f"┃ 🎙 Ovoz ishlatganlar: *{ts.get('voice_users', 0):,}* ta\n\n"
                 
                 "🎙 *OVOZLI YORDAMCHI*\n"
                 f"┃ 📉 Jami ovozli xabarlar: *{vt.get('total', 0):,}*\n\n"
                 
-                f"вЏ° _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
+                f"⏰ _Yangilangan: {datetime.now().strftime('%H:%M:%S')}_"
             )
             
         except Exception as e:
             logger.error(f"Admin activity error: {e}")
-            message = f"вќЊ Xatolik: {e}"
+            message = f"❌ Xatolik: {e}"
         
         keyboard = [
             [InlineKeyboardButton("🕐 Yangilash", callback_data="admin_activity")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -11021,7 +11057,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             f"📅 *Bugungi qarzlar:* {len(today_debts)} ta\n"
-            f"вЏ° *Yaqinlashayotgan (3 kun):* {len(upcoming_debts)} ta\n\n"
+            f"⏰ *Yaqinlashayotgan (3 kun):* {len(upcoming_debts)} ta\n\n"
         )
         
         if today_debts:
@@ -11037,7 +11073,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         keyboard = [
             [InlineKeyboardButton("🔔 Hozir yuborish", callback_data="admin_trigger_reminders")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -11052,7 +11088,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         from app.scheduler import get_debts_due_today, get_scheduler
         
         await query.edit_message_text(
-            "вЏі Eslatmalar yuborilmoqda...",
+            "⏳ Eslatmalar yuborilmoqda...",
             parse_mode="Markdown"
         )
         
@@ -11077,7 +11113,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 if currency == "USD":
                     amount_str = f"${amount:,.0f}"
                 elif currency == "RUB":
-                    amount_str = f"в‚Ѕ{amount:,.0f}"
+                    amount_str = f"₽{amount:,.0f}"
                 else:
                     amount_str = f"{amount:,.0f} so'm"
                 
@@ -11092,7 +11128,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         )
                     else:
                         msg = (
-                            "вљ пёЏ *BUGUN QARZ QAYTARISH KUNI!*\n"
+                            "⚠️ *BUGUN QARZ QAYTARISH KUNI!*\n"
                             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                             f"👤 *{person}*ga qarz qaytarishingiz kerak\n\n"
                             f"💰 Summa: *{amount_str}*\n"
@@ -11101,17 +11137,17 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 else:
                     if debt_type == "lent":
                         msg = (
-                            "🔔 *СЕГОДМРЇ ДЕМР¬ ВОР—ВРАТА ДОР›ГА!*\n"
+                            "🔔 *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
                             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-                            f"👤 *{person}* доЛжен вернутъ вам доЛг\n\n"
+                            f"👤 *{person}* должен вернуть вам долг\n\n"
                             f"💰 Сумма: *{amount_str}*\n"
                             f"📅 Дата: *Сегодня*\n"
                         )
                     else:
                         msg = (
-                            "вљ пёЏ *СЕГОДМРЇ ДЕМР¬ ВОР—ВРАТА ДОР›ГА!*\n"
+                            "⚠️ *СЕГОДНЯ ДЕНЬ ВОЗВРАТА ДОЛГА!*\n"
                             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-                            f"👤 Вы доЛжны вернутъ доЛг *{person}*\n\n"
+                            f"👤 Вы должны вернуть долг *{person}*\n\n"
                             f"💰 Сумма: *{amount_str}*\n"
                             f"📅 Дата: *Сегодня*\n"
                         )
@@ -11120,13 +11156,13 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     if lang == "uz":
                         msg += f"💡 Izoh: _{description}_\n"
                     else:
-                        msg += f"💡 Р—аметка: _{description}_\n"
+                        msg += f"💡 Заметка: _{description}_\n"
                 
                 msg += "\n┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
                 if lang == "uz":
                     msg += "💎 _Qarz qaytarilsa, tugmani bosing_"
                 else:
-                    msg += "💎 _Мажмите кнопку когда доЛг вернут_"
+                    msg += "💎 _Нажмите кнопку когда долг вернут_"
                 
                 keyboard = InlineKeyboardMarkup([
                     [
@@ -11137,7 +11173,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     ],
                     [
                         InlineKeyboardButton(
-                            "вЏ° Ertaga eslatish" if lang == "uz" else "вЏ° Мапомнитъ завтра",
+                            "⏰ Ertaga eslatish" if lang == "uz" else "⏰ Напомнить завтра",
                             callback_data=f"debt_reminder_snooze:{debt_id}"
                         ),
                         InlineKeyboardButton(
@@ -11164,12 +11200,12 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "✅ *ESLATMALAR YUBORILDI*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"✅ Yuborildi: *{sent_count}* ta\n"
-            f"вќЊ Xato: *{failed_count}* ta\n\n"
-            f"вЏ° _{now_uz().strftime('%H:%M:%S')}_"
+            f"❌ Xato: *{failed_count}* ta\n\n"
+            f"⏰ _{now_uz().strftime('%H:%M:%S')}_"
         )
         
         keyboard = [
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -11182,7 +11218,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # ==================== SOZLAMALAR ====================
     if query.data == "admin_settings":
         message = (
-            "вљ™пёЏ *ADMIN SOZLAMALARI*\n"
+            "⚙️ *ADMIN SOZLAMALARI*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             
             "🔔 *Ogohlantirish chegaralari:*\n"
@@ -11197,7 +11233,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         
         keyboard = [
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -11212,14 +11248,14 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard = [
             [
                 InlineKeyboardButton("✅ Ha, boshlayman", callback_data="admin_trial_confirm"),
-                InlineKeyboardButton("вќЊ Yo'q", callback_data="admin_main")
+                InlineKeyboardButton("❌ Yo'q", callback_data="admin_main")
             ]
         ]
         
         await query.edit_message_text(
             "🋃 *3 KUNLIK TRIAL YOQISH*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            "вљ пёЏ Bu amalni bajarsangiz:\n\n"
+            "⚠️ Bu amalni bajarsangiz:\n\n"
             "↳ Barcha foydalanuvchilarga 3 kunlik\n"
             "  TRIAL PRO obuna beriladi\n"
             "↳ 10 ta ovozli xabar limiti\n"
@@ -11234,7 +11270,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if query.data == "admin_trial_confirm":
         await query.edit_message_text(
-            "вЏі *TRIAL yoqilmoqda...*\n\n"
+            "⏳ *TRIAL yoqilmoqda...*\n\n"
             "Iltimos kuting...",
             parse_mode="Markdown"
         )
@@ -11292,15 +11328,15 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         keyboard = [
             [InlineKeyboardButton("📉 Broadcast yuborish", callback_data="admin_trial_broadcast")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
             "🋃 *TRIAL YOQILDI!*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"✅ Muvaffaqiyatli: *{success_count}* ta\n"
-            f"вЏ­ O'tkazib yuborildi: *{skip_count}* ta\n"
-            f"вќЊ Xatolik: *{error_count}* ta\n\n"
+            f"⏭ O'tkazib yuborildi: *{skip_count}* ta\n"
+            f"❌ Xatolik: *{error_count}* ta\n\n"
             f"📅 Trial tugash sanasi: *{trial_end_date}*\n\n"
             "📝 Endi foydalanuvchilarga xabar yuborasizmi?",
             parse_mode="Markdown",
@@ -11315,13 +11351,13 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Hurmatli foydalanuvchi!\n\n"
             "Sizga *3 kunlik BEPUL PRO* obuna taqdim etildi! 👍\n\n"
-            "вњЁ *Sizda ochilgan imkoniyatlar:*\n"
+            "✨ *Sizda ochilgan imkoniyatlar:*\n"
             "↳ 🋤 10 ta ovozli xabar\n"
-            "↳ вЏ± 10 soniyagacha audio\n"
+            "↳ ⏱ 10 soniyagacha audio\n"
             "↳ 📉 Hisobotlar va statistika\n"
             "↳ 💵 Cheksiz kategoriyalar\n"
             "↳ 📝 Export va arxiv\n\n"
-            "вЏ° *Muddati:* 3 kun\n\n"
+            "⏰ *Muddati:* 3 kun\n\n"
             "💎 _Bu imkoniyatlarni sinab ko'ring va\n"
             "moliyangizni oson boshqaring!_\n\n"
             "PRO sotib olish: /pro"
@@ -11332,18 +11368,18 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard = [
             [
                 InlineKeyboardButton("✅ Yuborish", callback_data="admin_trial_broadcast_send"),
-                InlineKeyboardButton("вњЏпёЏ Tahrirlash", callback_data="admin_trial_broadcast_edit")
+                InlineKeyboardButton("✏️пёЏ Tahrirlash", callback_data="admin_trial_broadcast_edit")
             ],
-            [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_main")]
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
             "📉 *TRIAL XABARI*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Quyidagi xabar yuboriladi:\n\n"
-            "в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n"
             f"{trial_message}\n"
-            "в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ\n\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "*Yuborishni tasdiqlaysizmi?*",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -11354,11 +11390,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["admin_trial_broadcast_editing"] = True
         
         keyboard = [
-            [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_main")]
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
-            "вњЏпёЏ *XABARNI TAHRIRLASH*\n"
+            "✏️пёЏ *XABARNI TAHRIRLASH*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             "Yangi xabar matnini yozing:\n\n"
             "💎 _Markdown formatlash qo'llab-quvvatlanadi_",
@@ -11370,12 +11406,12 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if query.data == "admin_trial_broadcast_send":
         trial_message = context.user_data.get("admin_trial_broadcast_message", "")
         if not trial_message:
-            await query.answer("вќЊ Xabar topilmadi!", show_alert=True)
+            await query.answer("❌ Xabar topilmadi!", show_alert=True)
             return
         
         await query.edit_message_text(
             "📉 *XABAR YUBORILMOQDA...*\n\n"
-            "вЏі Iltimos kuting...",
+            "⏳ Iltimos kuting...",
             parse_mode="Markdown"
         )
         
@@ -11405,14 +11441,14 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 error_count += 1
         
         keyboard = [
-            [InlineKeyboardButton("в—ЂпёЏ Admin panel", callback_data="admin_main")]
+            [InlineKeyboardButton("◀️ Admin panel", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
             "✅ *XABAR YUBORILDI!*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"📉 Yuborildi: *{success_count}* ta\n"
-            f"вќЊ Xatolik: *{error_count}* ta",
+            f"❌ Xatolik: *{error_count}* ta",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -11423,7 +11459,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["admin_broadcast"] = True
         
         keyboard = [
-            [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_main")]
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
@@ -11446,7 +11482,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["admin_search_user"] = True
         
         keyboard = [
-            [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_users")]
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_users")]
         ]
         
         await query.edit_message_text(
@@ -11532,7 +11568,7 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     
     # Check for cancel command
     if message.text and message.text == "/cancel":
-        await message.reply_text("вќЊ Broadcast bekor qilindi")
+        await message.reply_text("❌ Broadcast bekor qilindi")
         return
     
     db = await get_database()
@@ -11559,7 +11595,7 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     
     if is_forwarded:
         media_type = "forward"
-        await message.reply_text(f"📉 в†—пёЏ Forward xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📉 ↗️ Forward xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
     elif has_photo:
         media_type = "photo"
         file_id = message.photo[-1].file_id
@@ -11578,7 +11614,7 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
         broadcast_text = message.text
         await message.reply_text(f"📉 Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
     else:
-        await message.reply_text("вќЊ Noto'g'ri format. Matn, rasm, video yoki fayl yuboring.")
+        await message.reply_text("❌ Noto'g'ri format. Matn, rasm, video yoki fayl yuboring.")
         return
     
     success = 0
@@ -11624,7 +11660,7 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
         if (success + failed) % 30 == 0:
             await asyncio.sleep(1)
     
-    result_msg = f"✅ Broadcast yakunlandi!\n\n✅ Yuborildi: {success} ta\nвќЊ Xato: {failed} ta"
+    result_msg = f"✅ Broadcast yakunlandi!\n\n✅ Yuborildi: {success} ta\n❌ Xato: {failed} ta"
     
     if errors_log:
         result_msg += f"\n\n🏷 Xato namunalari:\n" + "\n".join(errors_log)
@@ -11675,9 +11711,9 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
     
     if not debt:
         if lang == "uz":
-            msg = "вќЊ Qarz topilmadi"
+            msg = "❌ Qarz topilmadi"
         else:
-            msg = "вќЊ Долг не наЙден"
+            msg = "❌ Долг не найден"
         await query.edit_message_text(msg)
         return
     
@@ -11703,7 +11739,7 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
         if currency == "USD":
             amount_str = f"${remaining:,.0f}"
         elif currency == "RUB":
-            amount_str = f"в‚Ѕ{remaining:,.0f}"
+            amount_str = f"₽{remaining:,.0f}"
         else:
             amount_str = f"{remaining:,.0f} so'm"
         
@@ -11717,16 +11753,16 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
             )
         else:
             msg = (
-                "✅ *ДОР›Г ВОР—ВРАЩРЃМ!*\n"
+                "✅ *ДОЛГ ВОЗВРАЩЁН!*\n"
                 "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
                 f"👤 *{person}*\n"
                 f"💰 Сумма: *{amount_str}*\n\n"
-                "📉 Статус доЛга обновЛС‘н!"
+                "📉 Статус долга обновЛС‘н!"
             )
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(
-                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
+                "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
                 callback_data="ai_debt_list"
             )]
         ])
@@ -11738,9 +11774,9 @@ async def debt_reminder_returned_callback(update: Update, context: ContextTypes.
         )
     else:
         if lang == "uz":
-            msg = "вќЊ Xatolik yuz berdi"
+            msg = "❌ Xatolik yuz berdi"
         else:
-            msg = "вќЊ ПроизошЛа ошибка"
+            msg = "❌ Произошла ошибка"
         await query.edit_message_text(msg)
 
 
@@ -11788,13 +11824,13 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
     day_num = tomorrow_dt.day
     months_uz = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 
                 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr']
-    months_ru = ['января', 'С„евраЛя', 'марта', 'апреЛя', 'мая', 'иСЋня',
-                'иСЋЛя', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
+    months_ru = ['января', 'февраля', 'марта', 'апреЛя', 'мая', 'июня',
+                'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
     
     if lang == "uz":
         date_str = f"{day_num}-{months_uz[tomorrow_dt.month - 1]}"
         msg = (
-            "вЏ° *ESLATMA KECHIKTIRILDI*\n"
+            "⏰ *ESLATMA KECHIKTIRILDI*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"📅 Yangi sana: *{date_str}*\n\n"
             "Ertaga soat 6:00 da yana eslatamiz!"
@@ -11802,15 +11838,15 @@ async def debt_reminder_snooze_callback(update: Update, context: ContextTypes.DE
     else:
         date_str = f"{day_num} {months_ru[tomorrow_dt.month - 1]}"
         msg = (
-            "вЏ° *МАПОРњИМАМИЕ ОТР›ОР–ЕМО*\n"
+            "⏰ *НАПОМИНАНИЕ ОТЛОЖЕНО*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            f"📅 Мовая дата: *{date_str}*\n\n"
-            "Мапомним завтра в 6:00!"
+            f"📅 Новая дата: *{date_str}*\n\n"
+            "Напомним завтра в 6:00!"
         )
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(
-            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список доЛгов",
+            "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
             callback_data="ai_debt_list"
         )]
     ])
@@ -11862,7 +11898,7 @@ async def admin_delete_user_start(update: Update, context: ContextTypes.DEFAULT_
     await query.edit_message_text(
         "🚀пёЏ *USER O'CHIRISH*\n"
         "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-        "вљ пёЏ Bu amal foydalanuvchini va uning BARCHA ma'lumotlarini o'chiradi!\n\n"
+        "⚠️ Bu amal foydalanuvchini va uning BARCHA ma'lumotlarini o'chiradi!\n\n"
         "💡 O'chirmoqchi bo'lgan user telegram ID sini yuboring:\n\n"
         "_Bekor qilish uchun /cancel_",
         parse_mode="Markdown"
@@ -11886,7 +11922,7 @@ async def admin_clear_user_tx_start(update: Update, context: ContextTypes.DEFAUL
     await query.edit_message_text(
         "🧹 *USER TRANZAKSIYALARINI TOZALASH*\n"
         "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-        "вљ пёЏ Bu amal foydalanuvchining BARCHA kirim-chiqimlarini o'chiradi!\n"
+        "⚠️ Bu amal foydalanuvchining BARCHA kirim-chiqimlarini o'chiradi!\n"
         "User o'zi o'chirilmaydi.\n\n"
         "💡 Tozalamoqchi bo'lgan user telegram ID sini yuboring:\n\n"
         "_Bekor qilish uchun /cancel_",
@@ -11909,11 +11945,11 @@ async def admin_clear_all_tx_confirm(update: Update, context: ContextTypes.DEFAU
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ HA, BARCHASINI O'CHIR", callback_data="admin_confirm_clear_all")],
-        [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_close")],
+        [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_close")],
     ])
     
     await query.edit_message_text(
-        "вљ пёЏ *OGOHLANTIRISH!*\n"
+        "⚠️ *OGOHLANTIRISH!*\n"
         "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
         "⚠ Bu amal BARCHA foydalanuvchilarning\n"
         "BARCHA kirim-chiqim ma'lumotlarini o'chiradi!\n\n"
@@ -11948,7 +11984,7 @@ async def admin_confirm_clear_all(update: Update, context: ContextTypes.DEFAULT_
     else:
         error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
-            f"вќЊ Xatolik: {error_msg}",
+            f"❌ Xatolik: {error_msg}",
             parse_mode="Markdown"
         )
     
@@ -11971,7 +12007,7 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         target_id = int(text)
     except ValueError:
         await update.message.reply_text(
-            "вќЊ Noto'g'ri format!\n\n"
+            "❌ Noto'g'ri format!\n\n"
             "Faqat raqam kiriting (telegram_id).\n"
             "Masalan: `1748575975`",
             parse_mode="Markdown"
@@ -11987,10 +12023,10 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # User topilmadi - qayta kiritish imkoniyati
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🕐 Qayta kiritish", callback_data="admin_manage_user")],
-            [InlineKeyboardButton("в—ЂпёЏ Admin panelga", callback_data="admin_main")],
+            [InlineKeyboardButton("◀️ Admin panelga", callback_data="admin_main")],
         ])
         await update.message.reply_text(
-            f"вќЊ *User topilmadi!*\n\n"
+            f"❌ *User topilmadi!*\n\n"
             f"Telegram ID: `{target_id}`\n\n"
             f"Bu ID bilan hech qanday user bazada yo'q.\n"
             f"Telegram ID ni tekshiring va qayta urinib ko'ring.",
@@ -12029,14 +12065,14 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ HA, O'CHIR", callback_data=f"admin_confirm_delete:{target_id}")],
-            [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_close")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_close")],
         ])
         
         await update.message.reply_text(
             f"🚀пёЏ *USER O'CHIRILADI*\n"
             f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{user_summary}\n"
-            f"вљ пёЏ Bu user va uning BARCHA ma'lumotlari o'chiriladi!\n"
+            f"⚠️ Bu user va uning BARCHA ma'lumotlari o'chiriladi!\n"
             f"Davom etasizmi?",
             parse_mode="Markdown",
             reply_markup=keyboard
@@ -12047,14 +12083,14 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ HA, TOZALA", callback_data=f"admin_confirm_clear_tx:{target_id}")],
-            [InlineKeyboardButton("вќЊ Bekor qilish", callback_data="admin_close")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_close")],
         ])
         
         await update.message.reply_text(
             f"🧹 *TRANZAKSIYALAR TOZALANADI*\n"
             f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"{user_summary}\n"
-            f"вљ пёЏ Bu userning BARCHA kirim-chiqimlari o'chiriladi!\n"
+            f"⚠️ Bu userning BARCHA kirim-chiqimlari o'chiriladi!\n"
             f"Davom etasizmi?",
             parse_mode="Markdown",
             reply_markup=keyboard
@@ -12070,7 +12106,7 @@ async def admin_handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             [InlineKeyboardButton("🧹 TX larini o'chirish", callback_data=f"admin_confirm_clear_tx:{target_id}")],
             [InlineKeyboardButton("💎 PRO berish", callback_data=f"admin_give_pro:{target_id}")],
             [InlineKeyboardButton("❌ PRO olib qo'yish", callback_data=f"admin_remove_pro:{target_id}")],
-            [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_main")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")],
         ])
         
         await update.message.reply_text(
@@ -12114,13 +12150,13 @@ async def admin_confirm_delete_user(update: Update, context: ContextTypes.DEFAUL
             f"┃ Qarzlar: {result['debts_deleted']} ta\n"
             f"┃ Voice usage: {result['voice_usage_deleted']} ta\n"
             f"┃ Feature usage: {result['feature_usage_deleted']} ta\n"
-            f"┃ Financial profile: {'✅' if result['financial_profile_deleted'] else 'вќЊ'}\n",
+            f"┃ Financial profile: {'✅' if result['financial_profile_deleted'] else '❌'}\n",
             parse_mode="Markdown"
         )
     else:
         error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
-            f"вќЊ *Xatolik:* {error_msg}",
+            f"❌ *Xatolik:* {error_msg}",
             parse_mode="Markdown"
         )
     
@@ -12153,7 +12189,7 @@ async def admin_confirm_clear_tx(update: Update, context: ContextTypes.DEFAULT_T
     else:
         error_msg = result.get('error', 'Nomalum xato')
         await query.edit_message_text(
-            f"вќЊ *Xatolik:* {error_msg}",
+            f"❌ *Xatolik:* {error_msg}",
             parse_mode="Markdown"
         )
     
@@ -12209,7 +12245,7 @@ async def admin_give_pro_to_user(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as e:
         logger.error(f"[Admin] PRO berishda xato: {e}")
         await query.edit_message_text(
-            f"вќЊ *Xatolik:* {str(e)}",
+            f"❌ *Xatolik:* {str(e)}",
             parse_mode="Markdown"
         )
     
@@ -12260,7 +12296,7 @@ async def admin_remove_pro_from_user(update: Update, context: ContextTypes.DEFAU
     except Exception as e:
         logger.error(f"[Admin] PRO olib qo'yishda xato: {e}")
         await query.edit_message_text(
-            f"вќЊ *Xatolik:* {str(e)}",
+            f"❌ *Xatolik:* {str(e)}",
             parse_mode="Markdown"
         )
     
@@ -12301,7 +12337,7 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     )
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_back")],
+        [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_back")],
     ])
     
     await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
@@ -12332,7 +12368,7 @@ async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         msg += f"{i}. {tier} `{user['telegram_id']}` @{username} ({tx_count} tx)\n"
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("в—ЂпёЏ Orqaga", callback_data="admin_back")],
+        [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_back")],
     ])
     
     await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=keyboard)
@@ -12403,7 +12439,7 @@ async def admin_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     context.user_data.pop("admin_search_user", None)
     context.user_data.pop("awaiting_admin_input", None)
     
-    await update.message.reply_text("вќЊ Amal bekor qilindi.")
+    await update.message.reply_text("❌ Amal bekor qilindi.")
     
     return ConversationHandler.END
 
