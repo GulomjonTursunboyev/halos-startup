@@ -11279,15 +11279,28 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if discount_active:
             keyboard = [
                 [InlineKeyboardButton("🔴 Skidkani O'CHIRISH", callback_data="admin_discount_off")],
-                [InlineKeyboardButton("📊 25% ga o'zgartirish", callback_data="admin_discount_25")],
-                [InlineKeyboardButton("📊 30% ga o'zgartirish", callback_data="admin_discount_30")],
+                [
+                    InlineKeyboardButton("50%", callback_data="admin_discount_50"),
+                    InlineKeyboardButton("60%", callback_data="admin_discount_60"),
+                    InlineKeyboardButton("70%", callback_data="admin_discount_70"),
+                ],
+                [
+                    InlineKeyboardButton("80%", callback_data="admin_discount_80"),
+                    InlineKeyboardButton("90%", callback_data="admin_discount_90"),
+                ],
                 [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
             ]
         else:
             keyboard = [
-                [InlineKeyboardButton("🟢 50% SKIDKA YOQISH", callback_data="admin_discount_50")],
-                [InlineKeyboardButton("📊 25% skidka yoqish", callback_data="admin_discount_25")],
-                [InlineKeyboardButton("📊 30% skidka yoqish", callback_data="admin_discount_30")],
+                [InlineKeyboardButton("🔥 50% SKIDKA", callback_data="admin_discount_50")],
+                [
+                    InlineKeyboardButton("60%", callback_data="admin_discount_60"),
+                    InlineKeyboardButton("70%", callback_data="admin_discount_70"),
+                ],
+                [
+                    InlineKeyboardButton("80%", callback_data="admin_discount_80"),
+                    InlineKeyboardButton("🔥 90%", callback_data="admin_discount_90"),
+                ],
                 [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
             ]
         
@@ -11317,20 +11330,38 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await admin_callback(update, context)
         return
     
-    # 25% skidka
-    if query.data == "admin_discount_25":
+    # 60% skidka
+    if query.data == "admin_discount_60":
         from app.subscription import set_discount
-        set_discount(enabled=True, percentage=25)
-        await query.answer("✅ 25% skidka yoqildi!", show_alert=True)
+        set_discount(enabled=True, percentage=60)
+        await query.answer("🔥 60% skidka yoqildi!", show_alert=True)
         query.data = "admin_pricing"
         await admin_callback(update, context)
         return
     
-    # 30% skidka
-    if query.data == "admin_discount_30":
+    # 70% skidka
+    if query.data == "admin_discount_70":
         from app.subscription import set_discount
-        set_discount(enabled=True, percentage=30)
-        await query.answer("✅ 30% skidka yoqildi!", show_alert=True)
+        set_discount(enabled=True, percentage=70)
+        await query.answer("🔥 70% skidka yoqildi!", show_alert=True)
+        query.data = "admin_pricing"
+        await admin_callback(update, context)
+        return
+    
+    # 80% skidka
+    if query.data == "admin_discount_80":
+        from app.subscription import set_discount
+        set_discount(enabled=True, percentage=80)
+        await query.answer("🔥 80% skidka yoqildi!", show_alert=True)
+        query.data = "admin_pricing"
+        await admin_callback(update, context)
+        return
+    
+    # 90% skidka
+    if query.data == "admin_discount_90":
+        from app.subscription import set_discount
+        set_discount(enabled=True, percentage=90)
+        await query.answer("🔥 90% skidka yoqildi!", show_alert=True)
         query.data = "admin_pricing"
         await admin_callback(update, context)
         return

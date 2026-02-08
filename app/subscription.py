@@ -97,12 +97,13 @@ def set_discount(enabled: bool, percentage: int = 50):
 
 
 def get_discount_label(lang: str = "uz") -> str:
-    """Skidka yorlig'ini olish"""
+    """Skidka yorlig'ini olish - foizni dinamik ko'rsatadi"""
     if not DISCOUNT_CONFIG["enabled"]:
         return ""
+    pct = DISCOUNT_CONFIG["percentage"]
     if lang == "ru":
-        return DISCOUNT_CONFIG["label_ru"]
-    return DISCOUNT_CONFIG["label_uz"]
+        return f"🔥 СКИДКА {pct}%!"
+    return f"🔥 {pct}% CHEGIRMA!"
 
 
 # Narxlar skidka bilan hisoblanadi
