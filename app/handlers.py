@@ -10642,6 +10642,9 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton(f"🏷️ PRO narxlar ({discount_text})", callback_data="admin_pricing")
         ],
         [
+            InlineKeyboardButton("📣 Engagement", callback_data="admin_engagement")
+        ],
+        [
             InlineKeyboardButton("🎁 TRIAL barchaga", callback_data="admin_trial_all"),
             InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
         ],
@@ -11330,6 +11333,120 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.answer("✅ 30% skidka yoqildi!", show_alert=True)
         query.data = "admin_pricing"
         await admin_callback(update, context)
+        return
+    
+    # ==================== USER ENGAGEMENT ====================
+    if query.data == "admin_engagement":
+        db = await get_database()
+        
+        # Get engagement stats
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                # Active users (last 7 days)
+                active_7d = await conn.fetchval("""
+                    SELECT COUNT(*) FROM users 
+                    WHERE last_active > NOW() - INTERVAL '7 days'
+                """)
+                
+                # Active today
+                active_today = await conn.fetchval("""
+                    SELECT COUNT(*) FROM users 
+                    WHERE DATE(last_active) = CURRENT_DATE
+                """)
+                
+                # Inactive 3+ days
+                inactive_3d = await conn.fetchval("""
+                    SELECT COUNT(*) FROM users 
+                    WHERE last_active < NOW() - INTERVAL '3 days'
+                    AND last_active > NOW() - INTERVAL '30 days'
+                """)
+                
+                # Blocked notifications
+                blocked = await conn.fetchval("""
+                    SELECT COUNT(*) FROM users 
+                    WHERE notifications_blocked = true
+                """) or 0
+                
+                # Today transactions count
+                tx_today = await conn.fetchval("""
+                    SELECT COUNT(*) FROM transactions 
+                    WHERE DATE(created_at) = CURRENT_DATE
+                """)
+        else:
+            active_7d = 0
+            active_today = 0
+            inactive_3d = 0
+            blocked = 0
+            tx_today = 0
+        
+        message = (
+            "📣 *USER ENGAGEMENT TIZIMI*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            
+            "📊 *STATISTIKA:*\n"
+            f"┃ 👥 Bugun faol: *{active_today}* kishi\n"
+            f"┃ 📅 7 kun ichida faol: *{active_7d}* kishi\n"
+            f"┃ 😴 3+ kun nofaol: *{inactive_3d}* kishi\n"
+            f"┃ 🚫 Bloklangan: *{blocked}* kishi\n"
+            f"┃ 📝 Bugungi tranzaksiyalar: *{tx_today}* ta\n\n"
+            
+            "⏰ *AVTOMATIK XABARLAR:*\n"
+            "┃ 🌅 Ertalabki motivatsiya: 08:00\n"
+            "┃ 🌙 Kechki hisobot: 21:00\n"
+            "┃ 📢 Nofaol eslatma: 14:00\n"
+            "┃ 📊 Haftalik hisobot: Yakshanba 10:00\n\n"
+            
+            "💡 Tizim avtomatik ishlaydi"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("📤 Hozir ertalabki xabar", callback_data="admin_send_morning")],
+            [InlineKeyboardButton("📤 Hozir kechki hisobot", callback_data="admin_send_evening")],
+            [InlineKeyboardButton("📤 Nofaollarga eslatma", callback_data="admin_send_reminder")],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # Send morning motivation manually
+    if query.data == "admin_send_morning":
+        await query.answer("⏳ Ertalabki xabarlar yuborilmoqda...", show_alert=True)
+        try:
+            from app.user_engagement import UserEngagementSystem
+            engagement = UserEngagementSystem(context.bot)
+            await engagement._send_morning_motivation()
+            await query.answer("✅ Ertalabki motivatsiya yuborildi!", show_alert=True)
+        except Exception as e:
+            await query.answer(f"❌ Xato: {str(e)[:50]}", show_alert=True)
+        return
+    
+    # Send evening summary manually
+    if query.data == "admin_send_evening":
+        await query.answer("⏳ Kechki hisobotlar yuborilmoqda...", show_alert=True)
+        try:
+            from app.user_engagement import UserEngagementSystem
+            engagement = UserEngagementSystem(context.bot)
+            await engagement._send_evening_summaries()
+            await query.answer("✅ Kechki hisobotlar yuborildi!", show_alert=True)
+        except Exception as e:
+            await query.answer(f"❌ Xato: {str(e)[:50]}", show_alert=True)
+        return
+    
+    # Send inactive reminders manually
+    if query.data == "admin_send_reminder":
+        await query.answer("⏳ Eslatmalar yuborilmoqda...", show_alert=True)
+        try:
+            from app.user_engagement import UserEngagementSystem
+            engagement = UserEngagementSystem(context.bot)
+            await engagement._send_inactive_reminders()
+            await query.answer("✅ Eslatmalar yuborildi!", show_alert=True)
+        except Exception as e:
+            await query.answer(f"❌ Xato: {str(e)[:50]}", show_alert=True)
         return
     
     # ==================== SOZLAMALAR ====================

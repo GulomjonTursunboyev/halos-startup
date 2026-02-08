@@ -18,6 +18,7 @@ from telegram.ext import (
 from app.config import BOT_TOKEN, ADMIN_IDS, States
 from app.database import get_database, close_database
 from app.scheduler import start_scheduler, stop_scheduler
+from app.user_engagement import UserEngagementSystem
 from app.app_login_handler import handle_app_login, app_login_confirm_callback, app_login_cancel_callback
 from app.handlers import (
     get_conversation_handler,
@@ -241,6 +242,19 @@ async def post_init(application: Application) -> None:
         logger.info("PRO Care Scheduler started successfully!")
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Start User Engagement System
+    logger.info("Starting User Engagement System...")
+    try:
+        engagement_system = UserEngagementSystem(application.bot)
+        await engagement_system.start()
+        # Store reference for cleanup
+        application.bot_data["engagement_system"] = engagement_system
+        logger.info("User Engagement System started successfully!")
+    except Exception as e:
+        logger.error(f"Failed to start engagement system: {e}")
         import traceback
         traceback.print_exc()
     

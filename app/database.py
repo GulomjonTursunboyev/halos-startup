@@ -431,6 +431,10 @@ class Database:
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_raw TEXT")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS used_promo_codes TEXT")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reengagement TIMESTAMP")
+                # User engagement columns
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reminder_sent TIMESTAMP")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_blocked BOOLEAN DEFAULT FALSE")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS engagement_streak INTEGER DEFAULT 0")
             except Exception:
                 pass  # Columns already exist
             
