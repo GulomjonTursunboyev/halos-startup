@@ -917,3 +917,223 @@ async def on_promo_used(telegram_id: int, promo_code: str) -> None:
         event_type="promo_used",
         event_data={"promo_code": promo_code}
     )
+
+
+# ==================== BROADCAST XABAR SHABLONLARI ====================
+
+BROADCAST_TEMPLATES = {
+    # ========== YANGI FUNKSIYA E'LONLARI ==========
+    "new_feature": {
+        "uz": """🎉 *YANGI FUNKSIYA!*
+
+Salom {name}! 👋
+
+HALOS botiga yangi ajoyib funksiyalar qo'shildi:
+
+✅ Ovozli tranzaksiya - gapiring, yozamiz!
+✅ Qarzlaringizni kuzatish
+✅ Haftalik/oylik hisobotlar
+✅ AI moliyaviy maslahatlar
+
+💎 Sinab ko'ring va fikringizni bildiring!
+
+/start - Boshlash""",
+        "ru": """🎉 *НОВАЯ ФУНКЦИЯ!*
+
+Привет {name}! 👋
+
+В HALOS бот добавлены новые функции:
+
+✅ Голосовые транзакции
+✅ Отслеживание долгов
+✅ Еженедельные/месячные отчёты
+✅ AI финансовые советы
+
+💎 Попробуйте и дайте обратную связь!
+
+/start - Начать"""
+    },
+    
+    # ========== INAKTIV USERLAR UCHUN ==========
+    "comeback": {
+        "uz": """👋 *Sizni sog'indik!*
+
+Salom {name}!
+
+HALOS botini ishlatmayapsiz shekilli 😢
+
+Eslatib o'tamiz:
+📊 Moliyangizni nazorat qilish oson
+🎤 Ovoz bilan tranzaksiya qo'shish
+📈 Haftalik hisobotlar
+
+Qaytib keling - biz yordamga tayyormiz! 💪
+
+/start - Davom etish""",
+        "ru": """👋 *Мы скучали!*
+
+Привет {name}!
+
+Вы давно не использовали HALOS 😢
+
+Напоминаем:
+📊 Легко контролировать финансы
+🎤 Голосовые транзакции
+📈 Еженедельные отчёты
+
+Возвращайтесь - мы готовы помочь! 💪
+
+/start - Продолжить"""
+    },
+    
+    # ========== TRIAL ESLATMA ==========
+    "trial_reminder": {
+        "uz": """⏰ *TRIAL tugayapti!*
+
+Salom {name}!
+
+Sizning bepul PRO davringingiz tugashiga yaqin.
+
+Siz bu vaqtda:
+✅ {tx_count} ta tranzaksiya yozgansiz
+✅ Moliyangizni nazorat qilgansiz
+
+PRO bilan davom eting:
+💎 Cheksiz ovozli tranzaksiyalar
+📊 To'liq hisobotlar
+🤖 AI maslahatlar
+
+🎁 PROMO kod: *HALOSWEEK* - 1 hafta bepul!
+
+/pro - PRO olish""",
+        "ru": """⏰ *TRIAL заканчивается!*
+
+Привет {name}!
+
+Ваш бесплатный период скоро истекает.
+
+За это время:
+✅ Вы записали {tx_count} транзакций
+✅ Контролировали финансы
+
+Продолжайте с PRO:
+💎 Безлимитные голосовые транзакции
+📊 Полные отчёты
+🤖 AI советы
+
+🎁 ПРОМОКОД: *HALOSWEEK* - 1 неделя бесплатно!
+
+/pro - Получить PRO"""
+    },
+    
+    # ========== MAXSUS TAKLIF ==========
+    "special_offer": {
+        "uz": """🔥 *MAXSUS TAKLIF!*
+
+Salom {name}! 🎁
+
+Siz uchun alohida chegirma:
+
+💎 *50% CHEGIRMA* PRO obunaga!
+
+⏰ Faqat 24 soat ichida!
+
+🎁 Promo kod: *NEWYEAR26*
+
+/pro - Hozir olish""",
+        "ru": """🔥 *СПЕЦИАЛЬНОЕ ПРЕДЛОЖЕНИЕ!*
+
+Привет {name}! 🎁
+
+Только для вас скидка:
+
+💎 *50% СКИДКА* на PRO подписку!
+
+⏰ Только 24 часа!
+
+🎁 Промокод: *NEWYEAR26*
+
+/pro - Получить сейчас"""
+    },
+    
+    # ========== OYLIK HISOBOT ESLATMASI ==========
+    "monthly_report": {
+        "uz": """📊 *OYLIK HISOBOT TAYYOR!*
+
+Salom {name}! 👋
+
+Yangi oy boshlanmoqda. O'tgan oyingiz qanday o'tdi?
+
+📈 Hisobotingizni ko'ring va yangi oy uchun rejalashtiring!
+
+/statistics - Statistikani ko'rish
+/budget - Byudjet yaratish""",
+        "ru": """📊 *МЕСЯЧНЫЙ ОТЧЁТ ГОТОВ!*
+
+Привет {name}! 👋
+
+Начинается новый месяц. Как прошёл прошлый?
+
+📈 Посмотрите отчёт и планируйте новый месяц!
+
+/statistics - Статистика
+/budget - Создать бюджет"""
+    },
+    
+    # ========== HAFTALIK ESLATMA ==========
+    "weekly_reminder": {
+        "uz": """📅 *HAFTALIK ESLATMA*
+
+Salom {name}! 👋
+
+Bu hafta moliyangizni yozib oldingizmi?
+
+💡 Eslatma: Har kuni kirim-chiqimlarni yozish - muvaffaqiyat kaliti!
+
+🎤 Oddiy gapirib yozing: "100 ming transport"
+
+/start - Boshlash""",
+        "ru": """📅 *ЕЖЕНЕДЕЛЬНОЕ НАПОМИНАНИЕ*
+
+Привет {name}! 👋
+
+Записали финансы на этой неделе?
+
+💡 Совет: Ежедневная запись - ключ к успеху!
+
+🎤 Просто скажите: "100 тысяч транспорт"
+
+/start - Начать"""
+    }
+}
+
+
+def get_broadcast_template(template_key: str, lang: str = "uz", **kwargs) -> str:
+    """Get broadcast template with formatting"""
+    templates = BROADCAST_TEMPLATES.get(template_key, {})
+    template = templates.get(lang, templates.get("uz", ""))
+    
+    # Default values
+    defaults = {
+        "name": "do'stim",
+        "tx_count": 0,
+        "savings": 0,
+    }
+    defaults.update(kwargs)
+    
+    try:
+        return template.format(**defaults)
+    except KeyError:
+        return template
+
+
+def get_template_list() -> List[Dict[str, str]]:
+    """Get list of available templates for admin panel"""
+    return [
+        {"key": "new_feature", "name": "🆕 Yangi funksiya e'loni"},
+        {"key": "comeback", "name": "👋 Qaytib keling (inaktiv)"},
+        {"key": "trial_reminder", "name": "⏰ Trial eslatma"},
+        {"key": "special_offer", "name": "🔥 Maxsus taklif"},
+        {"key": "monthly_report", "name": "📊 Oylik hisobot"},
+        {"key": "weekly_reminder", "name": "📅 Haftalik eslatma"},
+    ]

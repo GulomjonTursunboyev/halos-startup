@@ -10642,11 +10642,15 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton(f"🏷️ PRO narxlar ({discount_text})", callback_data="admin_pricing")
         ],
         [
-            InlineKeyboardButton("📣 Engagement", callback_data="admin_engagement")
+            InlineKeyboardButton("📣 Engagement", callback_data="admin_engagement"),
+            InlineKeyboardButton("📊 Marketing", callback_data="admin_marketing_stats")
         ],
         [
             InlineKeyboardButton("🎁 TRIAL barchaga", callback_data="admin_trial_all"),
             InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
+        ],
+        [
+            InlineKeyboardButton("📋 Shablon yuborish", callback_data="admin_broadcast_templates")
         ],
         # User boshqaruvi
         [
@@ -10670,6 +10674,82 @@ async def show_admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+
+async def show_admin_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin panel - PRO narxlar boshqaruvi sahifasini ko'rsatish"""
+    query = update.callback_query
+    
+    from app.subscription import (
+        is_discount_active, DISCOUNT_CONFIG, ORIGINAL_PRICES, 
+        get_current_prices
+    )
+    
+    discount_active = is_discount_active()
+    discount_pct = DISCOUNT_CONFIG["percentage"]
+    current_prices = get_current_prices()
+    
+    status_emoji = "🟢" if discount_active else "🔴"
+    status_text = f"{discount_pct}% SKIDKA FAOL" if discount_active else "SKIDKA O'CHIQ"
+    
+    message = (
+        "🏷️ *PRO NARXLAR BOSHQARUVI*\n"
+        "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+        
+        f"{status_emoji} *Status:* {status_text}\n\n"
+        
+        "💰 *ASOSIY NARXLAR:*\n"
+        f"┃ 📅 Haftalik: *{ORIGINAL_PRICES['pro_weekly']:,}* so'm\n"
+        f"┃ 📊 Oylik: *{ORIGINAL_PRICES['pro_monthly']:,}* so'm\n"
+        f"┃ 📅 Yillik: *{ORIGINAL_PRICES['pro_yearly']:,}* so'm\n\n"
+    )
+    
+    if discount_active:
+        message += (
+            f"🔥 *JORIY NARXLAR ({discount_pct}% skidka):*\n"
+            f"┃ 📅 Haftalik: *{current_prices['pro_weekly']:,}* so'm\n"
+            f"┃ 📊 Oylik: *{current_prices['pro_monthly']:,}* so'm\n"
+            f"┃ 📅 Yillik: *{current_prices['pro_yearly']:,}* so'm\n\n"
+            
+            "✅ Foydalanuvchilar skidka narxlarini ko'rmoqda"
+        )
+    else:
+        message += "ℹ️ Foydalanuvchilar asosiy narxlarni ko'rmoqda"
+    
+    # Tugmalar
+    if discount_active:
+        keyboard = [
+            [InlineKeyboardButton("🔴 Skidkani O'CHIRISH", callback_data="admin_discount_off")],
+            [
+                InlineKeyboardButton("50%", callback_data="admin_discount_50"),
+                InlineKeyboardButton("60%", callback_data="admin_discount_60"),
+                InlineKeyboardButton("70%", callback_data="admin_discount_70"),
+            ],
+            [
+                InlineKeyboardButton("80%", callback_data="admin_discount_80"),
+                InlineKeyboardButton("🔥 90%", callback_data="admin_discount_90"),
+            ],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton("🔥 50% SKIDKA", callback_data="admin_discount_50")],
+            [
+                InlineKeyboardButton("60%", callback_data="admin_discount_60"),
+                InlineKeyboardButton("70%", callback_data="admin_discount_70"),
+            ],
+            [
+                InlineKeyboardButton("80%", callback_data="admin_discount_80"),
+                InlineKeyboardButton("🔥 90%", callback_data="admin_discount_90"),
+            ],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
+        ]
+    
+    await query.edit_message_text(
+        message,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -11239,86 +11319,16 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # ==================== PRO NARXLAR BOSHQARUVI ====================
     if query.data == "admin_pricing":
-        from app.subscription import (
-            is_discount_active, DISCOUNT_CONFIG, ORIGINAL_PRICES, 
-            get_current_prices, get_plan_price
-        )
-        
-        discount_active = is_discount_active()
-        discount_pct = DISCOUNT_CONFIG["percentage"]
-        current_prices = get_current_prices()
-        
-        status_emoji = "🟢" if discount_active else "🔴"
-        status_text = f"{discount_pct}% SKIDKA FAOL" if discount_active else "SKIDKA O'CHIQ"
-        
-        message = (
-            "🏷️ *PRO NARXLAR BOSHQARUVI*\n"
-            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            
-            f"{status_emoji} *Status:* {status_text}\n\n"
-            
-            "💰 *ASOSIY NARXLAR:*\n"
-            f"┃ 📅 Haftalik: *{ORIGINAL_PRICES['pro_weekly']:,}* so'm\n"
-            f"┃ 📊 Oylik: *{ORIGINAL_PRICES['pro_monthly']:,}* so'm\n"
-            f"┃ 📅 Yillik: *{ORIGINAL_PRICES['pro_yearly']:,}* so'm\n\n"
-        )
-        
-        if discount_active:
-            message += (
-                f"🔥 *JORIY NARXLAR ({discount_pct}% skidka):*\n"
-                f"┃ 📅 Haftalik: *{current_prices['pro_weekly']:,}* so'm\n"
-                f"┃ 📊 Oylik: *{current_prices['pro_monthly']:,}* so'm\n"
-                f"┃ 📅 Yillik: *{current_prices['pro_yearly']:,}* so'm\n\n"
-                
-                "✅ Foydalanuvchilar skidka narxlarini ko'rmoqda"
-            )
-        else:
-            message += "ℹ️ Foydalanuvchilar asosiy narxlarni ko'rmoqda"
-        
-        # Tugmalar
-        if discount_active:
-            keyboard = [
-                [InlineKeyboardButton("🔴 Skidkani O'CHIRISH", callback_data="admin_discount_off")],
-                [
-                    InlineKeyboardButton("50%", callback_data="admin_discount_50"),
-                    InlineKeyboardButton("60%", callback_data="admin_discount_60"),
-                    InlineKeyboardButton("70%", callback_data="admin_discount_70"),
-                ],
-                [
-                    InlineKeyboardButton("80%", callback_data="admin_discount_80"),
-                    InlineKeyboardButton("90%", callback_data="admin_discount_90"),
-                ],
-                [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
-            ]
-        else:
-            keyboard = [
-                [InlineKeyboardButton("🔥 50% SKIDKA", callback_data="admin_discount_50")],
-                [
-                    InlineKeyboardButton("60%", callback_data="admin_discount_60"),
-                    InlineKeyboardButton("70%", callback_data="admin_discount_70"),
-                ],
-                [
-                    InlineKeyboardButton("80%", callback_data="admin_discount_80"),
-                    InlineKeyboardButton("🔥 90%", callback_data="admin_discount_90"),
-                ],
-                [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
-            ]
-        
-        await query.edit_message_text(
-            message,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await show_admin_pricing(update, context)
         return
     
     # Skidkani o'chirish
     if query.data == "admin_discount_off":
         from app.subscription import set_discount
         set_discount(enabled=False)
-        await query.answer("✅ Skidka o'chirildi! Asosiy narxlar qaytdi.", show_alert=True)
-        # Refresh pricing page
-        query.data = "admin_pricing"
-        await admin_callback(update, context)
+        await query.answer("✅ Skidka o'chirildi!", show_alert=True)
+        # Sahifani yangilash
+        await show_admin_pricing(update, context)
         return
     
     # 50% skidka
@@ -11326,8 +11336,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         from app.subscription import set_discount
         set_discount(enabled=True, percentage=50)
         await query.answer("🔥 50% skidka yoqildi!", show_alert=True)
-        query.data = "admin_pricing"
-        await admin_callback(update, context)
+        await show_admin_pricing(update, context)
         return
     
     # 60% skidka
@@ -11335,8 +11344,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         from app.subscription import set_discount
         set_discount(enabled=True, percentage=60)
         await query.answer("🔥 60% skidka yoqildi!", show_alert=True)
-        query.data = "admin_pricing"
-        await admin_callback(update, context)
+        await show_admin_pricing(update, context)
         return
     
     # 70% skidka
@@ -11344,8 +11352,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         from app.subscription import set_discount
         set_discount(enabled=True, percentage=70)
         await query.answer("🔥 70% skidka yoqildi!", show_alert=True)
-        query.data = "admin_pricing"
-        await admin_callback(update, context)
+        await show_admin_pricing(update, context)
         return
     
     # 80% skidka
@@ -11353,8 +11360,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         from app.subscription import set_discount
         set_discount(enabled=True, percentage=80)
         await query.answer("🔥 80% skidka yoqildi!", show_alert=True)
-        query.data = "admin_pricing"
-        await admin_callback(update, context)
+        await show_admin_pricing(update, context)
         return
     
     # 90% skidka
@@ -11362,8 +11368,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         from app.subscription import set_discount
         set_discount(enabled=True, percentage=90)
         await query.answer("🔥 90% skidka yoqildi!", show_alert=True)
-        query.data = "admin_pricing"
-        await admin_callback(update, context)
+        await show_admin_pricing(update, context)
         return
     
     # ==================== USER ENGAGEMENT ====================
@@ -11721,22 +11726,216 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # ==================== BROADCAST ====================
     if query.data == "admin_broadcast":
-        context.user_data["admin_broadcast"] = True
+        # Broadcast kategoriyalarini ko'rsatish
+        db = await get_database()
+        stats = await db.get_broadcast_stats()
+        
+        message = (
+            "📢 *BROADCAST XABAR*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            "📊 *Foydalanuvchilar statistikasi:*\n\n"
+            f"👥 Jami: *{stats.get('all', 0):,}* ta\n"
+            f"🆓 Bepul: *{stats.get('free', 0):,}* ta\n"
+            f"💎 PRO: *{stats.get('pro', 0):,}* ta\n"
+            f"⏳ Trial: *{stats.get('trial', 0):,}* ta\n"
+            f"😴 7 kun inaktiv: *{stats.get('inactive_7', 0):,}* ta\n"
+            f"💤 30 kun inaktiv: *{stats.get('inactive_30', 0):,}* ta\n"
+            f"🚫 Hech ishlatmagan: *{stats.get('never_active', 0):,}* ta\n\n"
+            "Qaysi guruhga xabar yuborishni tanlang:"
+        )
         
         keyboard = [
-            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_main")]
+            [InlineKeyboardButton(f"👥 BARCHAGA ({stats.get('all', 0)})", callback_data="broadcast_all")],
+            [
+                InlineKeyboardButton(f"🆓 Bepul ({stats.get('free', 0)})", callback_data="broadcast_free"),
+                InlineKeyboardButton(f"💎 PRO ({stats.get('pro', 0)})", callback_data="broadcast_pro")
+            ],
+            [
+                InlineKeyboardButton(f"⏳ Trial ({stats.get('trial', 0)})", callback_data="broadcast_trial"),
+                InlineKeyboardButton(f"😴 7 kun inaktiv ({stats.get('inactive_7', 0)})", callback_data="broadcast_inactive_7")
+            ],
+            [
+                InlineKeyboardButton(f"💤 30 kun inaktiv ({stats.get('inactive_30', 0)})", callback_data="broadcast_inactive_30"),
+                InlineKeyboardButton(f"🚫 Ishlatmagan ({stats.get('never_active', 0)})", callback_data="broadcast_never")
+            ],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
         await query.edit_message_text(
-            "📉 *XABAR YUBORISH*\n"
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== BROADCAST KATEGORIYASI TANLANDI ====================
+    if query.data.startswith("broadcast_"):
+        broadcast_type = query.data.replace("broadcast_", "")
+        context.user_data["admin_broadcast"] = True
+        context.user_data["broadcast_type"] = broadcast_type
+        
+        type_names = {
+            "all": "BARCHA foydalanuvchilar",
+            "free": "BEPUL foydalanuvchilar",
+            "pro": "PRO obunachilari",
+            "trial": "TRIAL foydalanuvchilari",
+            "inactive_7": "7 kun INAKTIV",
+            "inactive_30": "30 kun INAKTIV",
+            "never": "Hech ishlatmaganlar"
+        }
+        
+        type_name = type_names.get(broadcast_type, broadcast_type)
+        
+        keyboard = [
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_broadcast")]
+        ]
+        
+        await query.edit_message_text(
+            f"📢 *XABAR YUBORISH*\n"
+            f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"📍 *Guruh:* {type_name}\n\n"
+            f"Yuboriladigan xabarni yozing yoki media yuboring:\n\n"
+            f"✅ Matn\n"
+            f"✅ 📷 Rasm + matn (caption)\n"
+            f"✅ 🎬 Video + matn (caption)\n"
+            f"✅ 📄 Fayl + matn (caption)\n"
+            f"✅ ↗️ Forward qilingan xabar\n\n"
+            f"💎 _Xabar aynan siz yozganingizdek yuboriladi_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # ==================== SHABLON BROADCAST ====================
+    if query.data == "admin_broadcast_templates":
+        from app.marketing import get_template_list
+        templates = get_template_list()
+        
+        message = (
+            "📋 *SHABLON XABARLAR*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            "Barcha foydalanuvchilarga yuboriladigan\n"
-            "xabarni yozing yoki media yuboring:\n\n"
-            "✅ Matn\n"
-            "✅ 📷 Rasm + matn (caption)\n"
-            "✅ 🎬 Video + matn (caption)\n"
-            "✅ 📄 Fayl + matn (caption)\n\n"
-            "💎 _Markdown formatlash qo'llab-quvvatlanadi_",
+            "Tayyor shablon tanlang va barcha userlarga yuboring:\n"
+        )
+        
+        keyboard = []
+        for tmpl in templates:
+            keyboard.append([
+                InlineKeyboardButton(tmpl["name"], callback_data=f"tmpl_preview_{tmpl['key']}")
+            ])
+        keyboard.append([InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")])
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # Shablon preview
+    if query.data.startswith("tmpl_preview_"):
+        from app.marketing import get_broadcast_template, BROADCAST_TEMPLATES
+        template_key = query.data.replace("tmpl_preview_", "")
+        
+        # Preview xabarni ko'rsatish
+        preview_uz = get_broadcast_template(template_key, "uz", name="Do'stim", tx_count=15)
+        
+        message = (
+            "👁 *SHABLON KO'RISH*\n"
+            "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
+            f"*O'zbekcha versiya:*\n\n"
+            f"{preview_uz}\n\n"
+            "─────────────────\n"
+            "Ushbu shablonni yuborishni xohlaysizmi?"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("✅ BARCHAGA yuborish", callback_data=f"tmpl_send_{template_key}_all")],
+            [
+                InlineKeyboardButton("🆓 Bepullarga", callback_data=f"tmpl_send_{template_key}_free"),
+                InlineKeyboardButton("😴 Inaktivlarga", callback_data=f"tmpl_send_{template_key}_inactive_7")
+            ],
+            [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_broadcast_templates")]
+        ]
+        
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    # Shablon yuborish
+    if query.data.startswith("tmpl_send_"):
+        from app.marketing import get_broadcast_template
+        parts = query.data.replace("tmpl_send_", "").rsplit("_", 1)
+        template_key = parts[0]
+        filter_type = parts[1] if len(parts) > 1 else "all"
+        
+        # Map filter types
+        filter_map = {
+            "all": "all",
+            "free": "free",
+            "pro": "pro",
+            "inactive": "inactive",
+            "7": "inactive_7",
+        }
+        
+        # Handle inactive_7 type
+        if template_key.endswith("_inactive"):
+            template_key = template_key.replace("_inactive", "")
+            filter_type = "inactive"
+        
+        db = await get_database()
+        
+        # Get users based on filter
+        if filter_type == "inactive_7" or filter_type == "inactive":
+            user_rows = await db.get_users_for_broadcast("inactive", inactive_days=7)
+        else:
+            user_rows = await db.get_users_for_broadcast(filter_type)
+        
+        await query.edit_message_text(
+            f"📢 Shablon xabar *{len(user_rows)}* ta foydalanuvchiga yuborilmoqda...\n\n"
+            f"⏳ Iltimos kuting...",
+            parse_mode="Markdown"
+        )
+        
+        success = 0
+        failed = 0
+        
+        for user_row in user_rows:
+            try:
+                user_id = user_row["telegram_id"]
+                lang = user_row.get("language", "uz")
+                name = user_row.get("first_name", "do'stim")
+                
+                # Get personalized template
+                msg_text = get_broadcast_template(template_key, lang, name=name, tx_count=15)
+                
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=msg_text,
+                    parse_mode="Markdown"
+                )
+                success += 1
+                
+                # Rate limiting
+                if success % 30 == 0:
+                    await asyncio.sleep(1)
+            except Exception as e:
+                failed += 1
+                logger.error(f"Template broadcast error to {user_row.get('telegram_id')}: {e}")
+        
+        result_msg = (
+            f"✅ *Shablon broadcast yakunlandi!*\n\n"
+            f"✅ Yuborildi: *{success}* ta\n"
+            f"❌ Xato: *{failed}* ta\n\n"
+            f"📋 Shablon: {template_key}"
+        )
+        
+        keyboard = [[InlineKeyboardButton("◀️ Admin panel", callback_data="admin_main")]]
+        
+        await query.edit_message_text(
+            result_msg,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -11828,6 +12027,7 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
         return
     
     context.user_data["admin_broadcast"] = False
+    broadcast_type = context.user_data.pop("broadcast_type", "all")
     
     message = update.message
     
@@ -11838,15 +12038,37 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     
     db = await get_database()
     
-    # Barcha foydalanuvchilarni olish
-    if db.is_postgres:
-        async with db._pool.acquire() as conn:
-            rows = await conn.fetch("SELECT telegram_id FROM users")
-            users = [row["telegram_id"] for row in rows]
+    # ==================== KATEGORIYAGA QARAB USERLARNI OLISH ====================
+    type_names = {
+        "all": "BARCHA",
+        "free": "BEPUL",
+        "pro": "PRO",
+        "trial": "TRIAL",
+        "inactive_7": "7 kun INAKTIV",
+        "inactive_30": "30 kun INAKTIV",
+        "never": "Hech ishlatmagan"
+    }
+    type_name = type_names.get(broadcast_type, broadcast_type)
+    
+    if broadcast_type == "all":
+        user_rows = await db.get_users_for_broadcast("all")
+    elif broadcast_type == "free":
+        user_rows = await db.get_users_for_broadcast("free")
+    elif broadcast_type == "pro":
+        user_rows = await db.get_users_for_broadcast("pro")
+    elif broadcast_type == "trial":
+        user_rows = await db.get_users_for_broadcast("trial")
+    elif broadcast_type == "inactive_7":
+        user_rows = await db.get_users_for_broadcast("inactive", inactive_days=7)
+    elif broadcast_type == "inactive_30":
+        user_rows = await db.get_users_for_broadcast("inactive", inactive_days=30)
+    elif broadcast_type == "never":
+        user_rows = await db.get_users_for_broadcast("never_active")
     else:
-        cursor = await db._connection.execute("SELECT telegram_id FROM users")
-        rows = await cursor.fetchall()
-        users = [row[0] for row in rows]
+        # Default: all users
+        user_rows = await db.get_users_for_broadcast("all")
+    
+    users = [row["telegram_id"] for row in user_rows]
     
     # Check if message is forwarded - use forward method
     is_forwarded = message.forward_date is not None
@@ -11860,24 +12082,24 @@ async def admin_broadcast_message(update: Update, context: ContextTypes.DEFAULT_
     
     if is_forwarded:
         media_type = "forward"
-        await message.reply_text(f"📉 ↗️ Forward xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📢 ↗️ Forward xabar *{type_name}* userlarga ({len(users)} ta) yuborilmoqda...", parse_mode="Markdown")
     elif has_photo:
         media_type = "photo"
         file_id = message.photo[-1].file_id
-        await message.reply_text(f"📉 📷 Rasm {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📢 📷 Rasm *{type_name}* userlarga ({len(users)} ta) yuborilmoqda...", parse_mode="Markdown")
     elif has_video:
         media_type = "video"
         file_id = message.video.file_id
-        await message.reply_text(f"📉 🎬 Video {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📢 🎬 Video *{type_name}* userlarga ({len(users)} ta) yuborilmoqda...", parse_mode="Markdown")
     elif has_document:
         media_type = "document"
         file_id = message.document.file_id
-        await message.reply_text(f"📉 📄 Fayl {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📢 📄 Fayl *{type_name}* userlarga ({len(users)} ta) yuborilmoqda...", parse_mode="Markdown")
     elif has_text:
         media_type = "text"
         file_id = None
         broadcast_text = message.text
-        await message.reply_text(f"📉 Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+        await message.reply_text(f"📢 📝 Xabar *{type_name}* userlarga ({len(users)} ta) yuborilmoqda...", parse_mode="Markdown")
     else:
         await message.reply_text("❌ Noto'g'ri format. Matn, rasm, video yoki fayl yuboring.")
         return

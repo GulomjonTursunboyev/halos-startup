@@ -195,15 +195,28 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
         yearly_price = get_plan_price("pro_yearly")
         
         if is_discount_active():
+            from app.subscription import DISCOUNT_CONFIG
+            discount_pct = DISCOUNT_CONFIG["percentage"]
             discount_label = get_discount_label("uz")
             orig_weekly = ORIGINAL_PRICES["pro_weekly"]
             orig_monthly = ORIGINAL_PRICES["pro_monthly"]
             orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+            
+            # Tejam hisoblash
+            save_weekly = orig_weekly - weekly_price
+            save_monthly = orig_monthly - monthly_price
+            save_yearly = orig_yearly - yearly_price
+            
             msg += (
-                f"{discount_label}\n\n"
+                f"{discount_label}\n"
+                f"_Asl narxdan {discount_pct}% chegirma!_\n\n"
                 f"├ ⚡ 1 hafta — ~{orig_weekly:,}~ → *{weekly_price:,}* so'm\n"
-                f"├ ⭐ 1 oy — ~{orig_monthly:,}~ → *{monthly_price:,}* so'm _(tavsiya)_\n"
-                f"└ 🏆 1 yil — ~{orig_yearly:,}~ → *{yearly_price:,}* so'm\n\n"
+                f"│   💚 _{save_weekly:,} so'm tejaysiz!_\n"
+                f"├ ⭐ 1 oy — ~{orig_monthly:,}~ → *{monthly_price:,}* so'm\n"
+                f"│   💚 _{save_monthly:,} so'm tejaysiz!_ _(tavsiya)_\n"
+                f"└ 🏆 1 yil — ~{orig_yearly:,}~ → *{yearly_price:,}* so'm\n"
+                f"    💚 _{save_yearly:,} so'm tejaysiz!_\n\n"
+                "⚡ _Chegirma cheklangan vaqt!_\n\n"
             )
         else:
             msg += (
@@ -284,15 +297,28 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
         yearly_price = get_plan_price("pro_yearly")
         
         if is_discount_active():
+            from app.subscription import DISCOUNT_CONFIG
+            discount_pct = DISCOUNT_CONFIG["percentage"]
             discount_label = get_discount_label("ru")
             orig_weekly = ORIGINAL_PRICES["pro_weekly"]
             orig_monthly = ORIGINAL_PRICES["pro_monthly"]
             orig_yearly = ORIGINAL_PRICES["pro_yearly"]
+            
+            # Tejam hisoblash
+            save_weekly = orig_weekly - weekly_price
+            save_monthly = orig_monthly - monthly_price
+            save_yearly = orig_yearly - yearly_price
+            
             msg += (
-                f"{discount_label}\n\n"
+                f"{discount_label}\n"
+                f"_Скидка {discount_pct}% от обычной цены!_\n\n"
                 f"├ ⚡ 1 неделя — ~{orig_weekly:,}~ → *{weekly_price:,}* сум\n"
-                f"├ ⭐ 1 месяц — ~{orig_monthly:,}~ → *{monthly_price:,}* сум _(реком.)_\n"
-                f"└ 🏆 1 год — ~{orig_yearly:,}~ → *{yearly_price:,}* сум\n\n"
+                f"│   💚 _Экономия {save_weekly:,} сум!_\n"
+                f"├ ⭐ 1 месяц — ~{orig_monthly:,}~ → *{monthly_price:,}* сум\n"
+                f"│   💚 _Экономия {save_monthly:,} сум!_ _(реком.)_\n"
+                f"└ 🏆 1 год — ~{orig_yearly:,}~ → *{yearly_price:,}* сум\n"
+                f"    💚 _Экономия {save_yearly:,} сум!_\n\n"
+                "⚡ _Скидка ограничена по времени!_\n\n"
             )
         else:
             msg += (

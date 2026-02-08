@@ -2118,33 +2118,60 @@ class Database:
             logger.error(f"Error logging marketing event: {e}")
             return False
     
-    async def get_inactive_users(self, days: int = 3) -> List[Dict[str, Any]]:
-        """Get users who have been inactive for X days"""
+    async def get_inactive_users(self, days: int = 3, include_free: bool = False) -> List[Dict[str, Any]]:
+        """Get users who have been inactive for X days
+        
+        Args:
+            days: Number of inactive days
+            include_free: If True, include free tier users (for marketing broadcast)
+        """
         try:
             cutoff_date = datetime.now() - timedelta(days=days)
             
             if self.is_postgres:
                 async with self._pool.acquire() as conn:
-                    rows = await conn.fetch("""
+                    if include_free:
+                        # BARCHA userlar - free ham, pro ham
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, last_active, 
+                                   subscription_tier, last_reengagement
+                            FROM users 
+                            WHERE (last_active IS NULL OR last_active < $1)
+                            AND (last_reengagement IS NULL OR last_reengagement < $2)
+                        """, cutoff_date, cutoff_date)
+                    else:
+                        # Faqat PRO/Trial userlar
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, last_active, 
+                                   subscription_tier, last_reengagement
+                            FROM users 
+                            WHERE last_active < $1 
+                            AND (last_reengagement IS NULL OR last_reengagement < $2)
+                            AND subscription_tier != 'free'
+                        """, cutoff_date, cutoff_date)
+                    return [dict(row) for row in rows]
+            else:
+                if include_free:
+                    async with self._connection.execute("""
                         SELECT telegram_id, first_name, language, last_active, 
                                subscription_tier, last_reengagement
                         FROM users 
-                        WHERE last_active < $1 
-                        AND (last_reengagement IS NULL OR last_reengagement < $2)
+                        WHERE (last_active IS NULL OR last_active < ?)
+                        AND (last_reengagement IS NULL OR last_reengagement < ?)
+                    """, (cutoff_date.isoformat(), cutoff_date.isoformat())) as cursor:
+                        rows = await cursor.fetchall()
+                        return [dict(row) for row in rows]
+                else:
+                    async with self._connection.execute("""
+                        SELECT telegram_id, first_name, language, last_active, 
+                               subscription_tier, last_reengagement
+                        FROM users 
+                        WHERE last_active < ? 
+                        AND (last_reengagement IS NULL OR last_reengagement < ?)
                         AND subscription_tier != 'free'
-                    """, cutoff_date, cutoff_date)
-                    return [dict(row) for row in rows]
-            else:
-                async with self._connection.execute("""
-                    SELECT telegram_id, first_name, language, last_active, 
-                           subscription_tier, last_reengagement
-                    FROM users 
-                    WHERE last_active < ? 
-                    AND (last_reengagement IS NULL OR last_reengagement < ?)
-                    AND subscription_tier != 'free'
-                """, (cutoff_date.isoformat(), cutoff_date.isoformat())) as cursor:
-                    rows = await cursor.fetchall()
-                    return [dict(row) for row in rows]
+                    """, (cutoff_date.isoformat(), cutoff_date.isoformat())) as cursor:
+                        rows = await cursor.fetchall()
+                        return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error getting inactive users: {e}")
             return []
@@ -2219,6 +2246,163 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting transaction stats: {e}")
             return {"income": 0, "expense": 0, "count": 0}
+
+    # ==================== BROADCAST VA MARKETING UCHUN ====================
+    
+    async def get_users_for_broadcast(
+        self, 
+        filter_type: str = "all",
+        inactive_days: int = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Broadcast uchun userlarni olish
+        
+        Args:
+            filter_type: 
+                - "all": Barcha userlar
+                - "free": Faqat bepul userlar
+                - "pro": Faqat PRO userlar
+                - "trial": Trial userlar
+                - "inactive": Inaktiv userlar (inactive_days bilan)
+                - "never_active": Hech qachon botni ishlatmagan
+            inactive_days: "inactive" filter uchun kunlar soni
+        """
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    if filter_type == "all":
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, 
+                                   subscription_tier, last_active, created_at
+                            FROM users
+                        """)
+                    elif filter_type == "free":
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, 
+                                   subscription_tier, last_active, created_at
+                            FROM users 
+                            WHERE subscription_tier = 'free' OR subscription_tier IS NULL
+                        """)
+                    elif filter_type == "pro":
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, 
+                                   subscription_tier, last_active, created_at
+                            FROM users 
+                            WHERE subscription_tier = 'pro'
+                        """)
+                    elif filter_type == "trial":
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, 
+                                   subscription_tier, last_active, created_at
+                            FROM users 
+                            WHERE subscription_tier = 'trial'
+                        """)
+                    elif filter_type == "inactive":
+                        cutoff = datetime.now() - timedelta(days=inactive_days or 7)
+                        rows = await conn.fetch("""
+                            SELECT telegram_id, first_name, language, 
+                                   subscription_tier, last_active, created_at
+                            FROM users 
+                            WHERE last_active IS NULL OR last_active < $1
+                        """, cutoff)
+                    elif filter_type == "never_active":
+                        # Userlar botdan foydalanmagan (tranzaksiyasi yo'q)
+                        rows = await conn.fetch("""
+                            SELECT u.telegram_id, u.first_name, u.language, 
+                                   u.subscription_tier, u.last_active, u.created_at
+                            FROM users u
+                            LEFT JOIN transactions t ON u.id = t.user_id
+                            WHERE t.id IS NULL
+                        """)
+                    else:
+                        rows = []
+                    
+                    return [dict(row) for row in rows]
+            else:
+                # SQLite versiya
+                if filter_type == "all":
+                    async with self._connection.execute("""
+                        SELECT telegram_id, first_name, language, 
+                               subscription_tier, last_active, created_at
+                        FROM users
+                    """) as cursor:
+                        rows = await cursor.fetchall()
+                        return [dict(row) for row in rows]
+                else:
+                    async with self._connection.execute("SELECT telegram_id FROM users") as cursor:
+                        rows = await cursor.fetchall()
+                        return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting users for broadcast: {e}")
+            return []
+    
+    async def get_broadcast_stats(self) -> Dict[str, int]:
+        """Broadcast uchun statistika - har bir kategoriyada qancha user bor"""
+        try:
+            stats = {
+                "all": 0,
+                "free": 0,
+                "pro": 0,
+                "trial": 0,
+                "inactive_7": 0,
+                "inactive_30": 0,
+                "never_active": 0
+            }
+            
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    # Jami
+                    row = await conn.fetchrow("SELECT COUNT(*) as cnt FROM users")
+                    stats["all"] = row["cnt"] if row else 0
+                    
+                    # Free
+                    row = await conn.fetchrow("""
+                        SELECT COUNT(*) as cnt FROM users 
+                        WHERE subscription_tier = 'free' OR subscription_tier IS NULL
+                    """)
+                    stats["free"] = row["cnt"] if row else 0
+                    
+                    # PRO
+                    row = await conn.fetchrow("""
+                        SELECT COUNT(*) as cnt FROM users WHERE subscription_tier = 'pro'
+                    """)
+                    stats["pro"] = row["cnt"] if row else 0
+                    
+                    # Trial
+                    row = await conn.fetchrow("""
+                        SELECT COUNT(*) as cnt FROM users WHERE subscription_tier = 'trial'
+                    """)
+                    stats["trial"] = row["cnt"] if row else 0
+                    
+                    # 7 kun inaktiv
+                    cutoff_7 = datetime.now() - timedelta(days=7)
+                    row = await conn.fetchrow("""
+                        SELECT COUNT(*) as cnt FROM users 
+                        WHERE last_active IS NULL OR last_active < $1
+                    """, cutoff_7)
+                    stats["inactive_7"] = row["cnt"] if row else 0
+                    
+                    # 30 kun inaktiv
+                    cutoff_30 = datetime.now() - timedelta(days=30)
+                    row = await conn.fetchrow("""
+                        SELECT COUNT(*) as cnt FROM users 
+                        WHERE last_active IS NULL OR last_active < $1
+                    """, cutoff_30)
+                    stats["inactive_30"] = row["cnt"] if row else 0
+                    
+                    # Hech qachon botni ishlatmagan
+                    row = await conn.fetchrow("""
+                        SELECT COUNT(DISTINCT u.id) as cnt 
+                        FROM users u
+                        LEFT JOIN transactions t ON u.id = t.user_id
+                        WHERE t.id IS NULL
+                    """)
+                    stats["never_active"] = row["cnt"] if row else 0
+            
+            return stats
+        except Exception as e:
+            logger.error(f"Error getting broadcast stats: {e}")
+            return stats
 
 
 # Singleton database instance
