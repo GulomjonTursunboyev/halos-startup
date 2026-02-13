@@ -1000,7 +1000,7 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "📊 *Batafsil statistika*\n"
             "   Haftalik, oylik, yillik tahlil\n\n"
             
-            "📅 *Halos sanangiz*\n"
+            "📅 *Erkinlik sanangiz*\n"
             "   Qarzlardan qachon xalos bo'lasiz\n\n"
             
             "🔔 *Aqlli eslatmalar*\n"

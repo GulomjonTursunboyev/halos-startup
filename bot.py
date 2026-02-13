@@ -301,8 +301,15 @@ async def post_init(application: Application) -> None:
 
 async def post_shutdown(application: Application) -> None:
     """Cleanup on shutdown"""
-    logger.info("Stopping PRO Care Scheduler...")
+    logger.info("Stopping Engagement systems...")
+    # Stop User Engagement System
+    engagement = application.bot_data.get("engagement_system")
+    if engagement:
+        await engagement.stop()
+    
+    # Stop PRO Care Scheduler
     await stop_scheduler()
+    
     logger.info("Closing database connection...")
     await close_database()
     logger.info("Shutdown complete")

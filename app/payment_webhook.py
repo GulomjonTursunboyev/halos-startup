@@ -366,7 +366,7 @@ async def send_pro_activation_message(telegram_id: int, plan_id: str, expires: d
             f"📦 Tarif: *{plan_name}*\n"
             f"📅 Amal qilish: *{expires.strftime('%d.%m.%Y')}* gacha\n\n"
             "🌟 *Sizning yangi imkoniyatlaringiz:*\n"
-            "├ 🗓 HALOS sanangiz\n"
+            "├ 🗓 Erkinlik sanangiz\n"
             "├ ⚡ Tezkor qutilish rejasi\n"
             "├ 💰 Shaxsiy kapital hisoblash\n"
             "├ 🎤 Ovozli AI yordamchi\n"

@@ -135,7 +135,7 @@ async def show_pricing(update: Update, context: ContextTypes.DEFAULT_TYPE, is_re
             "│  🎯 *ASOSIY AFZALLIKLAR*  │\n"
             "└─────────────────────┘\n\n"
             
-            "📅 *Halos sanangiz*\n"
+            "📅 *Erkinlik sanangiz*\n"
             "   Qarzlardan qachon xalos bo'lishingizni\n"
             "   aniq sana bilan ko'ring\n\n"
             
@@ -435,7 +435,7 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             "🎯 *FAQAT PRO FOYDALANUVCHILAR UCHUN:*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             
-            "🗓 *HALOS SANANGIZ*\n"
+            "🗓 *ERKINLIK SANANGIZ*\n"
             "Qarzlardan qachon xalos bo'lishingizni\n"
             "aniq sana bilan ko'rasiz\n\n"
             

@@ -27,11 +27,11 @@ def now_uz():
 # ==================== ENGAGEMENT MESSAGES ====================
 
 MORNING_GREETINGS = [
-    "🌅 Xayrli tong! Bugun moliyaviy maqsadlaringizga bir qadam yaqinlashing!",
-    "☀️ Yangi kun - yangi imkoniyatlar! Xarajatlaringizni kuzatishni unutmang!",
-    "🌞 Xayrli tong! Bugun qancha tejashni rejalashtiryapsiz?",
-    "🌄 Yangi kun boshlandi! Moliyaviy erkinlik sari yana bir qadam!",
-    "✨ Xayrli tong! Kichik tejamlar katta natijalar beradi!",
+    "🌅 Xayrli tong! Bugun Erkinlik Strategiyangizga bir qadam yaqinlashing! 🚀",
+    "☀️ Yangi kun — yangi imkoniyat! Xarajatlaringizni nazorat qilishni unutmang! 📝",
+    "🌞 Xayrli tong! Bugun shaxsiy kapitalingiz uchun nima qila olasiz? 💎",
+    "🌄 Kuningiz xayrli bo'lsin! Moliyaviy erkinlik sari intizom bilan davom etamiz! 🎯",
+    "✨ Xayrli tong! Kichik tejamlar — katta kelajak poydevoridir! 🏛",
 ]
 
 EVENING_SUMMARIES = [
@@ -39,6 +39,21 @@ EVENING_SUMMARIES = [
     "🌆 Ajoyib kun edi! Bugungi moliyaviy natijalaringiz:",
     "🌇 Kun tugadi! Qancha tejadingiz, bilasizmi?",
     "🌃 Bugun ham moliyaviy maqsadlarga yaqinlashdingiz!",
+]
+
+# Daily nudge messages (Urging users to input today's data)
+DAILY_NUDGE_UZ = [
+    "🔔 *KUNLIK ESLATMA*\n\nBugun hali xarajatlaringizni yozmadingiz. Bir daqiqa ajratib, Erkinlik Strategiyasini davom ettiring! 🚀",
+    "📝 Bugun qancha sarflaganingizni hisobga oldingizmi? Har bir so'm erkinlik sari yo'l! 💎",
+    "🎯 Moliyaviy intizom — muvaffaqiyat kaliti. Bugungi xarajatlarni hozirning o'zida yozib qo'ying! 📊",
+    "💡 Esingizda bo'lsin: Nazorat qilinmagan xarajat — boylik dushmani. Bugungi qaydlarni kiritish yo'li: _\"15 ming tushlik\"_ shell!",
+]
+
+DAILY_NUDGE_RU = [
+    "🔔 *ЕЖЕДНЕВНОЕ НАПОМИНАНИЕ*\n\nВы еще не записали расходы за сегодня. Уделите минуту Стратегии Свободы! 🚀",
+    "📝 Учли ли вы сегодняшние расходы? Каждый сум — это путь к свободе! 💎",
+    "🎯 Финансовая дисциплина — ключ к успеху. Запишите сегодняшние расходы прямо сейчас! 📊",
+    "💡 Помните: Неконтролируемый расход — враг богатства. Запишите сегодня: _\"15 тысяч обед\"_!",
 ]
 
 REMINDER_MESSAGES_UZ = [
@@ -59,10 +74,10 @@ REMINDER_MESSAGES_RU = [
 
 MOTIVATION_QUOTES = [
     "💪 \"Kichik qadamlar bilan katta marralar zabt etiladi!\"",
-    "🌟 \"Bugun tejagan 1000 so'm - ertaga 1,000,000 so'm!\"",
-    "🎯 \"Maqsadga erishish - har kungi izchillikda!\"",
-    "🚀 \"Moliyaviy erkinlik - bu sizning tanlovingiz!\"",
-    "💎 \"Har bir so'm muhim - ularni nazorat qiling!\"",
+    "🌟 \"Bugun tejagan 1000 so'mingiz — kelajakdagi erkinligingizdir!\"",
+    "🎯 \"Maqsadga erishish — har kungi intizomda!\"",
+    "🚀 \"Erkinlik Strategiyasi — sizning mustaqil kelajagingiz!\"",
+    "💎 \"Har bir so'm muhim — ularni o'zingizga ishlashga majbur qiling!\"",
 ]
 
 
@@ -91,11 +106,12 @@ class UserEngagementSystem:
         self._tasks = [
             asyncio.create_task(self._morning_motivation_job()),
             asyncio.create_task(self._evening_summary_job()),
+            asyncio.create_task(self._daily_nudge_job()),      # NEW: Daily nudge for inactive-today
             asyncio.create_task(self._inactive_reminder_job()),
             asyncio.create_task(self._weekly_report_job()),
         ]
         
-        logger.info("✅ User Engagement System started with 4 jobs")
+        logger.info("✅ User Engagement System started with 5 jobs (including Daily Nudge)")
     
     async def stop(self):
         """Stop engagement system"""
@@ -204,9 +220,9 @@ class UserEngagementSystem:
             try:
                 now = now_uz()
                 
-                # Calculate next 21:00
-                target = now.replace(hour=21, minute=0, second=0, microsecond=0)
-                if now.hour >= 21:
+                # Calculate next 20:30
+                target = now.replace(hour=20, minute=30, second=0, microsecond=0)
+                if now.hour >= 20 and now.minute >= 30:
                     target += timedelta(days=1)
                 
                 wait_seconds = (target - now).total_seconds()
@@ -309,6 +325,102 @@ class UserEngagementSystem:
             
         except Exception as e:
             logger.error(f"Evening summary batch error: {e}")
+    
+    # ==================== DAILY NUDGE (19:30) ====================
+    
+    async def _daily_nudge_job(self):
+        """Bugun harajat kiritmaganlarga soat 19:30 da eslatma yuborish"""
+        while self._running:
+            try:
+                now = now_uz()
+                
+                # Nudge soat 19:30 da
+                target = now.replace(hour=19, minute=30, second=0, microsecond=0)
+                if now.hour >= 19 and now.minute >= 30:
+                    target += timedelta(days=1)
+                
+                wait_seconds = (target - now).total_seconds()
+                logger.info(f"Daily nudge scheduled in {wait_seconds/3600:.1f} hours")
+                
+                await asyncio.sleep(wait_seconds)
+                
+                if self._running:
+                    await self._send_daily_nudges()
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Daily nudge error: {e}")
+                await asyncio.sleep(3600)
+
+    async def _send_daily_nudges(self):
+        """Bugun passiv bo'lgan userlarga nudge yuborish"""
+        try:
+            db = await get_database()
+            import random
+            
+            # 1. Bugun transaction kiritganlar ID ro'yxati
+            today_active_ids = await self._get_today_active_user_ids()
+            
+            # 2. Oxirgi 14 kunda faol bo'lgan barcha userlar
+            all_active = await self._get_active_users(days=14)
+            
+            sent_count = 0
+            for user in all_active:
+                user_id = user["id"]
+                if user_id in today_active_ids:
+                    continue
+                
+                # Bugun hali nudge yuborilmaganini tekshirish (pauza uchun)
+                # (aslida run_daily kabi ishlaydi, lekin ehtiyotkorlik uchun)
+                
+                try:
+                    lang = user.get("language", "uz")
+                    telegram_id = user["telegram_id"]
+                    
+                    messages = DAILY_NUDGE_UZ if lang == "uz" else DAILY_NUDGE_RU
+                    message = random.choice(messages)
+                    
+                    keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(
+                            "✍️ Xarajat kiritish" if lang == "uz" else "✍️ Записать расход",
+                            callback_data="add_expense"
+                        )],
+                        [InlineKeyboardButton(
+                            "🎤 Ovozli xabar" if lang == "uz" else "🎤 Голосовое сообщение",
+                            callback_data="ai_assistant"
+                        )]
+                    ])
+                    
+                    await self.bot.send_message(
+                        chat_id=telegram_id,
+                        text=message,
+                        parse_mode="Markdown",
+                        reply_markup=keyboard
+                    )
+                    sent_count += 1
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    logger.warning(f"Failed to nudge {user.get('telegram_id')}: {e}")
+            
+            logger.info(f"✅ Sent daily nudges to {sent_count} users")
+            
+        except Exception as e:
+            logger.error(f"Daily nudge batch error: {e}")
+
+    async def _get_today_active_user_ids(self) -> set:
+        """Bugun transaction kiritgan user ID larini qaytaradi"""
+        db = await get_database()
+        today = now_uz().date()
+        
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("SELECT DISTINCT user_id FROM transactions WHERE DATE(created_at) = $1", today)
+                return {row["user_id"] for row in rows}
+        else:
+            async with db._connection.execute("SELECT DISTINCT user_id FROM transactions WHERE DATE(created_at) = ?", (today.isoformat(),)) as cursor:
+                rows = await cursor.fetchall()
+                return {row[0] for row in rows}
     
     # ==================== INACTIVE USER REMINDERS ====================
     

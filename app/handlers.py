@@ -485,7 +485,7 @@ async def onboarding_credit_amount_handler(update: Update, context: ContextTypes
     
     if amount < 0:
         await update.message.reply_text(
-            "❌ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "❌ МеверныЙ С„ормат. Введите цисЛо.",
+            "❌ Noto'g'ri format. Raqam kiriting." if lang == "uz" else "❌ Неверный формат. Введите число.",
             parse_mode="Markdown"
         )
         return States.ONBOARDING_CREDIT_AMOUNT
@@ -1657,7 +1657,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Handle photo (screenshot of credit schedule) - AI bilan o'qish
     if photo:
         processing_msg = await update.message.reply_text(
-            "📷 Rasm tahlil qilinmoqda..." if lang == "uz" else "📷 АнаЛизируСЋ изображение..."
+            "📷 Rasm tahlil qilinmoqda..." if lang == "uz" else "📷 Анализирую изображение..."
         )
         
         try:
@@ -1772,7 +1772,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 # Rasmni o'qib bo'lmadi
                 await update.message.reply_text(
                     "❌ Rasmdan ma'lumotni o'qib bo'lmadi. PDF yoki HTML faylni yuboring." if lang == "uz"
-                    else "❌ Ме удаЛосъ процитатъ данные с изображения. Отправъте PDF иЛи HTML С„аЙЛ."
+                    else "❌ Не удалось прочитать данные с изображения. Отправьте PDF или HTML файл."
                 )
                 return States.KATM_UPLOAD
                 
@@ -1781,7 +1781,7 @@ async def katm_pdf_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await processing_msg.delete()
             await update.message.reply_text(
                 "❌ Rasmni qayta ishlashda xatolik. PDF/HTML faylni yuboring." if lang == "uz"
-                else "❌ Ошибка обработки изображения. Отправъте PDF/HTML С„аЙЛ."
+                else "❌ Ошибка обработки изображения. Отправьте PDF/HTML файл."
             )
             return States.KATM_UPLOAD
     
@@ -5297,7 +5297,7 @@ async def save_and_show_menu_results(message, context: ContextTypes.DEFAULT_TYPE
                     f"💵 Yuk: *{format_number(total_debt)} so'm*\n"
                     f"📅 To'lov: *{format_number(loan_payment)} so'm/oy*\n"
                     f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-                    f"📊 *Taxminiy HALOS sanangiz:* {exit_str}\n"
+                    f"📊 *Taxminiy Erkinlik sanangiz:* {exit_str}\n"
                     f"📊 *Qolgan muddat:* {months} oy\n\n"
                 )
                 
@@ -5502,7 +5502,7 @@ async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_
                     f"💵 Yuk: *{format_number(debt)} so'm*\n"
                     f"📅 To'lov: *{format_number(loan_payment)} so'm/oy*\n"
                     f"┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-                    f"📊 *Taxminiy HALOS sanangiz:* {exit_str}\n"
+                    f"📊 *Taxminiy Erkinlik sanangiz:* {exit_str}\n"
                     f"📊 *Qolgan muddat:* {months} oy\n\n"
                 )
                 
@@ -5820,7 +5820,7 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if lang == "uz":
         processing_text = "🤖 *AI tahlil qilmoqda...*"
     else:
-        processing_text = "🤖 *AI анаЛизирует...*"
+        processing_text = "🤖 *AI analiz qilmoqda...*" if lang == "uz" else "🤖 *AI анализирует...*"
     
     processing_msg = await update.message.reply_text(
         processing_text,
@@ -7718,7 +7718,7 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             logger.warning(f"[VOICE] Transcription returned None/empty")
             await processing_msg.edit_text(
                 "❌ Ovozni aniqlab bo'lmadi. Qaytadan urinib ko'ring." if lang == "uz" else 
-                "❌ Ме удаЛосъ распознатъ гоЛос. ПопробуЙте ещС‘ раз.",
+                "❌ Не удалось распознать голос. Попробуйте ещё раз.",
                 parse_mode="Markdown"
             )
             return
@@ -7792,12 +7792,12 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     # AI manbasini ko'rsatish
                     ai_source = transaction.get("ai_source", "local")
                     if ai_source == "gemini":
-                        msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _АнаЛиз с помощъСЋ Gemini AI_"
+                        msg += "\n\n🤖 _Gemini AI yordamida tahlil qilindi_" if lang == "uz" else "\n\n🤖 _Анализ с помощью Gemini AI_"
                     
                     # Get updated voice limit info (Admin uchun ko'rsatmaslik)
                     if not is_admin:
                         new_limit_info = await check_voice_limit(db, user["id"])
-                        limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
+                        limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} голосовых осталось_"
                         msg += limit_msg
                     
                     # Aniqlashtirish kerakmi tekshirish - kengaytirilgan
@@ -9067,26 +9067,26 @@ async def ai_correct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         msg = (
             "✏️пёЏ *ИСПРАВЛЕНИЕ*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            f"💡 Текущая записъ:\n"
+            f"💡 Текущая запись:\n"
             f"┃ Тип: *{'Доход' if transaction['type'] == 'income' else 'Расход'}*\n"
             f"┃ Категория: *{transaction['category']}*\n"
             f"┃ Сумма: *{transaction['amount']:,}* сум\n"
             f"┃ Описание: _{description}_\n\n"
-            "🤖 _МеверныЙ анаЛиз. Как исправитъ?_"
+            "🤖 _Неверный анализ. Как исправить?_"
         )
     
     keyboard = [
         # Gemini bilan qayta tahlil
         [InlineKeyboardButton(
-            "🤖 Gemini bilan qayta tahlil" if lang == "uz" else "🤖 ПовторныЙ анаЛиз Gemini",
+            "🤖 Gemini bilan qayta tahlil" if lang == "uz" else "🤖 Повторный анализ Gemini",
             callback_data=f"ai_reanalyze_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            f"🕐 {new_type_label}ga o'zgartirish" if lang == "uz" else f"🕐 СдеЛатъ {new_type_label_ru.lower()}ом",
-            callback_data=f"ai_swap_type_{transaction_id}_{new_type}"
+            f"🕐 {new_type_label}ga o'zgartirish" if lang == "uz" else f"🕐 Сделать {new_type_label_ru.lower()}ом",
+            callback_data=f"ai_change_type_{transaction_id}"
         )],
         [InlineKeyboardButton(
-            "💡 Kategoriyani o'zgartirish" if lang == "uz" else "💡 Изменитъ категориСЋ",
+            "💡 Kategoriyani o'zgartirish" if lang == "uz" else "💡 Изменить категорию",
             callback_data=f"ai_change_category_{transaction_id}"
         )],
         [InlineKeyboardButton(
@@ -9231,15 +9231,15 @@ async def ai_swap_type_callback(update: Update, context: ContextTypes.DEFAULT_TY
         )
     else:
         msg = (
-            "✅ *ИсправЛено! AI сдеЛаЛ выводы!*\n"
+            "✅ *Исправлено! AI сделал выводы!*\n"
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
-            f"🕐 Тип изменС‘н:\n"
+            f"🕐 Тип изменён:\n"
             f"┃ {'📈 Доход' if old_type == 'income' else '📉 Расход'} ↳ "
             f"{'📈 Доход' if new_type == 'income' else '📉 Расход'}\n"
             f"┃ Категория: *{new_category_name}*\n"
             f"┃ Сумма: *{transaction['amount']:,}* сум\n\n"
-            "🧠 _AI гЛубоко проанаЛизироваЛ ьту ошибку!_\n"
-            "_В сЛедуСЋщиЙ раз подобное сообщение будет обработано правиЛъно._"
+            "🧠 _AI ushbu xatoni chuqur tahlil qildi!_\n" if lang == "uz" else "🧠 _AI глубоко проанализировал эту ошибку!_\n"
+            "_Keyingi safar bunday xabarlar to'g'ri qayta ishlanadi._" if lang == "uz" else "_В следующий раз подобное сообщение будет обработано правильно._"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9592,7 +9592,7 @@ async def ai_set_category_callback(update: Update, context: ContextTypes.DEFAULT
             "┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃┃\n\n"
             f"📝 Новая категория: *{new_category_name}*\n"
             f"💰 Сумма: *{transaction['amount']:,}* сум\n\n"
-            "🧠 _AI сдеЛаЛ выводы из ьтоЙ ошибки и запомниЛ!_"
+            "🧠 _AI сделал выводы из этой ошибки и запомнил!_"
         )
     
     await query.edit_message_text(msg, parse_mode="Markdown")
@@ -9742,7 +9742,7 @@ async def ai_amount_input_handler(update: Update, context: ContextTypes.DEFAULT_
     if not new_amount:
         await update.message.reply_text(
             "❌ Summani aniqlab bo'lmadi. Qaytadan kiriting." if lang == "uz" else
-            "❌ Ме удаЛосъ опредеЛитъ сумму. ПопробуЙте ещС‘ раз.",
+            "❌ Не удалось определить сумму. Попробуйте ещё раз.",
             parse_mode="Markdown"
         )
         return
@@ -11426,19 +11426,21 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"┃ 🚫 Bloklangan: *{blocked}* kishi\n"
             f"┃ 📝 Bugungi tranzaksiyalar: *{tx_today}* ta\n\n"
             
-            "⏰ *AVTOMATIK XABARLAR:*\n"
+            "⏰ *AVTOMATIK XABARLAR (ENGAGEMENT):*\n"
             "┃ 🌅 Ertalabki motivatsiya: 08:00\n"
+            "┃ 📢 Kunlik eslatma (Nudge): 19:30\n"
             "┃ 🌙 Kechki hisobot: 21:00\n"
-            "┃ 📢 Nofaol eslatma: 14:00\n"
+            "┃ ⏳ Nofaol eslatma: 14:00 (1-3 kun)\n"
             "┃ 📊 Haftalik hisobot: Yakshanba 10:00\n\n"
             
-            "💡 Tizim avtomatik ishlaydi"
+            "✅ *Tizim to'liq avtomatik rejimlarda!*"
         )
         
         keyboard = [
-            [InlineKeyboardButton("📤 Hozir ertalabki xabar", callback_data="admin_send_morning")],
-            [InlineKeyboardButton("📤 Hozir kechki hisobot", callback_data="admin_send_evening")],
-            [InlineKeyboardButton("📤 Nofaollarga eslatma", callback_data="admin_send_reminder")],
+            [InlineKeyboardButton("🌅 Ertalabki motivatsiya", callback_data="admin_send_morning")],
+            [InlineKeyboardButton("🔔 Kunlik nudge (19:30)", callback_data="admin_send_nudge")],
+            [InlineKeyboardButton("🌙 Kechki hisobot", callback_data="admin_send_evening")],
+            [InlineKeyboardButton("⏳ Nofaollarga eslatma", callback_data="admin_send_reminder")],
             [InlineKeyboardButton("◀️ Orqaga", callback_data="admin_main")]
         ]
         
@@ -11469,6 +11471,18 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             engagement = UserEngagementSystem(context.bot)
             await engagement._send_evening_summaries()
             await query.answer("✅ Kechki hisobotlar yuborildi!", show_alert=True)
+        except Exception as e:
+            await query.answer(f"❌ Xato: {str(e)[:50]}", show_alert=True)
+        return
+
+    # Send daily nudge manually
+    if query.data == "admin_send_nudge":
+        await query.answer("⏳ Kunlik nudge yuborilmoqda...", show_alert=True)
+        try:
+            from app.user_engagement import UserEngagementSystem
+            engagement = UserEngagementSystem(context.bot)
+            await engagement._send_daily_nudges()
+            await query.answer("✅ Kunlik eslatmalar (nudge) yuborildi!", show_alert=True)
         except Exception as e:
             await query.answer(f"❌ Xato: {str(e)[:50]}", show_alert=True)
         return
