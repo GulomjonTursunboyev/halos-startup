@@ -450,6 +450,11 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
         return
     
+    # Show loading message immediately (before long Excel generation)
+    loading_msg = "⏳ *Excel hisobot tayyorlanmoqda...*\n\n_Bu bir necha soniya vaqt olishi mumkin_" if lang == "uz" else "⏳ *Формируем Excel отчёт...*\n\n_Это может занять несколько секунд_"
+    if query:
+        await query.edit_message_text(loading_msg, parse_mode="Markdown")
+    
     # Get user data
     db = await get_database()
     user = await db.get_user(telegram_id)
@@ -466,6 +471,7 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         else:
             await update.message.reply_text(msg)
         return
+
     
     # Generate beautiful Excel file
     try:
@@ -924,7 +930,8 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         wb.save(output)
         output.seek(0)
         
-        # Send file
+        # Send file using InputFile for proper BytesIO handling
+        from telegram import InputFile
         filename = f"HALOS_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
         
         if query:
@@ -932,23 +939,29 @@ async def export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         else:
             chat_id = update.message.chat_id
         
+        caption_uz = "📊 *HALOS Moliyaviy Hisobot*\n\n✅ 3 ta sahifa:\n• Xulosa\n• Tranzaksiyalar\n• Kunlik hisobchi"
+        caption_ru = "📊 *HALOS Финансовый Отчёт*\n\n✅ 3 листа:\n• Сводка\n• Транзакции\n• Дневник расходов"
+        
         await context.bot.send_document(
             chat_id=chat_id,
-            document=output,
-            filename=filename,
-            caption="📊 *HALOS Moliyaviy Hisobot*\n\n✅ 3 ta sahifa:\n• Xulosa\n• Tranzaksiyalar\n• Kunlik hisobchi" if lang == "uz" else "📊 *HALOS Финансовый Отчёт*\n\n✅ 3 листа:\n• Сводка\n• Транзакции\n• Дневник расходов",
+            document=InputFile(output, filename=filename),
+            caption=caption_uz if lang == "uz" else caption_ru,
             parse_mode="Markdown"
         )
         
+        # Update the loading message to success
         if lang == "uz":
-            msg = "✅ Excel hisobot yuborildi!\n\n📋 Hisobotda:\n• Daromadlar va xarajatlar\n• HALOS usuli taqsimoti\n• Qarzdan chiqish muddati\n• Oylik tranzaksiyalar\n• Kunlik hisobchi"
+            msg = "✅ *Excel hisobot yuborildi!*\n\n📋 Hisobotda:\n• Daromadlar va xarajatlar\n• HALOS usuli taqsimoti\n• Qarzdan chiqish muddati\n• Oylik tranzaksiyalar\n• Kunlik hisobchi"
         else:
-            msg = "✅ Excel отчёт отправлен!\n\n📋 В отчёте:\n• Доходы и расходы\n• Распределение по методу HALOS\n• Срок выхода из долга\n• Транзакции за месяц\n• Дневник расходов"
+            msg = "✅ *Excel отчёт отправлен!*\n\n📋 В отчёте:\n• Доходы и расходы\n• Распределение по методу HALOS\n• Срок выхода из долга\n• Транзакции за месяц\n• Дневник расходов"
         
         if query:
-            await query.edit_message_text(msg)
+            try:
+                await query.edit_message_text(msg, parse_mode="Markdown")
+            except Exception:
+                pass  # Message may have been superseded
         else:
-            await update.message.reply_text(msg)
+            await update.message.reply_text(msg, parse_mode="Markdown")
             
     except Exception as e:
         logger.error(f"Excel export error: {e}")

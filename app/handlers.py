@@ -7927,49 +7927,6 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 parse_mode="Markdown"
             )
             return
-        debt_info = await parse_debt_transaction(text, lang)
-        
-        if debt_info:
-            # Bu qarz tranzaksiyasi
-            debt_id = await save_personal_debt(db, user["id"], debt_info)
-            
-            # Qarz xulosasini olish
-            debt_summary = await get_debt_summary(db, user["id"])
-            
-            # Xabarni formatlash
-            msg = format_debt_saved_message(debt_info, lang)
-            msg += "\n\n" + format_debt_summary_message(debt_summary, lang)
-            
-            # Get updated voice limit info (Admin uchun ko'rsatmaslik)
-            if not is_admin:
-                new_limit_info = await check_voice_limit(db, user["id"])
-                limit_msg = f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} ovozli xabar qoldi_" if lang == "uz" else f"\n\n🋤 _{new_limit_info['remaining']}/{new_limit_info['limit']} гоЛосовых остаЛосъ_"
-                msg += limit_msg
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                        callback_data="ai_confirm_ok"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Noto'g'ri" if lang == "uz" else "❌ Меверно",
-                        callback_data=f"ai_debt_correct_{debt_id}"
-                    )
-                ],
-                [InlineKeyboardButton(
-                    "📋 Qarzlar ro'yxati" if lang == "uz" else "📋 Список долгов",
-                    callback_data="ai_debt_list"
-                )]
-            ]
-            
-            await processing_msg.edit_text(
-                msg,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-        
         # ==================== QOLGAN HOLAT - SUMMA TOPILMADI ====================
         # Agar yuqoridagi hech biri ishlamagan bo'lsa
         transactions = await parse_multiple_transactions(text, lang)
@@ -8349,31 +8306,65 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         # If no transactions found, this is probably not a transaction message
         if not transactions:
-            # ==================== BEPUL USERLAR UCHUN ODDIY PARSING ====================
-            if not is_pro:
-                # Oddiy regex bilan parse qilish
-                simple_tx = await simple_parse_transaction(text, lang)
-                if simple_tx:
-                    transaction_id = await save_transaction(db, user["id"], simple_tx)
-                    
-                    # Qisqa xabar
-                    emoji = "📉" if simple_tx["type"] == "expense" else "📈"
-                    amount = simple_tx["amount"]
-                    desc = simple_tx.get("description", "")
-                    
-                    # Bugungi balansni hisoblash
-                    from app.ai_assistant import get_transaction_summary
-                    today_summary = await get_transaction_summary(db, user["id"], days=1)
-                    today_balance = today_summary.get("total_income", 0) - today_summary.get("total_expense", 0)
-                    
+            # ==================== ODDIY PARSING (PRO VA BEPUL) ====================
+            # Oddiy regex bilan parse qilish
+            simple_tx = await simple_parse_transaction(text, lang)
+            if simple_tx:
+                transaction_id = await save_transaction(db, user["id"], simple_tx)
+                
+                # Qisqa xabar
+                emoji = "📉" if simple_tx["type"] == "expense" else "📈"
+                amount = simple_tx["amount"]
+                desc = simple_tx.get("description", "")
+                
+                # Bugungi balansni hisoblash
+                from app.ai_assistant import get_transaction_summary
+                today_summary = await get_transaction_summary(db, user["id"], days=1)
+                today_balance = today_summary.get("total_income", 0) - today_summary.get("total_expense", 0)
+                
+                if lang == "uz":
+                    msg = f"{emoji} *{desc}* — {amount:,} so'm\n📉 Bugun: {today_balance:+,}"
+                else:
+                    msg = f"{emoji} *{desc}* — {amount:,} сум\n📉 Сегодня: {today_balance:+,}"
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            "✅ To'g'ri" if lang == "uz" else "✅ Верно",
+                            callback_data="ai_confirm_ok"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
+                            callback_data=f"ai_correct_{transaction_id}"
+                        )
+                    ]
+                ]
+                
+                await update.message.reply_text(
+                    msg, 
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                return
+            else:
+                # Hech qanday summa topilmadi - oddiy xabar
+                if len(text) < 200:
                     if lang == "uz":
-                        msg = f"{emoji} *{desc}* вЂ” {amount:,} so'm\n📉 Bugun: {today_balance:+,}"
+                        msg = (
+                            "💡 *Xabaringiz qabul qilindi!*\n\n"
+                            "Tranzaksiya yozish uchun summa yozing:\n"
+                            '_"choy 5000" yoki "maosh 3 mln"_\n\n'
+                            "📊 Hisobotingizni ko'rish uchun 📊 *Hisobotlar* tugmasini bosing."
+                        )
                     else:
-                        msg = f"{emoji} *{desc}* вЂ” {amount:,} сум\n📉 Сегодня: {today_balance:+,}"
-                    
+                        msg = (
+                            "💡 *Сообщение получено!*\n\n"
+                            "Для записи транзакции напишите сумму:\n"
+                            '_"чай 5000" или "зарплата 3 млн"_\n\n'
+                            "📊 Для просмотра отчёта нажмите 📊 *Отчёты*."
+                        )
                     await update.message.reply_text(msg, parse_mode="Markdown")
-                    return
-            return
+                return
         
         # Get budget status
         budget_status = await get_budget_status(db, user["id"])
