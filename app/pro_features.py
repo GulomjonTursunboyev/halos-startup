@@ -993,10 +993,134 @@ async def show_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     is_pro = await is_user_pro(telegram_id)
     
     if not is_pro:
-        # Show pricing instead
+        # Show value-driven pricing page
         from app.subscription_handlers import show_pricing
         await show_pricing(update, context)
         return
+    
+    # Get user's subscription info
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+    sub_end = user.get("subscription_end", "") if user else ""
+    
+    # Format expiry date
+    expiry_text = ""
+    if sub_end:
+        try:
+            from datetime import datetime as dt
+            expiry_dt = dt.fromisoformat(str(sub_end).replace("Z", "+00:00"))
+            days_left = (expiry_dt.replace(tzinfo=None) - dt.utcnow()).days
+            if lang == "uz":
+                expiry_text = f"\n⏳ _Obuna: {days_left} kun qoldi_\n"
+            else:
+                expiry_text = f"\n⏳ _Подписка: осталось {days_left} дней_\n"
+        except Exception:
+            pass
+    
+    if lang == "uz":
+        msg = (
+            "👑 *HALOS PRO — Siz PRO foydalanuvchisiz!*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{expiry_text}\n"
+            "🎯 *Barcha imkoniyatlaringiz:*\n\n"
+            
+            "🎤 *Ovozli AI Yordamchi*\n"
+            "└ Ovoz bilan gapiring, bot avtomatik saqlaydi\n\n"
+            
+            "🧠 *Smart AI Tahlil*\n"
+            "└ Xarajat tendentsiya va shaxsiy maslahatlar\n\n"
+            
+            "📊 *Chuqur Statistika*\n"
+            "└ Haftalik / oylik / yillik grafiklar\n\n"
+            
+            "📅 *Qarzdan Ozodlik Sana*\n"
+            "└ HALOS metodi bilan aniq sana va reja\n\n"
+            
+            "🔔 *Aqlli Eslatmalar*\n"
+            "└ To'lov, byudjet va haftalik hisobot\n\n"
+            
+            "📥 *Excel Hisobot*\n"
+            "└ 3 varaqdagi moliyaviy hisobotni yuklab oling\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👇 Quyidagi tugmalardan birini tanlang:"
+        )
+    else:
+        msg = (
+            "👑 *HALOS PRO — Вы PRO пользователь!*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{expiry_text}\n"
+            "🎯 *Все ваши возможности:*\n\n"
+            
+            "🎤 *Голосовой AI Помощник*\n"
+            "└ Говорите вслух — бот автоматически записывает\n\n"
+            
+            "🧠 *Smart AI Анализ*\n"
+            "└ Тренды расходов и персональные советы\n\n"
+            
+            "📊 *Глубокая Статистика*\n"
+            "└ Еженедельные / ежемесячные / годовые графики\n\n"
+            
+            "📅 *Дата свободы от долгов*\n"
+            "└ Точная дата и план по методу HALOS\n\n"
+            
+            "🔔 *Умные Напоминания*\n"
+            "└ Оплата, бюджет и еженедельный отчёт\n\n"
+            
+            "📥 *Excel Отчёт*\n"
+            "└ Полный финансовый отчёт на 3 листах\n\n"
+            
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👇 Выберите функцию:"
+        )
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🎤 Ovozli AI" if lang == "uz" else "🎤 Голосовой AI",
+                callback_data="ai_assistant"
+            ),
+            InlineKeyboardButton(
+                "📊 Statistika" if lang == "uz" else "📊 Статистика",
+                callback_data="pro_statistics"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "🔔 Eslatmalar" if lang == "uz" else "🔔 Напоминания",
+                callback_data="pro_reminders"
+            ),
+            InlineKeyboardButton(
+                "📋 Qarz nazorat" if lang == "uz" else "📋 Контроль долга",
+                callback_data="pro_debt_monitor"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
+                callback_data="pro_export_excel"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "📊 Hisobot sozlamalari" if lang == "uz" else "📊 Настройки отчётов",
+                callback_data="report_settings"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                "◀️ Orqaga" if lang == "uz" else "◀️ Назад",
+                callback_data="back_to_main"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if query:
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
+
     
     if lang == "uz":
         msg = (
