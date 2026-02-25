@@ -4209,8 +4209,12 @@ async def save_personal_debt(db, user_id: int, debt_info: Dict, save_as_transact
         # PostgreSQL requires date objects, not strings
         from datetime import datetime as dt
         if isinstance(given_date, str):
+            if "T" in given_date:
+                given_date = given_date.split("T")[0]
             given_date = dt.strptime(given_date, "%Y-%m-%d").date()
         if due_date and isinstance(due_date, str):
+            if "T" in due_date:
+                due_date = due_date.split("T")[0]
             due_date = dt.strptime(due_date, "%Y-%m-%d").date()
         
         async with db._pool.acquire() as conn:

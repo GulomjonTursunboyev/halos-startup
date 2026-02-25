@@ -381,14 +381,35 @@ class UserEngagementSystem:
                     messages = DAILY_NUDGE_UZ if lang == "uz" else DAILY_NUDGE_RU
                     message = random.choice(messages)
                     
+                    # PRO Teaser for free users
+                    from app.subscription_handlers import is_user_pro
+                    is_pro = await is_user_pro(telegram_id)
+                    
+                    if not is_pro:
+                        if lang == "uz":
+                            teasers = [
+                                "\n\n💡 *PRO maslahat:* Ovozli xabar bilan xarajat yozish ancha tezroq! 🎤",
+                                "\n\n📊 *PRO fakt:* PRO foydalanuvchilar o'rtacha 25% ko'proq tejashadi!",
+                                "\n\n📅 *PRO imkoniyat:* Qachon qarzdan qutulishingizni aniq sanasini bilishni xohlaysizmi?",
+                                "\n\n📥 *PRO qulaylik:* Barcha ma'lumotlarni Excelga yuklab olishni bilarmidingiz?"
+                            ]
+                        else:
+                            teasers = [
+                                "\n\n💡 *PRO совет:* Записывать расходы голосом гораздо быстрее! 🎤",
+                                "\n\n📊 *PRO факт:* PRO пользователи экономят в среднем на 25% больше!",
+                                "\n\n📅 *PRO возможность:* Хотите узнать точную дату избавления от долгов?",
+                                "\n\n📥 *PRO удобство:* Знаете ли вы, что можно скачать все данные в Excel?"
+                            ]
+                        message += random.choice(teasers)
+                    
                     keyboard = InlineKeyboardMarkup([
                         [InlineKeyboardButton(
                             "✍️ Xarajat kiritish" if lang == "uz" else "✍️ Записать расход",
                             callback_data="add_expense"
                         )],
                         [InlineKeyboardButton(
-                            "🎤 Ovozli xabar" if lang == "uz" else "🎤 Голосовое сообщение",
-                            callback_data="ai_assistant"
+                            "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
+                            callback_data="show_pricing"
                         )]
                     ])
                     

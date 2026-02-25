@@ -8019,58 +8019,241 @@ async def ai_voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # ==================== BEPUL USERLAR UCHUN ODDIY PARSING ====================
 
+# ==================== MEHRIBON JAVOBLAR TIZIMI ====================
+EMPATHETIC_RESPONSES = {
+    "uz": {
+        "sogliq": ["💊 Tezroq sog'ayib keting! 🙏", "💊 Sog'lig'ingiz uchun duo qilamiz! 🤲", "💊 Sog'lom bo'ling, inshaAlloh!"],
+        "oziq_ovqat": ["🍽 Yoqimli ishtaha! 😊", "🍽 Mazali bo'lsin! 😋", "🍽 Barakali bo'lsin! 🤲"],
+        "transport": ["🚕 Yo'lingiz bexatar bo'lsin! 🙏", "🚕 Oq yo'l! 🛣"],
+        "kommunal": ["🏠 Uy-joy muborak bo'lsin! 🏡", "🏠 Rahmat, o'z vaqtida to'ladingiz! ✅"],
+        "uy_joy": ["🏠 Uy-joy barakali bo'lsin! 🏡"],
+        "kiyim": ["👔 Chiroyli ko'rining! ✨", "👗 Muborak bo'lsin! 🎉"],
+        "texnika": ["📱 Uzoq ishlating! 💪", "💻 Foydali xarid! ✅"],
+        "ta_lim": ["📚 Ilm olish - eng yaxshi sarmoya! 🌟", "📖 Bilim - kuch! 💪"],
+        "sovg_a": ["🎁 Yaxshi ish qildingiz! ❤️", "🎁 Mehr bilan! 💝"],
+        "qarz_berdim": ["💸 Xayrli bo'lsin! Qaytarib olishni unutmang 📝"],
+        "ish_haqi": ["💰 Tabriklaymiz! Maoshingiz muborak! 🎉", "💰 Halol mehnat mevasini yeyapsiz! 💪"],
+        "biznes": ["📈 Biznesingiz rivojlansin! 🚀", "💼 Barakali bo'lsin! 🤲"],
+        "default": ["✅ Yozib oldim!", "📝 Saqlandi!", "✅ Qabul qildim!"]
+    },
+    "ru": {
+        "sogliq": ["💊 Выздоравливайте скорее! 🙏", "💊 Здоровья вам! 🤲"],
+        "oziq_ovqat": ["🍽 Приятного аппетита! 😊", "🍽 Вкусно будет! 😋"],
+        "transport": ["🚕 Удачной дороги! 🙏"],
+        "kommunal": ["🏠 Спасибо за своевременную оплату! ✅"],
+        "kiyim": ["👔 Красиво будете выглядеть! ✨"],
+        "ta_lim": ["📚 Знание - лучшая инвестиция! 🌟"],
+        "ish_haqi": ["💰 Поздравляем с зарплатой! 🎉"],
+        "default": ["✅ Записано!", "📝 Сохранено!"]
+    }
+}
+
+def get_empathetic_response(category_key: str, description: str, lang: str = "uz") -> str:
+    """Kategoriyaga mos mehribon javob qaytarish"""
+    import random
+    
+    responses = EMPATHETIC_RESPONSES.get(lang, EMPATHETIC_RESPONSES["uz"])
+    
+    # Maxsus so'zlar bo'yicha aniqlash (kategoriya key dan olis bo'lsa ham)
+    desc_lower = description.lower() if description else ""
+    
+    # Dori/sog'liq
+    health_words = ['dori', 'dorixona', 'shifokor', 'kasalxona', 'apteka', 'vrach', 
+                    'bolnitsa', 'tabletka', 'ukol', 'davolash', 'klinika', 'stomatolog',
+                    'лекарство', 'аптека', 'больница', 'врач']
+    for word in health_words:
+        if word in desc_lower:
+            return random.choice(responses.get("sogliq", responses["default"]))
+    
+    # Kategoriya bo'yicha
+    if category_key in responses:
+        return random.choice(responses[category_key])
+    
+    return random.choice(responses["default"])
+
+
+async def chatgpt_parse_transaction(text: str, lang: str = "uz") -> dict:
+    """
+    ChatGPT orqali tranzaksiyani tahlil qilish.
+    Mahalliy AI tushunmagan xabarlarni ChatGPT ga yuboradi.
+    Natijani o'rganib qoladi - keyingi safar ChatGPT ga murojaat qilmaydi.
+    """
+    from app.gemini_ai import _call_openai, OPENAI_API_KEY
+    
+    if not OPENAI_API_KEY:
+        return None
+    
+    prompt = f"""Quyidagi matnni tahlil qilib, moliyaviy tranzaksiya sifatida JSON formatida javob ber.
+
+Matn: "{text}"
+
+Qoidalar:
+1. Agar matnda summa bo'lsa (raqam yoki so'z bilan), uni aniqlang
+2. "ga" suffixini olib tashlang: "48100ga" = 48100
+3. Tur: "expense" (xarajat) yoki "income" (daromad)
+4. Kategoriya FAQAT quyidagilardan biri bo'lsin:
+   - oziq_ovqat (ovqat, ichimlik, restoran)
+   - transport (taksi, avtobus, benzin)
+   - kommunal (gaz, suv, elektr, internet)
+   - uy_joy (ijara, remont)
+   - kiyim (kiyim-kechak, poyabzal)
+   - sogliq (dori, shifokor)
+   - ta_lim (kurs, kitob, maktab)
+   - texnika (telefon, kompyuter)
+   - ko_ngilochar (kino, o'yin)
+   - sovg_a (tug'ilgan kun, sovg'a)
+   - ish_haqi (maosh, oylik)
+   - biznes (savdo, foyda)
+   - qarz_berdim (qarz berish)
+   - qarz_oldim (qarz olish)
+   - boshqa (boshqa narsa)
+
+5. Tavsif - qisqa izoh
+
+FAQAT JSON qaytar, boshqa hech narsa yozma:
+{{
+  "type": "expense",
+  "amount": 48100,
+  "category": "oziq_ovqat",
+  "description": "Oziq ovqat"
+}}
+
+Agar matnda summa yo'q bo'lsa yoki bu tranzaksiya emas bo'lsa:
+{{
+  "error": true,
+  "reason": "summa topilmadi"
+}}"""
+    
+    try:
+        response = await _call_openai(
+            prompt, 
+            system_prompt="Sen moliyaviy yordamchisan. Faqat JSON formatida javob ber, boshqa hech narsa yozma.",
+            model="gpt-4o-mini"
+        )
+        
+        if not response:
+            return None
+        
+        import json
+        import re
+        
+        # JSON ni ajratish
+        json_match = re.search(r'\{[^{}]+\}', response, re.DOTALL)
+        if not json_match:
+            return None
+        
+        result = json.loads(json_match.group())
+        
+        if result.get("error"):
+            return None
+        
+        amount = result.get("amount", 0)
+        if amount <= 0:
+            return None
+        
+        tx_type = result.get("type", "expense")
+        category = result.get("category", "boshqa")
+        description = result.get("description", "")
+        
+        # Kategoriya nomini olish
+        from app.ai_assistant import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+        if tx_type == "income":
+            category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+        else:
+            category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category, "📦 Boshqa")
+        
+        return {
+            "type": tx_type,
+            "amount": amount,
+            "description": description.capitalize() if description else "Boshqa",
+            "category": category_name,
+            "category_key": category,
+            "ai_source": "chatgpt",
+            "original_text": text[:100]
+        }
+        
+    except Exception as e:
+        print(f"[ChatGPT parse] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
     """
     Oddiy regex bilan tranzaksiyani parse qilish - bepul userlar uchun
     Format: "choy 5000" yoki "50000 taksi" yoki "maosh 3 mln"
+    YAXSHILANGAN: "48100ga oziq ovqat" kabi formatlarni ham tushunadi
     """
     import re
     
+    text_orig = text
     text = text.lower().strip()
     
-    # Summa patterns
+    # O'zbek tilidagi suffixlarni olib tashlash (48100ga -> 48100, 5000dan -> 5000)
+    # Bu pattern raqamdan keyin kelgan suffixlarni tozalaydi
+    cleaned_text = re.sub(r'(\d)(ga|dan|da|ni|ning|lik|chi|ta|cha)\b', r'\1', text)
+    
+    # Summa patterns - KENGAYTIRILGAN
     amount_patterns = [
-        r'(\d+)\s*mln',           # 5 mln, 5mln
-        r'(\d+)\s*млн',           # 5 млн (rus)
-        r'(\d+)\s*ming',          # 50 ming
-        r'(\d+)\s*тыс',           # 50 тыс (rus)
-        r'(\d+)\s*k\b',           # 50k
-        r'(\d[\d\s]*\d)',         # 50 000, 50000
-        r'(\d+)',                 # oddiy raqam
+        r'(\d+)[.,](\d+)\s*mln',   # 3.5 mln, 3,5mln
+        r'(\d+)\s*mln',             # 5 mln, 5mln
+        r'(\d+)\s*million',         # 5 million
+        r'(\d+)\s*млн',             # 5 млн (rus)
+        r'(\d+)\s*ming',            # 50 ming
+        r'(\d+)\s*тыс',             # 50 тыс (rus)
+        r'(\d+)\s*k\b',             # 50k
+        r'(\d[\d\s]*\d)',           # 50 000, 50000
+        r'(\d+)',                   # oddiy raqam
     ]
     
     amount = 0
     amount_text = ""
     
     for pattern in amount_patterns:
-        match = re.search(pattern, text)
+        match = re.search(pattern, cleaned_text)
         if match:
             amount_text = match.group(0)
-            amount_str = match.group(1).replace(" ", "")
-            amount = int(amount_str)
-            
-            # Multiplier
-            if 'mln' in amount_text or 'млн' in amount_text:
-                amount *= 1_000_000
-            elif 'ming' in amount_text or 'тыс' in amount_text or 'k' in amount_text.lower():
-                amount *= 1_000
+            # Decimal mln: 3.5 mln = 3,500,000
+            if len(match.groups()) >= 2 and ('mln' in amount_text or 'million' in amount_text):
+                whole = int(match.group(1))
+                decimal = int(match.group(2))
+                # 3.5 mln = 3500000
+                decimal_len = len(match.group(2))
+                amount = whole * 1_000_000 + decimal * (10 ** (6 - decimal_len))
+            else:
+                amount_str = match.group(1).replace(" ", "")
+                amount = int(amount_str)
+                
+                # Multiplier
+                if 'mln' in amount_text or 'million' in amount_text or 'млн' in amount_text:
+                    amount *= 1_000_000
+                elif 'ming' in amount_text or 'тыс' in amount_text or 'k' in amount_text.lower():
+                    amount *= 1_000
             break
     
     if amount <= 0:
         return None
     
+    # Minimal summa - 100 so'mdan kam bo'lsa, bu tranzaksiya emas
+    if amount < 100:
+        return None
+    
     # Description - summani olib tashlash
-    description = text.replace(amount_text, "").strip()
-    description = re.sub(r'^\s*[-:]\s*', '', description)  # - yoki : olib tashlash
+    # Original text dan suffixli raqamni ham olib tashlash
+    description = re.sub(r'\d+([.,]\d+)?\s*(ga|dan|da|ni|ning|lik|chi|ta|cha)?\s*(mln|million|млн|ming|тыс|k)?', '', text, count=1).strip()
+    description = re.sub(r'^\s*[-:,]\s*', '', description)  # - yoki : olib tashlash
     description = description.strip()
     
     if not description:
-        description = "Boshqa" if lang == "uz" else "Процее"
+        description = "Boshqa" if lang == "uz" else "Прочее"
     
     # Type aniqlash - kirim so'zlari
     income_words = [
-        'maosh', 'oylik', 'daromad', 'kirim', 'pul keldi', 'oldi', 'ishdan',
-        'зарпЛата', 'доход', 'приход', 'поЛуциЛ', 'заработаЛ'
+        'maosh', 'oylik', 'daromad', 'kirim', 'pul keldi', 'tushdi', 'ishdan',
+        'topdi', 'ishladim', 'ishlab', 'bonus', 'mukofot', 'stipendiya',
+        'nafaqa', 'mablag', 'foyda', 'savdo', 'sotdim',
+        'зарплата', 'доход', 'приход', 'получил', 'заработал'
     ]
     
     tx_type = "expense"  # default
@@ -8079,12 +8262,55 @@ async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
             tx_type = "income"
             break
     
+    # Kategoriya aniqlash - KENGAYTIRILGAN
+    from app.ai_assistant import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+    
+    category_key = "boshqa"
+    
+    # Kategoriya kalit so'zlari
+    CATEGORY_KEYWORDS = {
+        'oziq_ovqat': ['ovqat', 'oziq', 'choy', 'non', 'gosht', "go'sht", 'suv', 'meva',
+                       'sabzavot', 'guruch', 'tuxum', 'sut', 'kolbasa', 'baliq', 'palov',
+                       'osh', 'somsa', 'kabob', 'lavash', 'pizza', 'burger', 'restoran',
+                       'kafe', 'bozor', 'market', 'magazin', 'tushlik', 'nonushta', 'kechki',
+                       'ovqatlandim', 'yedim', 'ichdim', 'sotib', 'oldim', 'mahsulot'],
+        'transport': ['taksi', 'avtobus', 'metro', 'benzin', 'mashina', 'yoqilgi',
+                      'pochta', 'yetkazib', 'dostavka', 'uber', 'yandex'],
+        'kommunal': ['gaz', 'elektr', 'suv', 'internet', 'telefon', 'kommunal',
+                     'kvitansiya', 'hisob'],
+        'uy_joy': ['ijara', 'arenda', 'kvartira', 'uy', 'remont', 'mebel'],
+        'sogliq': ['dori', 'dorixona', 'shifokor', 'kasalxona', 'apteka', 'davolash',
+                   'klinika', 'stomatolog', 'vrach', 'bolnitsa', 'tabletka'],
+        'kiyim': ['kiyim', 'oyoq', 'ko\'ylak', 'shim', 'kurtka', 'tufli', 'krossovka',
+                  'shapka', 'sumka', 'kiyinish'],
+        'ta_lim': ['kurs', 'kitob', 'maktab', 'talim', "ta'lim", 'repetitor', 'darslik',
+                   'universitet', 'institot'],
+        'texnika': ['telefon', 'noutbuk', 'kompyuter', 'televizor'],
+        'ko_ngilochar': ['kino', 'teatr', 'oyin', 'park', 'muzey'],
+        'sovg_a': ['sovga', "sovg'a", 'hadya', 'tugulgan', "tug'ilgan"],
+    }
+    
+    for cat_key, keywords in CATEGORY_KEYWORDS.items():
+        for kw in keywords:
+            if kw in description.lower() or kw in text:
+                category_key = cat_key
+                break
+        if category_key != "boshqa":
+            break
+    
+    # Kategoriya nomini olish
+    if tx_type == "income":
+        category_name = INCOME_CATEGORIES.get(lang, INCOME_CATEGORIES["uz"]).get(category_key, "📦 Boshqa")
+    else:
+        category_name = EXPENSE_CATEGORIES.get(lang, EXPENSE_CATEGORIES["uz"]).get(category_key, "📦 Boshqa")
+    
     return {
         "type": tx_type,
         "amount": amount,
         "description": description.capitalize(),
-        "category": "📆 Boshqa" if lang == "uz" else "📆 Процее",
-        "category_key": "boshqa"
+        "category": category_name,
+        "category_key": category_key,
+        "ai_source": "local"
     }
 
 
@@ -8096,6 +8322,9 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Skip if message is a command or from conversation handler
     if not update.message or not update.message.text:
         return
+    
+    text = update.message.text
+    logger.info(f"[TEXT] Received message from {update.effective_user.id}: {text[:50]}")
     
     # ========== CONVERSATION ICHIDA BO'LSA - AI ISHLAMASIN ==========
     # Onboarding, profil kiritish va boshqa conversation handlerlar uchun
@@ -8304,11 +8533,28 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         transactions = await parse_multiple_transactions(text, lang)
         
-        # If no transactions found, this is probably not a transaction message
+        # If no transactions found, try other methods
         if not transactions:
-            # ==================== ODDIY PARSING (PRO VA BEPUL) ====================
-            # Oddiy regex bilan parse qilish
+            # ==================== 1. ODDIY PARSING (LOCAL AI) ====================
             simple_tx = await simple_parse_transaction(text, lang)
+            
+            # ==================== 2. CHATGPT FALLBACK ====================
+            # Agar mahalliy AI tushunmasa - ChatGPT dan so'rash
+            if not simple_tx:
+                logger.info(f"[TEXT] Local parse failed, trying ChatGPT for: '{text[:50]}'")
+                simple_tx = await chatgpt_parse_transaction(text, lang)
+                
+                if simple_tx:
+                    logger.info(f"[TEXT] ChatGPT parsed: {simple_tx['type']} - {simple_tx['amount']} - {simple_tx.get('category_key')}")
+                    # ChatGPT dan o'rgangan natijani saqlash - keyingi safar ChatGPT siz ishlasin
+                    from app.ai_assistant import confirm_and_learn
+                    await confirm_and_learn(text, {
+                        "type": simple_tx["type"],
+                        "category": simple_tx.get("category_key", "boshqa"),
+                        "amount": simple_tx["amount"],
+                        "description": simple_tx.get("description", "")
+                    })
+            
             if simple_tx:
                 transaction_id = await save_transaction(db, user["id"], simple_tx)
                 
@@ -8316,22 +8562,43 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 emoji = "📉" if simple_tx["type"] == "expense" else "📈"
                 amount = simple_tx["amount"]
                 desc = simple_tx.get("description", "")
+                category_key = simple_tx.get("category_key", "boshqa")
                 
                 # Bugungi balansni hisoblash
                 from app.ai_assistant import get_transaction_summary
                 today_summary = await get_transaction_summary(db, user["id"], days=1)
                 today_balance = today_summary.get("total_income", 0) - today_summary.get("total_expense", 0)
                 
+                # Mehribon javob
+                empathetic_msg = get_empathetic_response(category_key, desc, lang)
+                
                 if lang == "uz":
-                    msg = f"{emoji} *{desc}* — {amount:,} so'm\n📉 Bugun: {today_balance:+,}"
+                    msg = f"{emoji} *{desc}* — {amount:,} so'm\n📊 Bugun: {today_balance:+,}\n\n{empathetic_msg}"
                 else:
-                    msg = f"{emoji} *{desc}* — {amount:,} сум\n📉 Сегодня: {today_balance:+,}"
+                    msg = f"{emoji} *{desc}* — {amount:,} сум\n📊 Сегодня: {today_balance:+,}\n\n{empathetic_msg}"
+                
+                # AI manbasi ko'rsatish
+                ai_source = simple_tx.get("ai_source", "local")
+                if ai_source == "chatgpt":
+                    msg += "\n\n🤖 _ChatGPT tahlili (o'rganib qoldim!)_" if lang == "uz" else "\n\n🤖 _Анализ ChatGPT (запомнил!)_"
+                
+                # O'rganish uchun context saqlash
+                context.user_data["last_transaction"] = {
+                    "original_text": text,
+                    "transaction_id": transaction_id,
+                    "type": simple_tx["type"],
+                    "category": simple_tx.get("category_key", "boshqa"),
+                    "amount": simple_tx["amount"],
+                    "description": desc,
+                    "ai_source": ai_source,
+                    "needs_learning": True
+                }
                 
                 keyboard = [
                     [
                         InlineKeyboardButton(
                             "✅ To'g'ri" if lang == "uz" else "✅ Верно",
-                            callback_data="ai_confirm_ok"
+                            callback_data="ai_confirm_learn"
                         ),
                         InlineKeyboardButton(
                             "❌ Noto'g'ri" if lang == "uz" else "❌ Неверно",
@@ -8347,21 +8614,31 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
                 return
             else:
-                # Hech qanday summa topilmadi - oddiy xabar
-                if len(text) < 200:
+                # ==================== 3. TUSHUNMADIM XABARI ====================
+                # Hech qanday AI ham tushunmadi
+                if len(text) < 300:
                     if lang == "uz":
                         msg = (
-                            "💡 *Xabaringiz qabul qilindi!*\n\n"
-                            "Tranzaksiya yozish uchun summa yozing:\n"
-                            '_"choy 5000" yoki "maosh 3 mln"_\n\n'
-                            "📊 Hisobotingizni ko'rish uchun 📊 *Hisobotlar* tugmasini bosing."
+                            "🤔 *Tushunolmadim...*\n\n"
+                            "Iltimos, xarajat yoki daromadni quyidagicha yozing:\n\n"
+                            "📝 _Misollar:_\n"
+                            '• `48100 oziq ovqat`\n'
+                            '• `taksi 15000`\n'
+                            '• `maosh 3 mln`\n'
+                            '• `dori 25000`\n'
+                            '• `choy non 8000`\n\n'
+                            "💡 Summa va tavsifni yozing, men o'rganaman! 🧠"
                         )
                     else:
                         msg = (
-                            "💡 *Сообщение получено!*\n\n"
-                            "Для записи транзакции напишите сумму:\n"
-                            '_"чай 5000" или "зарплата 3 млн"_\n\n'
-                            "📊 Для просмотра отчёта нажмите 📊 *Отчёты*."
+                            "🤔 *Не понял...*\n\n"
+                            "Пожалуйста, запишите расход или доход так:\n\n"
+                            "📝 _Примеры:_\n"
+                            '• `48100 продукты`\n'
+                            '• `такси 15000`\n'
+                            '• `зарплата 3 млн`\n'
+                            '• `лекарства 25000`\n\n'
+                            "💡 Напишите сумму и описание, я запомню! 🧠"
                         )
                     await update.message.reply_text(msg, parse_mode="Markdown")
                 return
@@ -8392,13 +8669,21 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # Format response with budget info
             msg = format_expense_saved_with_budget(transaction, budget_status, lang)
             
+            # Mehribon javob qo'shish
+            category_key = transaction.get("category_key") or transaction.get("category", "boshqa")
+            desc = transaction.get("description", "")
+            empathetic_msg = get_empathetic_response(category_key, desc, lang)
+            msg += f"\n\n{empathetic_msg}"
+            
             # AI manbasini ko'rsatish
             ai_source = transaction.get("ai_source", "local")
             confidence = transaction.get("confidence", 0)
             if ai_source == "gemini":
-                msg += f"\n\n🤖 _Gemini AI tahlili_" if lang == "uz" else f"\n\n🤖 _АнаЛиз Gemini AI_"
+                msg += f"\n🤖 _Gemini AI tahlili_" if lang == "uz" else f"\n🤖 _Анализ Gemini AI_"
+            elif ai_source == "chatgpt":
+                msg += f"\n🤖 _ChatGPT tahlili (o'rganib qoldim!)_" if lang == "uz" else f"\n🤖 _Анализ ChatGPT (запомнил!)_"
             elif ai_source == "learned":
-                msg += f"\n\n🧠 _O'rganilgan pattern ({confidence}%)_" if lang == "uz" else f"\n\n🧠 _ИзуценныЙ паттерн ({confidence}%)_"
+                msg += f"\n🧠 _O'rganilgan pattern ({confidence}%)_" if lang == "uz" else f"\n🧠 _Изученный паттерн ({confidence}%)_"
             
             # Aniqlashtirish kerakmi tekshirish
             needs_clarification = (
@@ -8438,53 +8723,57 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )])
         else:
             # ==================== KO'P TRANZAKSIYALAR ====================
-            # Faqat eng yaxshi bitta tranzaksiyani ko'rsatish (UX va mpl uchun)
-            best_tx = transactions[0] if transactions else None
-            if best_tx:
-                transaction_ids = await save_multiple_transactions(db, user["id"], [best_tx])
-                context.user_data.pop("last_transaction", None)
-                context.user_data["last_multi_transactions"] = {
-                    "original_text": text,
-                    "transactions": [best_tx],
-                    "transaction_ids": transaction_ids
-                }
-                # Format single transaction as if it was a multi
-                from app.ai_assistant import format_multiple_transactions_message
-                msg, needs_clarification_list = format_multiple_transactions_message([best_tx], budget_status, lang)
-                ids_str = ",".join([str(tid) for tid in transaction_ids])
-                keyboard = []
-                if needs_clarification_list:
-                    keyboard.append([InlineKeyboardButton(
-                        f"🏷 Aniqlashtirish (1 ta)" if lang == "uz" else f"🏷 РЈтоцнитъ (1)",
-                        callback_data=f"ai_clarify_multi_{ids_str}"
-                    )])
-                keyboard.append([
-                    InlineKeyboardButton(
-                        "✅ Hammasi to'g'ri" if lang == "uz" else "✅ ВсС‘ верно",
-                        callback_data="ai_confirm_learn"
-                    ),
-                    InlineKeyboardButton(
-                        "✏️пёЏ Tuzatish" if lang == "uz" else "✏️пёЏ Исправитъ",
-                        callback_data=f"ai_correct_multi_{ids_str}"
-                    )
-                ])
+            # Barcha tranzaksiyalarni saqlash
+            transaction_ids = await save_multiple_transactions(db, user["id"], transactions)
+            
+            # O'RGANISH UCHUN: Ko'p tranzaksiyalarni context ga saqlash (bittani tozalash)
+            context.user_data.pop("last_transaction", None)
+            context.user_data["last_multi_transactions"] = {
+                "original_text": text,
+                "transactions": transactions,
+                "transaction_ids": transaction_ids
+            }
+            
+            # Format multi-transaction message
+            from app.ai_assistant import format_multiple_transactions_message
+            msg, needs_clarification_list = format_multiple_transactions_message(transactions, budget_status, lang)
+            
+            # Keyboard
+            ids_str = ",".join([str(tid) for tid in transaction_ids])
+            keyboard = []
+            
+            # Aniqlashtirish tugmasi - agar kerak bo'lsa
+            if needs_clarification_list:
                 keyboard.append([InlineKeyboardButton(
-                    "📉 Hisobot" if lang == "uz" else "📉 ОтцС‘т",
-                    callback_data="ai_report"
+                    f"🏷 Aniqlashtirish ({len(needs_clarification_list)} ta)" if lang == "uz" else f"🏷 Уточнить ({len(needs_clarification_list)})",
+                    callback_data=f"ai_clarify_multi_{ids_str}"
                 )])
-                await update.message.reply_text(
-                    msg,
-                    parse_mode="Markdown",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
+            
+            keyboard.append([
+                InlineKeyboardButton(
+                    "✅ Hammasi to'g'ri" if lang == "uz" else "✅ Всё верно",
+                    callback_data="ai_confirm_learn"
+                ),
+                InlineKeyboardButton(
+                    "✏️ Tuzatish" if lang == "uz" else "✏️ Исправить",
+                    callback_data=f"ai_correct_multi_{ids_str}"
                 )
-            else:
-                await update.message.reply_text(
-                    "❌ AI tranzaksiya aniqlay olmadi.",
-                    parse_mode="Markdown"
-                )
+            ])
+            keyboard.append([InlineKeyboardButton(
+                "📉 Hisobot" if lang == "uz" else "📉 Отчёт",
+                callback_data="ai_report"
+            )])
+            
+            await update.message.reply_text(
+                msg,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
         
     except Exception as e:
         print(f"AI text handler error: {e}")
+
         import traceback
         traceback.print_exc()
 

@@ -85,7 +85,7 @@ class Database:
                         max_size=10,     # Max 10 concurrent (Supabase free tier limit ~15-20)
                         command_timeout=60,  # Longer timeout for reliability
                         timeout=30,      # Connection acquire timeout
-                        ssl='require',
+                        ssl='prefer',
                         max_inactive_connection_lifetime=60  # Close idle connections faster
                     )
                     await self._create_tables_postgres()
@@ -423,6 +423,36 @@ class Database:
                 )
             """)
             
+            # SAVINGS GOALS (Jamg'arma)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS savings_goals (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    target_amount REAL NOT NULL,
+                    current_amount REAL DEFAULT 0,
+                    currency TEXT DEFAULT 'UZS',
+                    target_date DATE,
+                    icon TEXT,
+                    status TEXT DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # SAVINGS TRANSACTIONS
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS savings_transactions (
+                    id SERIAL PRIMARY KEY,
+                    goal_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    amount REAL NOT NULL,
+                    type TEXT NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # Add marketing columns to users table
             try:
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT")
@@ -660,6 +690,35 @@ class Database:
                 event_data TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (telegram_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+            );
+            
+            -- Savings Goals table
+            CREATE TABLE IF NOT EXISTS savings_goals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                target_amount REAL NOT NULL,
+                current_amount REAL DEFAULT 0,
+                currency TEXT DEFAULT 'UZS',
+                target_date DATE,
+                icon TEXT,
+                status TEXT DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            -- Savings Transactions table
+            CREATE TABLE IF NOT EXISTS savings_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                goal_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                type TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
             
             -- Indexes for performance
@@ -2403,6 +2462,103 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting broadcast stats: {e}")
             return stats
+
+    # ==================== SAVINGS METHODS ====================
+
+    async def create_savings_goal(self, user_id: int, name: str, target_amount: float, icon: str = "💰", currency: str = "UZS") -> int:
+        """Create a new savings goal"""
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                return await conn.fetchval("""
+                    INSERT INTO savings_goals (user_id, name, target_amount, icon, currency)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id
+                """, user_id, name, target_amount, icon, currency)
+        else:
+            cursor = await self._connection.execute("""
+                INSERT INTO savings_goals (user_id, name, target_amount, icon, currency)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, name, target_amount, icon, currency))
+            await self._connection.commit()
+            return cursor.lastrowid
+
+    async def get_user_savings_goals(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all active savings goals for user"""
+        query_pg = "SELECT * FROM savings_goals WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC"
+        query_sq = "SELECT * FROM savings_goals WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC"
+        
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch(query_pg, user_id)
+                return [dict(row) for row in rows]
+        else:
+            async with self._connection.execute(query_sq, (user_id,)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_savings_goal(self, goal_id: int) -> Optional[Dict[str, Any]]:
+        """Get single savings goal"""
+        if self.is_postgres:
+            async with self._pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT * FROM savings_goals WHERE id = $1", goal_id)
+                return dict(row) if row else None
+        else:
+            async with self._connection.execute("SELECT * FROM savings_goals WHERE id = ?", (goal_id,)) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def add_savings_transaction(self, goal_id: int, user_id: int, amount: float, type: str = "deposit", description: str = None) -> bool:
+        """Add money to savings goal"""
+        try:
+            if self.is_postgres:
+                async with self._pool.acquire() as conn:
+                    # Transaction start
+                    async with conn.transaction():
+                        # Add transaction record
+                        await conn.execute("""
+                            INSERT INTO savings_transactions (goal_id, user_id, amount, type, description)
+                            VALUES ($1, $2, $3, $4, $5)
+                        """, goal_id, user_id, amount, type, description)
+                        
+                        # Update goal balance
+                        change = amount if type == 'deposit' else -amount
+                        await conn.execute("""
+                            UPDATE savings_goals 
+                            SET current_amount = current_amount + $1, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = $2
+                        """, change, goal_id)
+            else:
+                # SQLite
+                # Add transaction record
+                await self._connection.execute("""
+                    INSERT INTO savings_transactions (goal_id, user_id, amount, type, description)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (goal_id, user_id, amount, type, description))
+                
+                # Update goal balance
+                change = amount if type == 'deposit' else -amount
+                await self._connection.execute("""
+                    UPDATE savings_goals 
+                    SET current_amount = current_amount + ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (change, goal_id))
+                await self._connection.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error adding savings transaction: {e}")
+            return False
+
+    async def delete_savings_goal(self, goal_id: int, user_id: int) -> bool:
+        """Soft delete savings goal (set status to deleted)"""
+        try:
+            query_pg = "UPDATE savings_goals SET status = 'deleted' WHERE id = $1 AND user_id = $2"
+            query_sq = "UPDATE savings_goals SET status = 'deleted' WHERE id = ? AND user_id = ?"
+            
+            await self.execute_update(query_pg if self.is_postgres else query_sq, goal_id, user_id)
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting savings goal: {e}")
+            return False
 
 
 # Singleton database instance

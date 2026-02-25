@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
 import logging
 
-from api.routers import auth, users, transactions, debts, budgets, analytics, sync
+from api.routers import auth, users, transactions, debts, budgets, analytics, sync, admin
 from api.config import settings
 from api.database import init_db, close_db
 
@@ -58,6 +58,7 @@ app.include_router(debts.router, prefix="/api/v1/debts", tags=["Debts"])
 app.include_router(budgets.router, prefix="/api/v1/budgets", tags=["Budgets"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(sync.router, prefix="/api/v1/sync", tags=["Sync"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 
 
 @app.get("/")

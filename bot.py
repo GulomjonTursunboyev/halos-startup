@@ -182,8 +182,18 @@ from app.pro_features import (
 )
 from app.ai_assistant import (
     send_daily_reports,
-    send_weekly_reports,
     send_monthly_reports,
+)
+from app.savings_handlers import (
+    menu_savings_handler,
+    savings_view_callback,
+    savings_add_start,
+    handle_savings_name,
+    handle_savings_target,
+    savings_action_callback,
+    handle_savings_transaction,
+    active_savings_delete_callback,
+    back_to_savings_callback,
 )
 
 # Configure logging
@@ -358,6 +368,32 @@ def main() -> None:
     application.add_handler(CommandHandler("admin", admin_command))
     application.add_handler(CommandHandler("activate", admin_activate_pro))
     application.add_handler(CommandHandler("payments", admin_payments))
+    application.add_handler(CommandHandler("savings", menu_savings_handler))
+
+    # Savings Conversation Handler
+    savings_conv_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(savings_add_start, pattern="^savings_add_new$"),
+            CallbackQueryHandler(savings_action_callback, pattern="^savings_(dep|wd):"),
+        ],
+        states={
+            States.SAVINGS_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_savings_name)],
+            States.SAVINGS_TARGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_savings_target)],
+            States.SAVINGS_DEPOSIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_savings_transaction)],
+        },
+        fallbacks=[
+            CommandHandler("cancel", back_to_savings_callback),
+            CallbackQueryHandler(back_to_savings_callback, pattern="^back_to_savings$")
+        ],
+        allow_reentry=True,
+        name="savings_conv"
+    )
+    application.add_handler(savings_conv_handler)
+    
+    # Savings Callbacks
+    application.add_handler(CallbackQueryHandler(menu_savings_handler, pattern="^menu_savings$"))
+    application.add_handler(CallbackQueryHandler(savings_view_callback, pattern="^savings_view:"))
+    application.add_handler(CallbackQueryHandler(active_savings_delete_callback, pattern="^savings_del:"))
     
     # Admin user management ConversationHandler
     admin_conv_handler = ConversationHandler(

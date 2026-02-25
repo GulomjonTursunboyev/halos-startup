@@ -19,9 +19,80 @@ from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# Gemini API konfiguratsiyasi
+# AI API konfiguratsiyasi
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# Agar GEMINI_API_KEY "disabled" bo'lsa, uni bo'sh deb hisoblaymiz
+if GEMINI_API_KEY.lower() == "disabled":
+    GEMINI_API_KEY = ""
+
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+
+# ==================== AI API CALLERS ====================
+
+async def _call_openai(prompt: str, system_prompt: str = "You are a financial assistant.", model: str = "gpt-4o-mini") -> Optional[str]:
+    """OpenAI Chat Completions API call"""
+    if not OPENAI_API_KEY:
+        return None
+    
+    try:
+        timeout = aiohttp.ClientTimeout(total=15, connect=5)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            headers = {
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 2048
+            }
+            
+            async with session.post(OPENAI_API_URL, headers=headers, json=data) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    return result["choices"][0]["message"]["content"]
+                else:
+                    error_text = await response.text()
+                    logger.error(f"[OpenAI] API Error {response.status}: {error_text[:200]}")
+                    return None
+    except Exception as e:
+        logger.error(f"[OpenAI] Exception: {e}")
+        return None
+
+async def _call_gemini(prompt: str) -> Optional[str]:
+    """Gemini API call"""
+    if not GEMINI_API_KEY:
+        return None
+    
+    try:
+        timeout = aiohttp.ClientTimeout(total=10, connect=3)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "maxOutputTokens": 2048
+                }
+            }
+            url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+            
+            async with session.post(url, headers=headers, json=data) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    if "candidates" in result and result["candidates"]:
+                        return result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                return None
+    except Exception as e:
+        logger.error(f"[Gemini] Exception: {e}")
+        return None
 
 # ==================== TIL NORMALIZATSIYASI ====================
 # O'zbek tilida qo'llaniladigan chet til so'zlari va ularning tarjimalari
@@ -168,8 +239,8 @@ async def analyze_with_gemini(text: str, lang: str = "uz") -> Optional[Dict]:
             "confidence": 0.95
         }
     """
-    if not GEMINI_API_KEY:
-        logger.warning("[Gemini] API key topilmadi, oddiy algoritm ishlatiladi")
+    if not GEMINI_API_KEY and not OPENAI_API_KEY:
+        logger.warning("[AI] API keys topilmadi, oddiy algoritm ishlatiladi")
         return None
     
     # Kategoriyalar ro'yxati
@@ -194,62 +265,42 @@ Faqat JSON qaytar:
 {{"type":"expense","category":"oziq_ovqat","amount":50000,"description":"non"}}"""
 
     try:
-        timeout = aiohttp.ClientTimeout(total=8, connect=3)  # Fast timeout
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0,
-                    "maxOutputTokens": 150
-                }
-            }
+        text_response = None
+        
+        # 1. Try Gemini first
+        if GEMINI_API_KEY:
+            logger.info("[AI] Gemini'dan so'ralmoqda...")
+            text_response = await _call_gemini(prompt)
+        
+        # 2. If Gemini fails or not available, try OpenAI
+        if not text_response and OPENAI_API_KEY:
+            logger.info("[AI] OpenAI (ChatGPT)'dan so'ralmoqda...")
+            text_response = await _call_openai(prompt, system_prompt="Moliya assistantisan. Faqat JSON qaytar.")
+        
+        if text_response:
+            # JSON ni ajratib olish
+            text_response = text_response.strip()
             
-            url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+            # Markdown code block olib tashlash
+            if "```json" in text_response:
+                text_response = text_response.split("```json")[-1]
+            if "```" in text_response:
+                text_response = text_response.split("```")[0]
+            text_response = text_response.strip()
             
-            async with session.post(url, headers=headers, json=data) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    
-                    # Javobdan textni olish
-                    if "candidates" in result and result["candidates"]:
-                        text_response = result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        
-                        # JSON ni ajratib olish
-                        text_response = text_response.strip()
-                        
-                        # Markdown code block olib tashlash
-                        if "```json" in text_response:
-                            text_response = text_response.split("```json")[-1]
-                        if "```" in text_response:
-                            text_response = text_response.split("```")[0]
-                        text_response = text_response.strip()
-                        
-                        # JSON objectni topish - nested bo'lmagan
-                        import re
-                        json_match = re.search(r'\{[^{}]+\}', text_response, re.DOTALL)
-                        if json_match:
-                            text_response = json_match.group()
-                        
-                        # Newlines olib tashlash
-                        text_response = text_response.replace('\n', ' ').replace('\r', '')
-                        text_response = ' '.join(text_response.split())
-                        
-                        try:
-                            parsed = json.loads(text_response)
-                            logger.info(f"[Gemini] Muvaffaqiyat: {parsed}")
-                            return parsed
-                        except json.JSONDecodeError as e:
-                            logger.error(f"[Gemini] JSON parse xato: {e}, response: {text_response[:200]}")
-                            return None
-                    
-                elif response.status == 429:
-                    logger.warning("[Gemini] Rate limit, oddiy algoritm ishlatiladi")
-                    return None
-                else:
-                    error_text = await response.text()
-                    logger.error(f"[Gemini] API xato {response.status}: {error_text[:200]}")
-                    return None
+            # JSON objectni topish
+            json_match = re.search(r'\{[\s\S]*\}', text_response)
+            if json_match:
+                text_response = json_match.group()
+            
+            try:
+                parsed = json.loads(text_response)
+                logger.info(f"[AI] Muvaffaqiyat: {parsed}")
+                return parsed
+            except json.JSONDecodeError as e:
+                logger.error(f"[AI] JSON parse xato: {e}, response: {text_response[:200]}")
+                return None
+        return None
                     
     except Exception as e:
         logger.error(f"[Gemini] So'rov xatosi: {e}")
@@ -272,8 +323,8 @@ async def analyze_multiple_transactions(text: str, lang: str = "uz", user_contex
         {"type": "expense", "category": "oziq_ovqat", "amount": 100000, "description": "Tovuq", "needs_clarification": true, "clarification_type": "chicken_type"}
     ]
     """
-    if not GEMINI_API_KEY:
-        logger.warning("[Gemini] API key topilmadi")
+    if not GEMINI_API_KEY and not OPENAI_API_KEY:
+        logger.warning("[AI Multi] API keys topilmadi")
         return None
     
     # Matnni normalizatsiya qilish
@@ -356,73 +407,60 @@ MUHIM: Faqat JSON array qaytaring, hech qanday qo'shimcha matn yo'q!"""
     logger.info(f"[Gemini Multi] analyze_multiple_transactions boshlandi: '{text[:100]}...'")
     
     try:
-        timeout = aiohttp.ClientTimeout(total=12, connect=3)  # Optimized timeout
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.1,
-                    "topP": 0.9,
-                    "maxOutputTokens": 2048
-                }
-            }
+        text_response = None
+        
+        # 1. Try Gemini first
+        if GEMINI_API_KEY:
+            logger.info("[AI Multi] Gemini API so'rov yuborilmoqda...")
+            text_response = await _call_gemini(prompt)
+            if text_response:
+                logger.info("[AI Multi] Gemini'dan javob olindi")
+        
+        # 2. If Gemini fails or not available, try OpenAI
+        if not text_response and OPENAI_API_KEY:
+            logger.info("[AI Multi] OpenAI (ChatGPT) so'rov yuborilmoqda...")
+            text_response = await _call_openai(prompt, system_prompt="Moliya assistantisan. Faqat JSON array qaytar.")
+            if text_response:
+                logger.info("[AI Multi] OpenAI'dan javob olindi")
+        
+        if text_response:
+            logger.info(f"[AI Multi] Raw response: {text_response[:500]}")
             
-            url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
-            logger.info(f"[Gemini Multi] API so'rov yuborilmoqda...")
+            # Clean up JSON
+            text_response = text_response.strip()
+            if "```json" in text_response:
+                text_response = text_response.split("```json")[-1]
+            if "```" in text_response:
+                text_response = text_response.split("```")[0]
+            text_response = text_response.strip()
             
-            async with session.post(url, headers=headers, json=data) as response:
-                logger.info(f"[Gemini Multi] API javob: status={response.status}")
-                
-                if response.status == 200:
-                    result = await response.json()
+            # JSON array ni topish
+            json_match = re.search(r'\[[\s\S]*\]', text_response)
+            if json_match:
+                text_response = json_match.group()
+            
+            try:
+                parsed = json.loads(text_response)
+                if isinstance(parsed, list):
+                    # Imlo tuzatish va vaqt qo'shish
+                    for item in parsed:
+                        if "description" in item:
+                            item["description"] = fix_spelling(item["description"])
+                        item["created_at"] = datetime.now().isoformat()
                     
-                    if "candidates" in result and result["candidates"]:
-                        text_response = result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        logger.info(f"[Gemini Multi] Raw response: {text_response[:500]}")
-                        
-                        # Clean up JSON
-                        text_response = text_response.strip()
-                        if "```json" in text_response:
-                            text_response = text_response.split("```json")[-1]
-                        if "```" in text_response:
-                            text_response = text_response.split("```")[0]
-                        text_response = text_response.strip()
-                        
-                        # JSON array ni topish
-                        json_match = re.search(r'\[[\s\S]*\]', text_response)
-                        if json_match:
-                            text_response = json_match.group()
-                        
-                        try:
-                            parsed = json.loads(text_response)
-                            if isinstance(parsed, list):
-                                # Imlo tuzatish va vaqt qo'shish
-                                for item in parsed:
-                                    if "description" in item:
-                                        item["description"] = fix_spelling(item["description"])
-                                    item["created_at"] = datetime.now().isoformat()
-                                
-                                logger.info(f"[Gemini Multi] Muvaffaqiyat! {len(parsed)} ta tranzaksiya topildi")
-                                return parsed
-                            else:
-                                logger.info(f"[Gemini Multi] Bitta dict qaytdi, arrayga o'girildi")
-                                return [parsed]
-                        except json.JSONDecodeError as e:
-                            logger.error(f"[Gemini Multi] JSON parse xato: {e}, response: {text_response[:300]}")
-                            return None
-                    else:
-                        logger.error(f"[Gemini Multi] candidates topilmadi: {result}")
-                        return None
-                            
-                elif response.status == 429:
-                    logger.warning("[Gemini Multi] Rate limit!")
-                    return None
+                    logger.info(f"[AI Multi] Muvaffaqiyat! {len(parsed)} ta tranzaksiya topildi")
+                    return parsed
                 else:
-                    error_text = await response.text()
-                    logger.error(f"[Gemini Multi] API xato {response.status}: {error_text[:300]}")
-                    logger.error(f"[Gemini] API xato {response.status}: {error_text[:200]}")
-                    return None
+                    logger.info(f"[AI Multi] Bitta dict qaytdi, arrayga o'girildi")
+                    item = parsed
+                    if "description" in item:
+                        item["description"] = fix_spelling(item["description"])
+                    item["created_at"] = datetime.now().isoformat()
+                    return [item]
+            except json.JSONDecodeError as e:
+                logger.error(f"[AI Multi] JSON parse xato: {e}, response: {text_response[:300]}")
+                return None
+        return None
                     
     except Exception as e:
         logger.error(f"[Gemini] So'rov xatosi: {e}")
@@ -435,7 +473,7 @@ async def smart_categorize(text: str, transaction_type: str) -> Optional[str]:
     """
     Faqat kategoriyani aniqlash uchun tez so'rov
     """
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY and not OPENAI_API_KEY:
         return None
     
     if transaction_type == "expense":
@@ -456,42 +494,38 @@ Faqat kategoriya nomini qaytaring (masalan: oziq_ovqat yoki transport).
 Boshqa hech narsa yo'q, faqat bitta so'z!"""
 
     try:
-        timeout = aiohttp.ClientTimeout(total=4, connect=2)  # Fast timeout
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0,
-                    "maxOutputTokens": 50
-                }
-            }
+        text_response = None
+        
+        # Try Gemini first
+        if GEMINI_API_KEY:
+            text_response = await _call_gemini(prompt)
+        
+        # Try OpenAI next
+        if not text_response and OPENAI_API_KEY:
+            text_response = await _call_openai(prompt, system_prompt="Faqat bitta so'zli kategoriya nomini qaytar.")
+        
+        if text_response:
+            category = text_response.strip().lower()
             
-            url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+            # Kategoriya nomini tozalash
+            category = category.replace("'", "").replace('"', '').strip()
             
-            async with session.post(url, json=data) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if "candidates" in result and result["candidates"]:
-                        category = result["candidates"][0].get("content", {}).get("parts", [{}])[0].get("text", "").strip().lower()
-                        
-                        # Kategoriya nomini tozalash
-                        category = category.replace("'", "").replace('"', '').strip()
-                        
-                        if category in cats:
-                            logger.info(f"[Gemini] Kategoriya: {category}")
-                            return category
-                        
-                        # Partial match
-                        for cat in cats:
-                            if cat in category:
-                                return cat
-                                
+            if category in cats:
+                logger.info(f"[AI] Kategoriya: {category}")
+                return category
+            
+            # Partial match
+            for cat in cats:
+                if cat in category:
+                    return cat
     except Exception as e:
-        logger.error(f"[Gemini] Kategoriya xatosi: {e}")
+        logger.error(f"[AI] Kategoriya xatosi: {e}")
+    
+    return None
     
     return None
 
 
 def is_gemini_available() -> bool:
-    """Gemini API mavjudligini tekshirish"""
-    return bool(GEMINI_API_KEY)
+    """Gemini yoki OpenAI API mavjudligini tekshirish"""
+    return bool(GEMINI_API_KEY or OPENAI_API_KEY)

@@ -68,3 +68,8 @@ class States:
     # NEW SIMPLIFIED ONBOARDING STATES
     ONBOARDING_CREDIT = 60       # Simple credit question
     ONBOARDING_CREDIT_AMOUNT = 61  # Credit amount input
+    
+    # NEW SAVINGS STATES
+    SAVINGS_NAME = 70
+    SAVINGS_TARGET = 71
+    SAVINGS_DEPOSIT = 72

@@ -12,7 +12,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # API Base URL for mobile app backend
-API_URL = os.getenv("AUTH_API_URL", "https://halos-auth-api-production.up.railway.app/api/auth")
+API_URL = os.getenv("AUTH_API_URL", "http://halos-api:8000/api/auth")
 
 
 async def handle_app_login(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str):
