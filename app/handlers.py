@@ -5940,6 +5940,13 @@ async def text_expense_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
+        # MUHIM: Tranzaksiya muvaffaqiyatli parse qilindi va foydalanuvchiga ko'rsatildi
+        # ai_text_handler (group=5) ga dublikat yaratmaslik uchun flag qo'yamiz
+        context.user_data["last_text_handled"] = update.message.message_id
+        raise ApplicationHandlerStop()
+        
+    except ApplicationHandlerStop:
+        raise  # ApplicationHandlerStop ni qayta raise qilish
     except Exception as e:
         logger.error(f"[SMART_INPUT] Error: {e}")
         try:
@@ -8310,6 +8317,9 @@ async def simple_parse_transaction(text: str, lang: str = "uz") -> dict:
         "description": description.capitalize(),
         "category": category_name,
         "category_key": category_key,
+        "category_name": category_name,
+        "original_text": text_orig[:100],
+        "timestamp": datetime.now(timezone(timedelta(hours=5))).isoformat(),
         "ai_source": "local"
     }
 
@@ -8324,6 +8334,13 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     
     text = update.message.text
+    
+    # MUHIM: Agar bu xabar text_expense_handler (group=4) tomonidan 
+    # allaqachon qayta ishlangan bo'lsa, dublikat yaratmaslik
+    if context.user_data.get("last_text_handled") == update.message.message_id:
+        logger.info(f"[TEXT] Message {update.message.message_id} already handled by text_expense_handler, skipping")
+        return
+    
     logger.info(f"[TEXT] Received message from {update.effective_user.id}: {text[:50]}")
     
     # ========== CONVERSATION ICHIDA BO'LSA - AI ISHLAMASIN ==========
@@ -8521,7 +8538,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     )]
                 ]
                 
-                await update.message.reply_text(
+                await processing_msg.edit_text(
                     msg,
                     parse_mode="Markdown",
                     reply_markup=InlineKeyboardMarkup(keyboard)
@@ -8530,6 +8547,9 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         # ==================== MULTI-TRANSACTION PARSING ====================
         # Bir matnda bir nechta tranzaksiyalarni aniqlash
+        
+        processing_text = "🤖 *AI tahlil qilmoqda...*" if lang == "uz" else "🤖 *AI анализирует...*"
+        processing_msg = await update.message.reply_text(processing_text, parse_mode="Markdown")
         
         transactions = await parse_multiple_transactions(text, lang)
         
@@ -8607,7 +8627,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     ]
                 ]
                 
-                await update.message.reply_text(
+                await processing_msg.edit_text(
                     msg, 
                     parse_mode="Markdown",
                     reply_markup=InlineKeyboardMarkup(keyboard)
@@ -8640,7 +8660,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                             '• `лекарства 25000`\n\n'
                             "💡 Напишите сумму и описание, я запомню! 🧠"
                         )
-                    await update.message.reply_text(msg, parse_mode="Markdown")
+                    await processing_msg.edit_text(msg, parse_mode="Markdown")
                 return
         
         # Get budget status
@@ -8764,7 +8784,7 @@ async def ai_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 callback_data="ai_report"
             )])
             
-            await update.message.reply_text(
+            await processing_msg.edit_text(
                 msg,
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(keyboard)

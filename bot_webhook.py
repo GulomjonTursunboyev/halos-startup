@@ -511,11 +511,7 @@ def setup_handlers(app: Application) -> None:
         group=-1  # Highest priority - runs first
     )
     
-    # Text expense handler (for expense_text_mode)
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, text_expense_handler),
-        group=4  # Lower priority than menu handlers
-    )
+
     
     # Smart credit input handler - MUST be before other text handlers
     app.add_handler(
@@ -541,10 +537,10 @@ def setup_handlers(app: Application) -> None:
         group=4
     )
     
-    # Text message handler for AI assistant
+    # Text message handler for AI assistant (processes like voice)
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, ai_text_handler),
-        group=5
+        group=4
     )
     
     # Add error handler

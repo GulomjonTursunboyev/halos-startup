@@ -526,12 +526,7 @@ def main() -> None:
         group=2
     )
 
-    # Text expense handler (for expense_text_mode)
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, text_expense_handler),
-        group=4  # Lower priority than menu handlers
-    )
-    
+
     # Expense mode callbacks
     application.add_handler(
         CallbackQueryHandler(cancel_expense_mode_callback, pattern="^cancel_expense_mode$")
@@ -860,11 +855,11 @@ def main() -> None:
         group=4
     )
     
-    # Text message handler for AI assistant (lowest priority - group 5)
+    # Text message handler for AI assistant (processes like voice)
     # This catches any text that looks like expense/income and auto-saves it
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, ai_text_handler),
-        group=5
+        group=4
     )
     
     # Add error handler
