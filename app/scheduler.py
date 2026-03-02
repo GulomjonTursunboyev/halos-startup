@@ -57,6 +57,7 @@ class ProCareScheduler:
             asyncio.create_task(self._weekly_progress_job()),
             asyncio.create_task(self._monthly_countdown_job()),
             asyncio.create_task(self._debt_reminder_job()),  # Qarz eslatmalari
+            asyncio.create_task(self._atmos_auto_renew_job()), # Atmos auto renew
             asyncio.create_task(self._subscription_expiry_job()),  # Obuna muddati nazorati
             asyncio.create_task(self._kotib_balance_job()),  # Kotib.ai balans nazorati
             asyncio.create_task(self._marketing_reengagement_job()),  # Marketing re-engagement
@@ -508,6 +509,107 @@ class ProCareScheduler:
             # Check every hour
             await asyncio.sleep(60 * 60)
     
+    async def _atmos_auto_renew_job(self):
+        """
+        Job: Atmos orqali avtomatik to'lov
+        Har 4 soatda tekshiradi.
+        12 soat ichida tugaydigan PRO obunalarni avto to'lov bilan uzaytirishga harakat qiladi.
+        """
+        from app.atmos_payment import pay_with_token
+        from app.atmos_handlers import activate_pro_subscription
+        from app.subscription import get_plan_price
+        
+        while self._running:
+            try:
+                now = now_uz()
+                logger.info("Checking Atmos auto-renewals...")
+                db = await get_database()
+                
+                # Topamiz userlarni kimning avto-to'lovi yoniq va obunasi < 12 soat qolgan yoki yaqinda tugagan
+                cutoff_time = now + timedelta(hours=12)
+                
+                if db.is_postgres:
+                    users_to_renew = await db.fetch_all('''
+                        SELECT u.* FROM users u
+                        WHERE u.subscription_auto_renew = 1
+                        AND u.subscription_tier = 'pro'
+                        AND u.subscription_plan IS NOT NULL
+                        AND u.subscription_expires <= $1
+                        AND u.subscription_expires >= $2
+                    ''', cutoff_time, now - timedelta(days=2))
+                else:
+                    users_to_renew = await db.fetch_all('''
+                        SELECT u.* FROM users u
+                        WHERE u.subscription_auto_renew = 1
+                        AND u.subscription_tier = 'pro'
+                        AND u.subscription_plan IS NOT NULL
+                        AND u.subscription_expires <= ?
+                        AND u.subscription_expires >= ?
+                    ''', cutoff_time.isoformat(), (now - timedelta(days=2)).isoformat())
+                    
+                for user in users_to_renew:
+                    # Get their active card
+                    if db.is_postgres:
+                        cards = await db.fetch_all("SELECT * FROM user_cards WHERE user_id = $1 AND is_active = TRUE", user['id'])
+                    else:
+                        cards = await db.fetch_all("SELECT * FROM user_cards WHERE user_id = ? AND is_active = 1", user['id'])
+                        
+                    if not cards:
+                        # Karta yo'q bo'lsa avto to'lov qilolmaydi, uni auto renewni o'chirib qo'yamiz
+                        if db.is_postgres:
+                            await db.execute_update("UPDATE users SET subscription_auto_renew = 0 WHERE id = $1", user['id'])
+                        else:
+                            await db.execute_update("UPDATE users SET subscription_auto_renew = 0 WHERE id = ?", user['id'])
+                        continue
+                        
+                    card = cards[0]
+                    plan_id = user['subscription_plan']
+                    price = get_plan_price(plan_id)
+                    lang = user.get("language", "uz")
+                    
+                    logger.info(f"Auto-renewing {user['telegram_id']} for {plan_id} ({price} UZS) via Atmos")
+                    
+                    try:
+                        res = await pay_with_token(account_id=str(user['id']), amount=price, token=card['token'])
+                        if res.get("success"):
+                            # Muvaffaqiyatli!
+                            await activate_pro_subscription(
+                                user['telegram_id'], plan_id, db, 
+                                payment_id=res.get("payment_id", f"atmos_auto_renew_{now.timestamp()}"), 
+                                amount=price
+                            )
+                            # Userga xabar!
+                            if lang == "uz":
+                                msg = (
+                                    f"✅ *Avto-to'lov muvaffaqiyatli!*\n\n"
+                                    f"Sizning PRO obunangiz avtomatik tarzda uzaytirildi.\n"
+                                    f"Yechilgan summa: *{price:,}* so'm.\n"
+                                    f"Hislari va kartani 'Avto-to'lov' bo'limida boshqarishingiz mumkin."
+                                )
+                            else:
+                                msg = (
+                                    f"✅ *Авто-оплата успешна!*\n\n"
+                                    f"Ваша PRO подписка автоматически продлена.\n"
+                                    f"Списано: *{price:,}* сум.\n"
+                                    f"Управлять подпиской можно в разделе 'Авто-оплаты'."
+                                )
+                            await self._send_message_safe(user['telegram_id'], msg)
+                        else:
+                            # To'lov o'tmadi!
+                            if lang == "uz":
+                                await self._send_message_safe(user['telegram_id'], f"⚠️ Avto-to'lov xatosi: Karta balansini tekshiring.\nSabab: {res.get('error')}")
+                            else:
+                                await self._send_message_safe(user['telegram_id'], f"⚠️ Ошибка авто-оплаты: Проверьте баланс.\nПричина: {res.get('error')}")
+                    except Exception as e:
+                        logger.error(f"Error during auto renew: {e}")
+                    
+                    await asyncio.sleep(2)
+                    
+            except Exception as e:
+                logger.error(f"Error in atmos auto renew job: {e}")
+                
+            await asyncio.sleep(4 * 60 * 60) # Run every 4 hours
+
     async def _subscription_expiry_job(self):
         """
         Job: PRO obuna muddati nazorati

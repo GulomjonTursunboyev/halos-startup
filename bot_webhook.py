@@ -537,10 +537,12 @@ def setup_handlers(app: Application) -> None:
         group=4
     )
     
-    # Text message handler for AI assistant (processes like voice)
+    # Text message handler for AI assistant - MUST be in separate group!
+    # group=4 already has ai_amount_input_handler with same filter,
+    # and python-telegram-bot only runs FIRST matching handler per group
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, ai_text_handler),
-        group=4
+        group=5
     )
     
     # Add error handler

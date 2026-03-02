@@ -606,6 +606,10 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
                 callback_data="click_buy_pro_yearly"
             )],
             [InlineKeyboardButton(
+                "💳 Avto-to'lovni yoqish (Atmos)",
+                callback_data="payment_method_atmos"
+            )],
+            [InlineKeyboardButton(
                 "🎁 Promo-kod",
                 callback_data="enter_promo"
             )],
@@ -623,6 +627,10 @@ async def show_pricing_new_message(update: Update, context: ContextTypes.DEFAULT
             [InlineKeyboardButton(
                 f"🏆 1 год - {btn_yearly:,} сум",
                 callback_data="click_buy_pro_yearly"
+            )],
+            [InlineKeyboardButton(
+                "💳 Включить автооплату (Atmos)",
+                callback_data="payment_method_atmos"
             )],
             [InlineKeyboardButton(
                 "🎁 Промо-код",

@@ -168,6 +168,10 @@ from app.telegram_payments import (
     successful_payment_handler,
     telegram_pay_callback,
 )
+from app.atmos_handlers import (
+    atmos_method_callback, atmos_buy_callback, atmos_new_card_callback,
+    atmos_confirm_pay_callback, atmos_unbind_card_callback, handle_atmos_input
+)
 from app.pro_features import (
     show_pro_menu,
     pro_statistics_callback,
@@ -255,14 +259,13 @@ async def post_init(application: Application) -> None:
         import traceback
         traceback.print_exc()
     
-    # Start User Engagement System
-    logger.info("Starting User Engagement System...")
+    # Start User Engagement System v2 (restart-safe)
+    logger.info("Starting User Engagement System v2...")
     try:
         engagement_system = UserEngagementSystem(application.bot)
         await engagement_system.start()
-        # Store reference for cleanup
         application.bot_data["engagement_system"] = engagement_system
-        logger.info("User Engagement System started successfully!")
+        logger.info("User Engagement System v2 started successfully!")
     except Exception as e:
         logger.error(f"Failed to start engagement system: {e}")
         import traceback
@@ -436,10 +439,16 @@ def main() -> None:
         CallbackQueryHandler(telegram_pay_callback, pattern="^tg_pay_")
     )
     
-    # Promo code input handler - HIGHEST PRIORITY (must be before admin broadcast)
+    # Promo code input handler - HIGHEST PRIORITY (-1)
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_promo_code_input),
         group=-1  # Highest priority
+    )
+    
+    # Atmos Card / OTP text interceptor handler - EVEN HIGHER PRIORITY (-2)
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_atmos_input),
+        group=-2
     )
     
     # Admin broadcast message handler - supports text, photo, video, document
@@ -643,6 +652,23 @@ def main() -> None:
     # Click Payment handlers
     application.add_handler(
         CallbackQueryHandler(click_buy_callback, pattern="^click_buy_pro_")
+    )
+    
+    # Atmos Payment Handlers
+    application.add_handler(
+        CallbackQueryHandler(atmos_method_callback, pattern="^payment_method_atmos$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(atmos_buy_callback, pattern="^atmos_buy_pro_")
+    )
+    application.add_handler(
+        CallbackQueryHandler(atmos_new_card_callback, pattern="^atmos_new_card$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(atmos_confirm_pay_callback, pattern="^atmos_confirm_pay$")
+    )
+    application.add_handler(
+        CallbackQueryHandler(atmos_unbind_card_callback, pattern="^atmos_unbind_card$")
     )
     
     # NOTE: Payment method selection handlers disabled - using direct Telegram Payment
@@ -855,11 +881,12 @@ def main() -> None:
         group=4
     )
     
-    # Text message handler for AI assistant (processes like voice)
-    # This catches any text that looks like expense/income and auto-saves it
+    # Text message handler for AI assistant - MUST be in separate group!
+    # group=4 already has ai_amount_input_handler with same filter,
+    # and python-telegram-bot only runs FIRST matching handler per group
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, ai_text_handler),
-        group=4
+        group=5
     )
     
     # Add error handler

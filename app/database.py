@@ -453,6 +453,22 @@ class Database:
                 )
             """)
             
+            # USER CARDS (Atmos kabi to'lov tizimlari uchun)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_cards (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    card_number TEXT NOT NULL,
+                    card_mask TEXT NOT NULL,
+                    expiry_date TEXT NOT NULL,
+                    token TEXT NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    is_default BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # Add marketing columns to users table
             try:
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT")
@@ -718,6 +734,21 @@ class Database:
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            
+            -- User Cards table (Atmos payment)
+            CREATE TABLE IF NOT EXISTS user_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                card_number TEXT NOT NULL,
+                card_mask TEXT NOT NULL,
+                expiry_date TEXT NOT NULL,
+                token TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                is_default INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
             

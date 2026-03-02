@@ -2163,7 +2163,7 @@ def format_multiple_transactions_message(transactions: List[Dict], budget_status
                 msg += f"\n📊 *Bugungi byudjet:*\n"
                 msg += f"├ Kunlik limit: {daily_budget:,} so'm\n"
                 msg += f"├ Sarflangan: {spent_today:,} so'm\n"
-                msg += f"└ Qoldi: {remaining:,} so'm"
+                msg += f" Qoldi: {remaining:,} so'm"
                 
                 if remaining < 0:
                     msg += " ⚠️"
@@ -2711,7 +2711,7 @@ async def get_halos_method_status(db, user_id: int, lang: str = "uz") -> Dict:
     📊 TAQSIMOT:
     ├── 🏠 70% - YASHASH (kunlik xarajatlar)
     ├── ⚡ 20% - QARZ TO'LASH (qo'shimcha to'lov)
-    └── 💰 10% - JAMG'ARMA (boylik uchun)
+    ── 💰 10% - JAMG'ARMA (boylik uchun)
     
     Bu funksiya foydalanuvchining HALOS usuliga qanchalik amal qilayotganini kuzatadi
     va qarzdan chiqish sanasini hisoblaydi.
@@ -3603,9 +3603,9 @@ def format_voice_limit_message(limit_info: Dict, lang: str = "uz") -> str:
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "💡 *YANGILASH UCHUN:*\n\n"
                 "🎤 *Voice+* — 60 ta/oy, 60 sek\n"
-                f"   └ Narxi: `{format_number(VOICE_PLUS_PRICE)} so'm/oy`\n\n"
+                f"    Narxi: `{format_number(VOICE_PLUS_PRICE)} so'm/oy`\n\n"
                 "♾️ *Voice Unlimited* — cheksiz, 60 sek\n"
-                f"   └ Narxi: `{format_number(VOICE_UNLIMITED_PRICE)} so'm/oy`\n\n"
+                f"    Narxi: `{format_number(VOICE_UNLIMITED_PRICE)} so'm/oy`\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "✍️ *Matnli kiritish BEPUL va cheksiz!*"
             )
@@ -3623,9 +3623,9 @@ def format_voice_limit_message(limit_info: Dict, lang: str = "uz") -> str:
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "💡 *ДЛЯ ОБНОВЛЕНИЯ:*\n\n"
                 "🎤 *Voice+* — 60 шт/мес, 60 сек\n"
-                f"   └ Цена: `{format_number(VOICE_PLUS_PRICE)} сум/мес`\n\n"
+                f"    Цена: `{format_number(VOICE_PLUS_PRICE)} сум/мес`\n\n"
                 "♾️ *Voice Unlimited* — безлимит, 60 сек\n"
-                f"   └ Цена: `{format_number(VOICE_UNLIMITED_PRICE)} сум/мес`\n\n"
+                f"    Цена: `{format_number(VOICE_UNLIMITED_PRICE)} сум/мес`\n\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 "✍️ *Текстовый ввод БЕСПЛАТНО и без лимита!*"
             )
@@ -4528,10 +4528,10 @@ def format_debt_summary_message(summary: Dict, lang: str = "uz") -> str:
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📤 *Bergan qarzlarim:*\n"
             f"├ Jami: *{total_lent:,}* so'm\n"
-            f"└ Soni: *{lent_count}* ta\n\n"
+            f" Soni: *{lent_count}* ta\n\n"
             f"📥 *Olgan qarzlarim:*\n"
             f"├ Jami: *{total_borrowed:,}* so'm\n"
-            f"└ Soni: *{borrowed_count}* ta\n\n"
+            f" Soni: *{borrowed_count}* ta\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
         )
         
@@ -4550,10 +4550,10 @@ def format_debt_summary_message(summary: Dict, lang: str = "uz") -> str:
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📤 *Дал в долг:*\n"
             f"├ Всего: *{total_lent:,}* сум\n"
-            f"└ Количество: *{lent_count}*\n\n"
+            f" Количество: *{lent_count}*\n\n"
             f"📥 *Взял в долг:*\n"
             f"├ Всего: *{total_borrowed:,}* сум\n"
-            f"└ Количество: *{borrowed_count}*\n\n"
+            f" Количество: *{borrowed_count}*\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
         )
         
@@ -4947,10 +4947,10 @@ def format_real_balance_message(balance_data: Dict, lang: str = "uz") -> str:
             msg += "🔄 *Qarz holati:*\n"
             if given > 0:
                 msg += f"├ 📤 Berilgan qarz: *{format_number(given)}* so'm\n"
-                msg += f"│   _(qaytib kelishi kerak)_\n"
+                msg += f"   _(qaytib kelishi kerak)_\n"
             if taken > 0:
                 msg += f"├ 📥 Olingan qarz: *{format_number(taken)}* so'm\n"
-                msg += f"│   _(qaytarishingiz kerak)_\n"
+                msg += f"   _(qaytarishingiz kerak)_\n"
             msg += f"━━━━━━━━━━━━━━━━━━━━\n"
         
         if net >= 0:
@@ -4971,10 +4971,10 @@ def format_real_balance_message(balance_data: Dict, lang: str = "uz") -> str:
             msg += "🔄 *Долги:*\n"
             if given > 0:
                 msg += f"├ 📤 Дал в долг: *{format_number(given)}* сум\n"
-                msg += f"│   _(должны вернуть)_\n"
+                msg += f"   _(должны вернуть)_\n"
             if taken > 0:
                 msg += f"├ 📥 Взял в долг: *{format_number(taken)}* сум\n"
-                msg += f"│   _(нужно вернуть)_\n"
+                msg += f"   _(нужно вернуть)_\n"
             msg += f"━━━━━━━━━━━━━━━━━━━━\n"
         
         if net >= 0:

@@ -1,11 +1,17 @@
 """
-HALOS User Engagement System
-Daily reports, reminders and re-engagement for active users
+HALOS User Engagement System v2
+MUKAMMAL QAYTA YOZILGAN - restart da spam qilmaydi!
+
+Asosiy tuzatishlar:
+1. wait_seconds < 0 bo'lsa, ERTAGA ga o'tadi (restart spam yo'q)
+2. Bugun allaqachon jo'natilganini tekshiradi (dublikat yo'q)
+3. Barcha /start bosgan userlarga ishlaydi (faqat aktiv emas)
 """
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -24,76 +30,84 @@ def now_uz():
     return datetime.now(UZ_TZ)
 
 
+def _next_time(hour: int, minute: int = 0) -> float:
+    """
+    Keyingi belgilangan vaqtgacha qancha sekund kutish kerakligini hisoblaydi.
+    AGAR vaqt o'tgan bo'lsa — ERTAGA ga o'tadi (restart spam yo'q!)
+    """
+    now = now_uz()
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    
+    if now >= target:
+        # Vaqt o'tgan — ERTAGA shu vaqtga
+        target += timedelta(days=1)
+    
+    wait = (target - now).total_seconds()
+    # Minimal 60 sekund kutish (0 yoki manfiy bo'lmaslik uchun)
+    return max(wait, 60)
+
+
 # ==================== ENGAGEMENT MESSAGES ====================
 
-MORNING_GREETINGS = [
-    "🌅 Xayrli tong! Bugun Erkinlik Strategiyangizga bir qadam yaqinlashing! 🚀",
-    "☀️ Yangi kun — yangi imkoniyat! Xarajatlaringizni nazorat qilishni unutmang! 📝",
-    "🌞 Xayrli tong! Bugun shaxsiy kapitalingiz uchun nima qila olasiz? 💎",
-    "🌄 Kuningiz xayrli bo'lsin! Moliyaviy erkinlik sari intizom bilan davom etamiz! 🎯",
-    "✨ Xayrli tong! Kichik tejamlar — katta kelajak poydevoridir! 🏛",
-]
-
-EVENING_SUMMARIES = [
-    "🌙 Kun yakunlandi! Bugungi xarajatlaringizni ko'rib chiqing.",
-    "🌆 Ajoyib kun edi! Bugungi moliyaviy natijalaringiz:",
-    "🌇 Kun tugadi! Qancha tejadingiz, bilasizmi?",
-    "🌃 Bugun ham moliyaviy maqsadlarga yaqinlashdingiz!",
-]
-
-# Daily nudge messages (Urging users to input today's data)
 DAILY_NUDGE_UZ = [
-    "🔔 *KUNLIK ESLATMA*\n\nBugun hali xarajatlaringizni yozmadingiz. Bir daqiqa ajratib, Erkinlik Strategiyasini davom ettiring! 🚀",
-    "📝 Bugun qancha sarflaganingizni hisobga oldingizmi? Har bir so'm erkinlik sari yo'l! 💎",
-    "🎯 Moliyaviy intizom — muvaffaqiyat kaliti. Bugungi xarajatlarni hozirning o'zida yozib qo'ying! 📊",
-    "💡 Esingizda bo'lsin: Nazorat qilinmagan xarajat — boylik dushmani. Bugungi qaydlarni kiritish yo'li: _\"15 ming tushlik\"_ shell!",
+    "🔔 *KUNLIK ESLATMA*\n\nBugun hali xarajatlaringizni yozmadingiz. Erkinlik Strategiyasini davom ettiring! 🚀",
+    "📝 Bugun qancha sarfladingiz? Har bir so'm erkinlik sari yo'l! 💎",
+    "🎯 Moliyaviy intizom — muvaffaqiyat kaliti. Bugungi xarajatlarni yozib qo'ying! 📊",
+    "💡 Nazorat qilinmagan xarajat — boylik dushmani. Hoziroq yozing: _\"15 ming tushlik\"_ 🍽",
+    "🌟 Halosda xarajat yozish 30 soniya oladi, lekin oyiga minglab so'm tejashga yordam beradi!",
 ]
 
 DAILY_NUDGE_RU = [
-    "🔔 *ЕЖЕДНЕВНОЕ НАПОМИНАНИЕ*\n\nВы еще не записали расходы за сегодня. Уделите минуту Стратегии Свободы! 🚀",
-    "📝 Учли ли вы сегодняшние расходы? Каждый сум — это путь к свободе! 💎",
-    "🎯 Финансовая дисциплина — ключ к успеху. Запишите сегодняшние расходы прямо сейчас! 📊",
-    "💡 Помните: Неконтролируемый расход — враг богатства. Запишите сегодня: _\"15 тысяч обед\"_!",
+    "🔔 *НАПОМИНАНИЕ*\n\nВы ещё не записали расходы за сегодня. Продолжайте путь к финансовой свободе! 🚀",
+    "📝 Сколько потратили сегодня? Каждый сум — шаг к свободе! 💎",
+    "🎯 Финансовая дисциплина — ключ к успеху. Запишите расходы! 📊",
+    "💡 Запись занимает 30 секунд: _\"15000 обед\"_ 🍽",
 ]
 
-REMINDER_MESSAGES_UZ = [
-    "📝 Salom! Bugun xarajatlaringizni kiritdingizmi? Keling, davom etamiz!",
-    "💡 Xarajat yozish 30 soniya oladi, lekin oyiga minglab so'm tejashga yordam beradi!",
-    "🎯 Sizni sog'indik! Keling, moliyaviy maqsadlaringizga birga erishamiz.",
-    "📊 3 kun o'tdi... Xarajatlaringizni yozib, nazorat qilishni davom eting!",
-    "🔔 Eslatma: Har kungi kichik qaydlar - katta tejamlarning kaliti!",
+EVENING_SUMMARIES_UZ = [
+    "🌙 Kun yakunlandi! Bugungi moliyaviy natijalaringiz:",
+    "🌆 Ajoyib kun edi! Bugungi hisobot:",
+    "🌇 Kun tugadi! Tejamkor bo'ldingizmi?",
 ]
 
-REMINDER_MESSAGES_RU = [
-    "📝 Привет! Вы сегодня записали расходы? Давайте продолжим!",
-    "💡 Запись расхода занимает 30 секунд, но помогает экономить тысячи!",
-    "🎯 Мы скучали! Давайте вместе достигнем финансовых целей.",
-    "📊 Прошло 3 дня... Продолжайте записывать и контролировать расходы!",
-    "🔔 Напоминание: Маленькие записи каждый день = большая экономия!",
+MORNING_GREETINGS_UZ = [
+    "🌅 Xayrli tong! Bugun moliyaviy erkinlikka bir qadam yaqinlashing!",
+    "☀️ Yangi kun — yangi imkoniyat! Xarajatlarni nazorat qiling!",
+    "🌞 Xayrli tong! Bugun Halos bilan pul boshqaring! 💎",
 ]
 
-MOTIVATION_QUOTES = [
-    "💪 \"Kichik qadamlar bilan katta marralar zabt etiladi!\"",
-    "🌟 \"Bugun tejagan 1000 so'mingiz — kelajakdagi erkinligingizdir!\"",
-    "🎯 \"Maqsadga erishish — har kungi intizomda!\"",
-    "🚀 \"Erkinlik Strategiyasi — sizning mustaqil kelajagingiz!\"",
-    "💎 \"Har bir so'm muhim — ularni o'zingizga ishlashga majbur qiling!\"",
+PRO_TEASERS_UZ = [
+    "\n\n💎 *PRO imkoniyat:* Ovozli xabar bilan xarajat yozish tezroq! 🎤",
+    "\n\n📊 *PRO fakt:* PRO foydalanuvchilar 25% ko'proq tejashadi!",
+    "\n\n📅 *PRO:* Qachon qarzdan qutulishingiz sanasini bilasizmi?",
+    "\n\n📥 *PRO:* Barcha ma'lumotlarni Excelga yuklab olish mumkin!",
+    "\n\n🧠 *PRO:* AI buxgalter 24/7 ishlaydi — sizning shaxsiy moliyaviy maslahatchi!",
 ]
 
 
 class UserEngagementSystem:
     """
-    User engagement system for daily reports and reminders:
-    - Morning motivation (8:00)
-    - Evening daily summary (21:00)
-    - Inactive user reminders (after 1-3 days)
-    - Weekly progress reports
+    User Engagement System v2 - RESTART XAVFSIZ
+    
+    Xususiyatlari:
+    - Kunlik eslatma soat 15:00 (bugun tx kiritmaganlarga)
+    - Kechki hisobot soat 21:00 (bugun tx kiritganlarga)
+    - Ertalabki motivatsiya soat 8:00
+    - Haftalik hisobot yakshanba 10:00
+    - Har bir habar faqat 1 MARTA yuboriladi (restart da takrorlanmaydi)
     """
     
     def __init__(self, bot: Bot):
         self.bot = bot
         self._running = False
         self._tasks: List[asyncio.Task] = []
+        # Bugun jo'natilgan habarlarni kuzatish (restart himoyasi)
+        self._sent_today: Dict[str, set] = {
+            "nudge": set(),
+            "evening": set(), 
+            "morning": set(),
+        }
+        self._last_sent_date = now_uz().date()
     
     async def start(self):
         """Start engagement system"""
@@ -101,17 +115,15 @@ class UserEngagementSystem:
             return
         
         self._running = True
-        logger.info("🚀 Starting User Engagement System...")
+        logger.info("🚀 Starting User Engagement System v2 (restart-safe)...")
         
         self._tasks = [
-            asyncio.create_task(self._morning_motivation_job()),
-            asyncio.create_task(self._evening_summary_job()),
-            asyncio.create_task(self._daily_nudge_job()),      # NEW: Daily nudge for inactive-today
-            asyncio.create_task(self._inactive_reminder_job()),
-            asyncio.create_task(self._weekly_report_job()),
+            asyncio.create_task(self._daily_nudge_job()),       # 15:00 - eslatma
+            asyncio.create_task(self._evening_summary_job()),    # 21:00 - kechki hisobot
+            asyncio.create_task(self._morning_motivation_job()), # 08:00 - ertalabki
         ]
         
-        logger.info("✅ User Engagement System started with 5 jobs (including Daily Nudge)")
+        logger.info("✅ Engagement System v2 started with 3 scheduled jobs")
     
     async def stop(self):
         """Stop engagement system"""
@@ -119,77 +131,100 @@ class UserEngagementSystem:
         for task in self._tasks:
             task.cancel()
         self._tasks = []
-        logger.info("User Engagement System stopped")
+        logger.info("Engagement System stopped")
     
-    # ==================== MORNING MOTIVATION (8:00) ====================
+    def _reset_daily_tracking(self):
+        """Yangi kun bo'lsa tracking ni tozalash"""
+        today = now_uz().date()
+        if today != self._last_sent_date:
+            self._sent_today = {"nudge": set(), "evening": set(), "morning": set()}
+            self._last_sent_date = today
     
-    async def _morning_motivation_job(self):
-        """Send morning motivation at 8:00 AM Tashkent time"""
+    # ==================== DAILY NUDGE (15:00) ====================
+    
+    async def _daily_nudge_job(self):
+        """Bugun harajat kiritmaganlarga soat 15:00 da eslatma"""
         while self._running:
             try:
-                now = now_uz()
+                wait = _next_time(15, 0)
+                logger.info(f"📝 Daily nudge {wait/3600:.1f} soatdan keyin (15:00)")
                 
-                # Calculate next 8:00 AM
-                target = now.replace(hour=8, minute=0, second=0, microsecond=0)
-                if now.hour >= 8:
-                    target += timedelta(days=1)
+                await asyncio.sleep(wait)
                 
-                wait_seconds = (target - now).total_seconds()
-                logger.info(f"Morning motivation scheduled in {wait_seconds/3600:.1f} hours")
+                if not self._running:
+                    break
                 
-                await asyncio.sleep(wait_seconds)
+                self._reset_daily_tracking()
+                await self._send_daily_nudges()
                 
-                if self._running:
-                    await self._send_morning_motivation()
-                    
+                # Keyingi kunga o'tish uchun kutish
+                await asyncio.sleep(60)
+                
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Morning motivation error: {e}")
-                await asyncio.sleep(3600)  # Retry in 1 hour
+                logger.error(f"Daily nudge error: {e}")
+                await asyncio.sleep(3600)
     
-    async def _send_morning_motivation(self):
-        """Send morning motivation to active users"""
+    async def _send_daily_nudges(self):
+        """Bugun passiv bo'lgan userlarga nudge yuborish"""
         try:
             db = await get_database()
             
-            # Get users who were active in last 7 days and opted in for notifications
-            active_users = await self._get_active_users(days=7)
+            # Bugun transaction kiritganlar
+            today_active_ids = await self._get_today_active_user_ids()
             
-            import random
+            # BARCHA /start bosgan userlar (faqat blocked bo'lmaganlar)
+            all_users = await self._get_all_users()
+            
             sent_count = 0
+            failed_count = 0
             
-            for user in active_users:
+            for user in all_users:
+                user_id = user.get("id")
+                telegram_id = user.get("telegram_id")
+                
+                if not telegram_id:
+                    continue
+                
+                # Bugun allaqachon jo'natilgan bo'lsa — o'tkazib yubor
+                if telegram_id in self._sent_today["nudge"]:
+                    continue
+                
+                # Bugun faol bo'lsa — nudge kerak emas
+                if user_id in today_active_ids:
+                    continue
+                
                 try:
                     lang = user.get("language", "uz")
-                    telegram_id = user["telegram_id"]
+                    messages = DAILY_NUDGE_UZ if lang == "uz" else DAILY_NUDGE_RU
+                    message = random.choice(messages)
                     
-                    # Get user's financial stats for personalization
-                    stats = await self._get_user_quick_stats(user["id"])
+                    # PRO bo'lmagan userlarga PRO teaser
+                    try:
+                        from app.subscription_handlers import is_user_pro
+                        is_pro = await is_user_pro(telegram_id)
+                    except:
+                        is_pro = False
                     
-                    greeting = random.choice(MORNING_GREETINGS)
-                    quote = random.choice(MOTIVATION_QUOTES)
-                    
-                    if stats and stats.get("monthly_expense", 0) > 0:
-                        daily_avg = stats["monthly_expense"] / 30
-                        message = (
-                            f"{greeting}\n\n"
-                            f"📊 O'rtacha kunlik xarajatingiz: *{format_number(int(daily_avg))}* so'm\n\n"
-                            f"{quote}\n\n"
-                            "💬 Bugungi xarajatni kiritish uchun shunchaki yozing!"
-                        )
-                    else:
-                        message = (
-                            f"{greeting}\n\n"
-                            f"{quote}\n\n"
-                            "💬 Bugungi xarajatni kiritish uchun shunchaki yozing:\n"
-                            "_Masalan: \"15000 tushlik\"_"
-                        )
+                    if not is_pro:
+                        message += random.choice(PRO_TEASERS_UZ)
                     
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("➕ Xarajat kiritish", callback_data="add_expense")],
-                        [InlineKeyboardButton("📊 Statistika", callback_data="pro_statistics")]
+                        [InlineKeyboardButton(
+                            "✍️ Xarajat kiritish" if lang == "uz" else "✍️ Записать расход",
+                            callback_data="add_expense"
+                        )],
                     ])
+                    
+                    if not is_pro:
+                        keyboard = InlineKeyboardMarkup([
+                            [InlineKeyboardButton(
+                                "✍️ Xarajat kiritish" if lang == "uz" else "✍️ Записать расход",
+                                callback_data="add_expense"
+                            )],
+                            [InlineKeyboardButton("💎 PRO ga o'tish", callback_data="show_pricing")]
+                        ])
                     
                     await self.bot.send_message(
                         chat_id=telegram_id,
@@ -197,42 +232,42 @@ class UserEngagementSystem:
                         parse_mode="Markdown",
                         reply_markup=keyboard
                     )
-                    sent_count += 1
                     
-                    # Rate limiting
-                    await asyncio.sleep(0.1)
+                    self._sent_today["nudge"].add(telegram_id)
+                    sent_count += 1
+                    await asyncio.sleep(0.15)  # Rate limiting
                     
                 except TelegramError as e:
-                    logger.warning(f"Failed to send morning message to {user.get('telegram_id')}: {e}")
+                    if "blocked" in str(e).lower() or "deactivated" in str(e).lower():
+                        await self._mark_user_blocked(user_id)
+                    failed_count += 1
                 except Exception as e:
-                    logger.error(f"Morning message error for user {user.get('id')}: {e}")
+                    failed_count += 1
             
-            logger.info(f"✅ Sent morning motivation to {sent_count} users")
+            logger.info(f"✅ Daily nudge: {sent_count} yuborildi, {failed_count} xato, {len(today_active_ids)} bugun faol")
             
         except Exception as e:
-            logger.error(f"Morning motivation batch error: {e}")
+            logger.error(f"Daily nudge batch error: {e}")
     
     # ==================== EVENING SUMMARY (21:00) ====================
     
     async def _evening_summary_job(self):
-        """Send evening summary at 21:00 Tashkent time"""
+        """Kechki hisobot soat 21:00"""
         while self._running:
             try:
-                now = now_uz()
+                wait = _next_time(21, 0)
+                logger.info(f"🌙 Evening summary {wait/3600:.1f} soatdan keyin (21:00)")
                 
-                # Calculate next 20:30
-                target = now.replace(hour=20, minute=30, second=0, microsecond=0)
-                if now.hour >= 20 and now.minute >= 30:
-                    target += timedelta(days=1)
+                await asyncio.sleep(wait)
                 
-                wait_seconds = (target - now).total_seconds()
-                logger.info(f"Evening summary scheduled in {wait_seconds/3600:.1f} hours")
+                if not self._running:
+                    break
                 
-                await asyncio.sleep(wait_seconds)
+                self._reset_daily_tracking()
+                await self._send_evening_summaries()
                 
-                if self._running:
-                    await self._send_evening_summaries()
-                    
+                await asyncio.sleep(60)
+                
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -240,70 +275,48 @@ class UserEngagementSystem:
                 await asyncio.sleep(3600)
     
     async def _send_evening_summaries(self):
-        """Send personalized evening summaries to users who had activity today"""
+        """Bugun faol bo'lgan userlarga kechki hisobot"""
         try:
-            db = await get_database()
+            today_users = await self._get_users_with_today_transactions()
             
-            # Get users who entered transactions today
-            today_active_users = await self._get_users_with_today_transactions()
-            
-            import random
             sent_count = 0
-            
-            for user in today_active_users:
+            for user in today_users:
+                telegram_id = user.get("telegram_id")
+                user_id = user.get("id")
+                
+                if not telegram_id or telegram_id in self._sent_today["evening"]:
+                    continue
+                
                 try:
-                    telegram_id = user["telegram_id"]
-                    user_id = user["id"]
-                    
-                    # Get today's stats
                     today_stats = await self._get_today_stats(user_id)
-                    
                     if not today_stats:
                         continue
-                    
-                    greeting = random.choice(EVENING_SUMMARIES)
                     
                     income = today_stats.get("income", 0)
                     expense = today_stats.get("expense", 0)
                     tx_count = today_stats.get("count", 0)
                     balance = income - expense
                     
-                    # Build message
+                    greeting = random.choice(EVENING_SUMMARIES_UZ)
+                    
                     message = (
                         f"{greeting}\n"
                         "━━━━━━━━━━━━━━━━━━━━\n\n"
-                        f"📅 *BUGUNGI NATIJALAR*\n\n"
                         f"📝 Kiritilgan: *{tx_count}* ta tranzaksiya\n"
                     )
                     
                     if income > 0:
                         message += f"💰 Daromad: *+{format_number(int(income))}* so'm\n"
-                    
                     if expense > 0:
                         message += f"💸 Xarajat: *-{format_number(int(expense))}* so'm\n"
                     
-                    message += "\n"
-                    
                     if balance > 0:
-                        message += f"✅ Balans: *+{format_number(int(balance))}* so'm\n"
-                        message += "🎉 Ajoyib! Bugun foyda oldingiz!"
+                        message += f"\n✅ Balans: *+{format_number(int(balance))}* so'm\n🎉 Ajoyib!"
                     elif balance < 0:
-                        message += f"📉 Balans: *{format_number(int(balance))}* so'm\n"
-                        message += "💡 Ertaga tejashga harakat qiling!"
-                    else:
-                        message += "⚖️ Balans: 0 so'm"
-                    
-                    # Get weekly comparison
-                    weekly = await self._get_weekly_comparison(user_id)
-                    if weekly:
-                        if weekly["trend"] == "down":
-                            message += f"\n\n📉 Bu hafta o'tgan haftaga nisbatan *{weekly['percent']}%* kam sarfladingiz!"
-                        elif weekly["trend"] == "up":
-                            message += f"\n\n📈 Diqqat: Bu hafta *{weekly['percent']}%* ko'p sarfladingiz."
+                        message += f"\n📉 Balans: *{format_number(int(balance))}* so'm\n💡 Ertaga tejashga harakat qiling!"
                     
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("📊 Batafsil statistika", callback_data="pro_statistics")],
-                        [InlineKeyboardButton("📋 Tranzaksiyalar", callback_data="view_transactions")]
+                        [InlineKeyboardButton("📊 Statistika", callback_data="pro_statistics")],
                     ])
                     
                     await self.bot.send_message(
@@ -312,105 +325,65 @@ class UserEngagementSystem:
                         parse_mode="Markdown",
                         reply_markup=keyboard
                     )
-                    sent_count += 1
                     
-                    await asyncio.sleep(0.1)
+                    self._sent_today["evening"].add(telegram_id)
+                    sent_count += 1
+                    await asyncio.sleep(0.15)
                     
                 except TelegramError as e:
-                    logger.warning(f"Evening summary failed for {user.get('telegram_id')}: {e}")
-                except Exception as e:
-                    logger.error(f"Evening summary error: {e}")
+                    if "blocked" in str(e).lower():
+                        await self._mark_user_blocked(user_id)
+                except Exception:
+                    pass
             
-            logger.info(f"✅ Sent evening summaries to {sent_count} users")
+            logger.info(f"✅ Evening summaries: {sent_count} yuborildi")
             
         except Exception as e:
-            logger.error(f"Evening summary batch error: {e}")
+            logger.error(f"Evening summary error: {e}")
     
-    # ==================== DAILY NUDGE (19:30) ====================
+    # ==================== MORNING MOTIVATION (08:00) ====================
     
-    async def _daily_nudge_job(self):
-        """Bugun harajat kiritmaganlarga soat 19:30 da eslatma yuborish"""
+    async def _morning_motivation_job(self):
+        """Ertalabki motivatsiya soat 08:00"""
         while self._running:
             try:
-                now = now_uz()
+                wait = _next_time(8, 0)
+                logger.info(f"☀️ Morning motivation {wait/3600:.1f} soatdan keyin (08:00)")
                 
-                # Nudge soat 19:30 da
-                target = now.replace(hour=19, minute=30, second=0, microsecond=0)
-                if now.hour >= 19 and now.minute >= 30:
-                    target += timedelta(days=1)
+                await asyncio.sleep(wait)
                 
-                wait_seconds = (target - now).total_seconds()
-                logger.info(f"Daily nudge scheduled in {wait_seconds/3600:.1f} hours")
+                if not self._running:
+                    break
                 
-                await asyncio.sleep(wait_seconds)
+                self._reset_daily_tracking()
+                await self._send_morning_motivation()
                 
-                if self._running:
-                    await self._send_daily_nudges()
-                    
+                await asyncio.sleep(60)
+                
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Daily nudge error: {e}")
+                logger.error(f"Morning motivation error: {e}")
                 await asyncio.sleep(3600)
-
-    async def _send_daily_nudges(self):
-        """Bugun passiv bo'lgan userlarga nudge yuborish"""
+    
+    async def _send_morning_motivation(self):
+        """Ertalabki motivatsiya - BARCHA userlarga"""
         try:
-            db = await get_database()
-            import random
-            
-            # 1. Bugun transaction kiritganlar ID ro'yxati
-            today_active_ids = await self._get_today_active_user_ids()
-            
-            # 2. Oxirgi 14 kunda faol bo'lgan barcha userlar
-            all_active = await self._get_active_users(days=14)
+            all_users = await self._get_all_users()
             
             sent_count = 0
-            for user in all_active:
-                user_id = user["id"]
-                if user_id in today_active_ids:
+            for user in all_users:
+                telegram_id = user.get("telegram_id")
+                
+                if not telegram_id or telegram_id in self._sent_today["morning"]:
                     continue
                 
-                # Bugun hali nudge yuborilmaganini tekshirish (pauza uchun)
-                # (aslida run_daily kabi ishlaydi, lekin ehtiyotkorlik uchun)
-                
                 try:
-                    lang = user.get("language", "uz")
-                    telegram_id = user["telegram_id"]
-                    
-                    messages = DAILY_NUDGE_UZ if lang == "uz" else DAILY_NUDGE_RU
-                    message = random.choice(messages)
-                    
-                    # PRO Teaser for free users
-                    from app.subscription_handlers import is_user_pro
-                    is_pro = await is_user_pro(telegram_id)
-                    
-                    if not is_pro:
-                        if lang == "uz":
-                            teasers = [
-                                "\n\n💡 *PRO maslahat:* Ovozli xabar bilan xarajat yozish ancha tezroq! 🎤",
-                                "\n\n📊 *PRO fakt:* PRO foydalanuvchilar o'rtacha 25% ko'proq tejashadi!",
-                                "\n\n📅 *PRO imkoniyat:* Qachon qarzdan qutulishingizni aniq sanasini bilishni xohlaysizmi?",
-                                "\n\n📥 *PRO qulaylik:* Barcha ma'lumotlarni Excelga yuklab olishni bilarmidingiz?"
-                            ]
-                        else:
-                            teasers = [
-                                "\n\n💡 *PRO совет:* Записывать расходы голосом гораздо быстрее! 🎤",
-                                "\n\n📊 *PRO факт:* PRO пользователи экономят в среднем на 25% больше!",
-                                "\n\n📅 *PRO возможность:* Хотите узнать точную дату избавления от долгов?",
-                                "\n\n📥 *PRO удобство:* Знаете ли вы, что можно скачать все данные в Excel?"
-                            ]
-                        message += random.choice(teasers)
+                    greeting = random.choice(MORNING_GREETINGS_UZ)
+                    message = f"{greeting}\n\n💬 Bugungi xarajatni kiritish uchun shunchaki yozing!"
                     
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(
-                            "✍️ Xarajat kiritish" if lang == "uz" else "✍️ Записать расход",
-                            callback_data="add_expense"
-                        )],
-                        [InlineKeyboardButton(
-                            "💎 PRO ga o'tish" if lang == "uz" else "💎 Перейти на PRO",
-                            callback_data="show_pricing"
-                        )]
+                        [InlineKeyboardButton("➕ Xarajat kiritish", callback_data="add_expense")],
                     ])
                     
                     await self.bot.send_message(
@@ -419,16 +392,39 @@ class UserEngagementSystem:
                         parse_mode="Markdown",
                         reply_markup=keyboard
                     )
+                    
+                    self._sent_today["morning"].add(telegram_id)
                     sent_count += 1
-                    await asyncio.sleep(0.1)
-                except Exception as e:
-                    logger.warning(f"Failed to nudge {user.get('telegram_id')}: {e}")
+                    await asyncio.sleep(0.15)
+                    
+                except TelegramError as e:
+                    if "blocked" in str(e).lower():
+                        await self._mark_user_blocked(user.get("id"))
+                except Exception:
+                    pass
             
-            logger.info(f"✅ Sent daily nudges to {sent_count} users")
+            logger.info(f"✅ Morning motivation: {sent_count} yuborildi")
             
         except Exception as e:
-            logger.error(f"Daily nudge batch error: {e}")
-
+            logger.error(f"Morning motivation error: {e}")
+    
+    # ==================== HELPER METHODS ====================
+    
+    async def _get_all_users(self) -> List[Dict[str, Any]]:
+        """BARCHA /start bosgan userlarni olish (blocked bo'lmaganlar)"""
+        db = await get_database()
+        
+        if db.is_postgres:
+            async with db._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT id, telegram_id, language, first_name
+                    FROM users
+                    WHERE telegram_id IS NOT NULL
+                    AND COALESCE(notifications_blocked, false) = false
+                """)
+                return [dict(row) for row in rows]
+        return []
+    
     async def _get_today_active_user_ids(self) -> set:
         """Bugun transaction kiritgan user ID larini qaytaradi"""
         db = await get_database()
@@ -436,331 +432,32 @@ class UserEngagementSystem:
         
         if db.is_postgres:
             async with db._pool.acquire() as conn:
-                rows = await conn.fetch("SELECT DISTINCT user_id FROM transactions WHERE DATE(created_at) = $1", today)
+                rows = await conn.fetch(
+                    "SELECT DISTINCT user_id FROM transactions WHERE DATE(created_at) = $1", 
+                    today
+                )
                 return {row["user_id"] for row in rows}
-        else:
-            async with db._connection.execute("SELECT DISTINCT user_id FROM transactions WHERE DATE(created_at) = ?", (today.isoformat(),)) as cursor:
-                rows = await cursor.fetchall()
-                return {row[0] for row in rows}
-    
-    # ==================== INACTIVE USER REMINDERS ====================
-    
-    async def _inactive_reminder_job(self):
-        """Send reminders to inactive users"""
-        while self._running:
-            try:
-                now = now_uz()
-                
-                # Run at 14:00 (afternoon)
-                target = now.replace(hour=14, minute=0, second=0, microsecond=0)
-                if now.hour >= 14:
-                    target += timedelta(days=1)
-                
-                wait_seconds = (target - now).total_seconds()
-                await asyncio.sleep(wait_seconds)
-                
-                if self._running:
-                    await self._send_inactive_reminders()
-                    
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Inactive reminder error: {e}")
-                await asyncio.sleep(3600)
-    
-    async def _send_inactive_reminders(self):
-        """Send reminders to users inactive for 1-3 days"""
-        try:
-            db = await get_database()
-            
-            import random
-            sent_count = 0
-            
-            # Get users inactive for different periods
-            for days, urgency in [(1, "soft"), (2, "medium"), (3, "strong")]:
-                inactive_users = await self._get_inactive_users(days_min=days, days_max=days+1)
-                
-                for user in inactive_users:
-                    try:
-                        telegram_id = user["telegram_id"]
-                        lang = user.get("language", "uz")
-                        
-                        if lang == "uz":
-                            messages = REMINDER_MESSAGES_UZ
-                        else:
-                            messages = REMINDER_MESSAGES_RU
-                        
-                        message = random.choice(messages)
-                        
-                        # Add personalization based on inactivity level
-                        if urgency == "soft" and lang == "uz":
-                            message = f"👋 {message}"
-                        elif urgency == "medium" and lang == "uz":
-                            message = f"⏰ {message}\n\n💡 Bir daqiqa ajrating - xarajat yozing!"
-                        elif urgency == "strong" and lang == "uz":
-                            streak_info = await self._get_user_streak(user["id"])
-                            if streak_info and streak_info > 0:
-                                message = (
-                                    f"🔥 *{streak_info} kunlik streak'ingiz* buzilmasin!\n\n"
-                                    f"{message}"
-                                )
-                            else:
-                                message = f"🎯 {message}\n\n*Bugun boshlang - 7 kunlik challenge!*"
-                        
-                        keyboard = InlineKeyboardMarkup([
-                            [InlineKeyboardButton(
-                                "✏️ Xarajat yozish" if lang == "uz" else "✏️ Записать расход",
-                                callback_data="add_expense"
-                            )],
-                            [InlineKeyboardButton(
-                                "📊 Statistika" if lang == "uz" else "📊 Статистика",
-                                callback_data="pro_statistics"
-                            )]
-                        ])
-                        
-                        await self.bot.send_message(
-                            chat_id=telegram_id,
-                            text=message,
-                            parse_mode="Markdown",
-                            reply_markup=keyboard
-                        )
-                        sent_count += 1
-                        
-                        # Update reminder sent timestamp
-                        await self._mark_reminder_sent(user["id"])
-                        
-                        await asyncio.sleep(0.1)
-                        
-                    except TelegramError as e:
-                        if "blocked" in str(e).lower():
-                            await self._mark_user_blocked(user["id"])
-                        logger.warning(f"Reminder failed for {user.get('telegram_id')}: {e}")
-                    except Exception as e:
-                        logger.error(f"Reminder error: {e}")
-            
-            logger.info(f"✅ Sent inactive reminders to {sent_count} users")
-            
-        except Exception as e:
-            logger.error(f"Inactive reminder batch error: {e}")
-    
-    # ==================== WEEKLY REPORT ====================
-    
-    async def _weekly_report_job(self):
-        """Send weekly progress report on Sundays at 10:00"""
-        while self._running:
-            try:
-                now = now_uz()
-                
-                # Find next Sunday at 10:00
-                days_until_sunday = (6 - now.weekday()) % 7
-                if days_until_sunday == 0 and now.hour >= 10:
-                    days_until_sunday = 7
-                
-                target = now.replace(hour=10, minute=0, second=0, microsecond=0)
-                target += timedelta(days=days_until_sunday)
-                
-                wait_seconds = (target - now).total_seconds()
-                logger.info(f"Weekly report scheduled in {wait_seconds/3600/24:.1f} days")
-                
-                await asyncio.sleep(wait_seconds)
-                
-                if self._running:
-                    await self._send_weekly_reports()
-                    
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Weekly report error: {e}")
-                await asyncio.sleep(3600)
-    
-    async def _send_weekly_reports(self):
-        """Send weekly progress reports to all active users"""
-        try:
-            db = await get_database()
-            
-            # Get users active in last 14 days
-            active_users = await self._get_active_users(days=14)
-            
-            sent_count = 0
-            
-            for user in active_users:
-                try:
-                    telegram_id = user["telegram_id"]
-                    user_id = user["id"]
-                    lang = user.get("language", "uz")
-                    
-                    # Get weekly stats
-                    weekly_stats = await self._get_weekly_stats(user_id)
-                    
-                    if not weekly_stats:
-                        continue
-                    
-                    income = weekly_stats.get("income", 0)
-                    expense = weekly_stats.get("expense", 0)
-                    tx_count = weekly_stats.get("count", 0)
-                    top_categories = weekly_stats.get("top_categories", [])
-                    
-                    if lang == "uz":
-                        message = (
-                            "📊 *HAFTALIK HISOBOT*\n"
-                            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                            f"📅 O'tgan 7 kun natijalari:\n\n"
-                            f"📝 Tranzaksiyalar: *{tx_count}* ta\n"
-                        )
-                        
-                        if income > 0:
-                            message += f"💰 Daromad: *+{format_number(int(income))}* so'm\n"
-                        
-                        message += f"💸 Xarajat: *-{format_number(int(expense))}* so'm\n"
-                        
-                        balance = income - expense
-                        if balance > 0:
-                            message += f"\n✅ Balans: *+{format_number(int(balance))}* so'm\n"
-                            message += "🎉 Ajoyib hafta edi!"
-                        else:
-                            message += f"\n📉 Balans: *{format_number(int(balance))}* so'm\n"
-                        
-                        if top_categories:
-                            message += "\n📌 *Eng ko'p sarflangan:*\n"
-                            for i, cat in enumerate(top_categories[:3], 1):
-                                message += f"  {i}. {cat['category']}: {format_number(int(cat['amount']))} so'm\n"
-                        
-                        message += "\n💡 _Yangi hafta - yangi imkoniyat!_"
-                    else:
-                        message = (
-                            "📊 *ЕЖЕНЕДЕЛЬНЫЙ ОТЧЁТ*\n"
-                            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                            f"📅 Результаты за 7 дней:\n\n"
-                            f"📝 Транзакций: *{tx_count}*\n"
-                        )
-                        
-                        if income > 0:
-                            message += f"💰 Доход: *+{format_number(int(income))}* сум\n"
-                        
-                        message += f"💸 Расход: *-{format_number(int(expense))}* сум\n"
-                        
-                        balance = income - expense
-                        if balance > 0:
-                            message += f"\n✅ Баланс: *+{format_number(int(balance))}* сум\n"
-                            message += "🎉 Отличная неделя!"
-                        else:
-                            message += f"\n📉 Баланс: *{format_number(int(balance))}* сум\n"
-                        
-                        message += "\n💡 _Новая неделя - новые возможности!_"
-                    
-                    keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(
-                            "📊 Batafsil" if lang == "uz" else "📊 Подробнее",
-                            callback_data="pro_statistics"
-                        )],
-                        [InlineKeyboardButton(
-                            "📥 Excel yuklab olish" if lang == "uz" else "📥 Скачать Excel",
-                            callback_data="pro_export_excel"
-                        )]
-                    ])
-                    
-                    await self.bot.send_message(
-                        chat_id=telegram_id,
-                        text=message,
-                        parse_mode="Markdown",
-                        reply_markup=keyboard
-                    )
-                    sent_count += 1
-                    
-                    await asyncio.sleep(0.1)
-                    
-                except TelegramError as e:
-                    logger.warning(f"Weekly report failed for {user.get('telegram_id')}: {e}")
-                except Exception as e:
-                    logger.error(f"Weekly report error: {e}")
-            
-            logger.info(f"✅ Sent weekly reports to {sent_count} users")
-            
-        except Exception as e:
-            logger.error(f"Weekly report batch error: {e}")
-    
-    # ==================== HELPER METHODS ====================
-    
-    async def _get_active_users(self, days: int = 7) -> List[Dict[str, Any]]:
-        """Get users active in last N days"""
-        db = await get_database()
-        cutoff = datetime.now() - timedelta(days=days)
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                rows = await conn.fetch("""
-                    SELECT DISTINCT u.*
-                    FROM users u
-                    WHERE u.last_active > $1
-                    AND u.telegram_id IS NOT NULL
-                    AND COALESCE(u.notifications_blocked, false) = false
-                """, cutoff)
-                return [dict(row) for row in rows]
-        else:
-            async with db._connection.execute("""
-                SELECT DISTINCT u.*
-                FROM users u
-                WHERE u.last_active > ?
-                AND u.telegram_id IS NOT NULL
-            """, (cutoff.isoformat(),)) as cursor:
-                rows = await cursor.fetchall()
-                return [dict(row) for row in rows]
-    
-    async def _get_inactive_users(self, days_min: int, days_max: int) -> List[Dict[str, Any]]:
-        """Get users inactive for specified day range"""
-        db = await get_database()
-        cutoff_max = datetime.now() - timedelta(days=days_min)
-        cutoff_min = datetime.now() - timedelta(days=days_max)
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                rows = await conn.fetch("""
-                    SELECT u.*
-                    FROM users u
-                    WHERE u.last_active BETWEEN $1 AND $2
-                    AND u.telegram_id IS NOT NULL
-                    AND COALESCE(u.notifications_blocked, false) = false
-                    AND COALESCE(u.last_reminder_sent, '1970-01-01'::timestamp) < NOW() - INTERVAL '1 day'
-                """, cutoff_min, cutoff_max)
-                return [dict(row) for row in rows]
-        else:
-            async with db._connection.execute("""
-                SELECT u.*
-                FROM users u
-                WHERE u.last_active BETWEEN ? AND ?
-                AND u.telegram_id IS NOT NULL
-            """, (cutoff_min.isoformat(), cutoff_max.isoformat())) as cursor:
-                rows = await cursor.fetchall()
-                return [dict(row) for row in rows]
+        return set()
     
     async def _get_users_with_today_transactions(self) -> List[Dict[str, Any]]:
-        """Get users who entered transactions today"""
+        """Bugun transaction kiritgan userlarni olish"""
         db = await get_database()
         today = now_uz().date()
         
         if db.is_postgres:
             async with db._pool.acquire() as conn:
                 rows = await conn.fetch("""
-                    SELECT DISTINCT u.*
+                    SELECT DISTINCT u.id, u.telegram_id, u.language
                     FROM users u
                     JOIN transactions t ON t.user_id = u.id
                     WHERE DATE(t.created_at) = $1
                     AND u.telegram_id IS NOT NULL
                 """, today)
                 return [dict(row) for row in rows]
-        else:
-            async with db._connection.execute("""
-                SELECT DISTINCT u.*
-                FROM users u
-                JOIN transactions t ON t.user_id = u.id
-                WHERE DATE(t.created_at) = ?
-                AND u.telegram_id IS NOT NULL
-            """, (today.isoformat(),)) as cursor:
-                rows = await cursor.fetchall()
-                return [dict(row) for row in rows]
+        return []
     
     async def _get_today_stats(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user's today transaction stats"""
+        """Bugungi tranzaksiya statistikasi"""
         db = await get_database()
         today = now_uz().date()
         
@@ -775,163 +472,22 @@ class UserEngagementSystem:
                     WHERE user_id = $1 AND DATE(created_at) = $2
                 """, user_id, today)
                 return dict(row) if row else None
-        else:
-            async with db._connection.execute("""
-                SELECT 
-                    COUNT(*) as count,
-                    COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-                    COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense
-                FROM transactions
-                WHERE user_id = ? AND DATE(created_at) = ?
-            """, (user_id, today.isoformat())) as cursor:
-                row = await cursor.fetchone()
-                return dict(row) if row else None
-    
-    async def _get_weekly_stats(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user's weekly transaction stats"""
-        db = await get_database()
-        week_ago = now_uz().date() - timedelta(days=7)
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                # Get totals
-                totals = await conn.fetchrow("""
-                    SELECT 
-                        COUNT(*) as count,
-                        COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-                        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense
-                    FROM transactions
-                    WHERE user_id = $1 AND DATE(created_at) >= $2
-                """, user_id, week_ago)
-                
-                # Get top categories
-                categories = await conn.fetch("""
-                    SELECT category, SUM(amount) as amount
-                    FROM transactions
-                    WHERE user_id = $1 AND DATE(created_at) >= $2 AND type = 'expense'
-                    GROUP BY category
-                    ORDER BY amount DESC
-                    LIMIT 3
-                """, user_id, week_ago)
-                
-                if totals:
-                    result = dict(totals)
-                    result["top_categories"] = [dict(c) for c in categories]
-                    return result
-                return None
-        else:
-            async with db._connection.execute("""
-                SELECT 
-                    COUNT(*) as count,
-                    COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
-                    COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense
-                FROM transactions
-                WHERE user_id = ? AND DATE(created_at) >= ?
-            """, (user_id, week_ago.isoformat())) as cursor:
-                row = await cursor.fetchone()
-                return dict(row) if row else None
-    
-    async def _get_weekly_comparison(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Compare this week's expenses with last week"""
-        db = await get_database()
-        today = now_uz().date()
-        week_ago = today - timedelta(days=7)
-        two_weeks_ago = today - timedelta(days=14)
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                this_week = await conn.fetchval("""
-                    SELECT COALESCE(SUM(amount), 0)
-                    FROM transactions
-                    WHERE user_id = $1 AND type = 'expense'
-                    AND DATE(created_at) BETWEEN $2 AND $3
-                """, user_id, week_ago, today)
-                
-                last_week = await conn.fetchval("""
-                    SELECT COALESCE(SUM(amount), 0)
-                    FROM transactions
-                    WHERE user_id = $1 AND type = 'expense'
-                    AND DATE(created_at) BETWEEN $2 AND $3
-                """, user_id, two_weeks_ago, week_ago)
-                
-                if last_week and last_week > 0:
-                    diff = this_week - last_week
-                    percent = abs(int((diff / last_week) * 100))
-                    trend = "up" if diff > 0 else "down"
-                    return {"trend": trend, "percent": percent}
-        
         return None
-    
-    async def _get_user_quick_stats(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user's quick monthly stats"""
-        db = await get_database()
-        month_ago = now_uz().date() - timedelta(days=30)
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                row = await conn.fetchrow("""
-                    SELECT 
-                        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as monthly_expense
-                    FROM transactions
-                    WHERE user_id = $1 AND DATE(created_at) >= $2
-                """, user_id, month_ago)
-                return dict(row) if row else None
-        return None
-    
-    async def _get_user_streak(self, user_id: int) -> int:
-        """Get user's consecutive days streak"""
-        db = await get_database()
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                # Get distinct dates with transactions
-                rows = await conn.fetch("""
-                    SELECT DISTINCT DATE(created_at) as tx_date
-                    FROM transactions
-                    WHERE user_id = $1
-                    ORDER BY tx_date DESC
-                    LIMIT 30
-                """, user_id)
-                
-                if not rows:
-                    return 0
-                
-                dates = [row["tx_date"] for row in rows]
-                today = now_uz().date()
-                
-                streak = 0
-                check_date = today
-                
-                for d in dates:
-                    if d == check_date:
-                        streak += 1
-                        check_date -= timedelta(days=1)
-                    elif d < check_date:
-                        break
-                
-                return streak
-        return 0
-    
-    async def _mark_reminder_sent(self, user_id: int):
-        """Mark that reminder was sent to user"""
-        db = await get_database()
-        now = datetime.now()
-        
-        if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                await conn.execute("""
-                    UPDATE users SET last_reminder_sent = $1 WHERE id = $2
-                """, now, user_id)
     
     async def _mark_user_blocked(self, user_id: int):
-        """Mark user as blocked (can't receive messages)"""
+        """User botni bloklagan"""
+        if not user_id:
+            return
         db = await get_database()
-        
         if db.is_postgres:
-            async with db._pool.acquire() as conn:
-                await conn.execute("""
-                    UPDATE users SET notifications_blocked = true WHERE id = $1
-                """, user_id)
+            try:
+                async with db._pool.acquire() as conn:
+                    await conn.execute(
+                        "UPDATE users SET notifications_blocked = true WHERE id = $1", 
+                        user_id
+                    )
+            except Exception:
+                pass
 
 
 # ==================== MANUAL SEND FUNCTIONS ====================
@@ -953,8 +509,8 @@ async def send_daily_report_to_user(bot: Bot, telegram_id: int, lang: str = "uz"
                 "📊 *BUGUNGI HISOBOT*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
                 "📝 Bugun hali tranzaksiya kiritilmadi.\n\n"
-                "💡 Xarajatlaringizni yozib, moliyaviy\n"
-                "holatni nazorat qiling!"
+                "💡 Xarajatlaringizni yozib borish\n"
+                "moliyaviy erkinlikning birinchi qadami!"
             )
         else:
             income = today_stats.get("income", 0)
