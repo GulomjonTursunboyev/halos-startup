@@ -15,7 +15,7 @@ ATMOS_STORE_ID = os.getenv("ATMOS_STORE_ID", "")
 ATMOS_TOKEN = os.getenv("ATMOS_TOKEN", "")
 
 # In test mode or when Atmos is unavailable during dev we can mock responses
-MOCK_ATMOS = os.getenv("MOCK_ATMOS", "True").lower() == "true"
+MOCK_ATMOS = os.getenv("MOCK_ATMOS", "False").lower() == "true"
 
 def _get_headers() -> Dict[str, str]:
     return {
