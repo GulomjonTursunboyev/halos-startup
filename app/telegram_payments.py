@@ -173,7 +173,7 @@ async def handle_voice_tier_payment(update: Update, context: ContextTypes.DEFAUL
     
     if not user:
         logger.error(f"User not found for Voice Tier: {telegram_id}")
-        await message.reply_text("❌ Foydalanuvchi topilmadi. /start bosing.")
+        await message.reply_text("⚠️ Foydalanuvchi topilmadi. Qayta urinib ko'ring yoki @halos_support ga yozing.")
         return
     
     # Activate voice tier
@@ -286,7 +286,7 @@ async def handle_voice_pack_payment(update: Update, context: ContextTypes.DEFAUL
     
     if not user:
         logger.error(f"User not found for Voice Pack: {telegram_id}")
-        await message.reply_text("❌ Foydalanuvchi topilmadi. /start bosing.")
+        await message.reply_text("⚠️ Foydalanuvchi topilmadi. Qayta urinib ko'ring yoki @halos_support ga yozing.")
         return
     
     # Add bonus voice messages
@@ -410,7 +410,7 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         
         if not user:
             logger.error(f"User not found: {telegram_id}")
-            await message.reply_text("❌ Foydalanuvchi topilmadi. /start bosing va qayta urinib ko'ring.")
+            await message.reply_text("⚠️ Foydalanuvchi topilmadi. Qayta urinib ko'ring yoki @halos_support ga yozing.")
             return
         
         # Activate PRO subscription
@@ -481,7 +481,7 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
                 "├ 📊 Batafsil statistika\n"
                 "├ 🔔 Aqlli eslatmalar\n"
                 "└ 📥 Excel hisobot\n\n"
-                "🚀 /start bosing va boshlaymiz!"
+                "🚀 Menyudan foydalanishni boshlang!"
             )
         else:
             success_msg = (
@@ -499,7 +499,7 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
                 "├ 📊 Детальная статистика\n"
                 "├ 🔔 Умные напоминания\n"
                 "└ 📥 Excel отчет\n\n"
-                "🚀 Нажмите /start и начнем!"
+                "🚀 Начните пользоваться меню!"
             )
         
         keyboard = [[InlineKeyboardButton(

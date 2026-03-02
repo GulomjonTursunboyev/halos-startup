@@ -40,8 +40,8 @@ MESSAGES = {
     },
     
     "contact_required": {
-        "uz": "📱 Iltimos, davom etish uchun tugmani bosing.",
-        "ru": "📱 Пожалуйста, нажмите кнопку для продолжения."
+        "uz": "📱 Siz hali ro'yxatdan o'tmagansiz.\n\nRo'yxatdan o'tish uchun /start buyrug'ini yuboring.",
+        "ru": "📱 Вы ещё не зарегистрированы.\n\nДля регистрации отправьте команду /start."
     },
     
     # ==================== NEW SIMPLE ONBOARDING ====================
@@ -1282,7 +1282,7 @@ MESSAGES = {
             "• Xarajatlar: {expenses} so'm\n"
             "• Farq: {difference} so'm\n\n"
             "Iltimos, xarajatlarni qayta ko'rib chiqing yoki daromadni oshiring.\n\n"
-            "Qayta boshlash uchun /start bosing."
+            "👤 *Profil* tugmasi orqali ma'lumotlarni yangilashingiz mumkin."
         ),
         "ru": (
             "⚠️ *Внимание!*\n\n"
@@ -1292,14 +1292,14 @@ MESSAGES = {
             "• Разница: {difference} сум\n\n"
             "Это сложная ситуация, но выход есть.\n"
             "Давайте вместе найдём способ снизить расходы.\n\n"
-            "Для перезапуска нажмите /start."
+            "Обновите данные через кнопку *👤 Профиль*."
         )
     },
     
     # ==================== NAVIGATION ====================
     "restart": {
-        "uz": "🔄 Qayta boshlash uchun /start bosing.",
-        "ru": "🔄 Для перезапуска нажмите /start."
+        "uz": "🔄 Menyudan kerakli bo'limni tanlang.",
+        "ru": "🔄 Выберите нужный раздел из меню."
     },
     
     "help": {
@@ -1373,8 +1373,8 @@ MESSAGES = {
     },
     
     "no_data": {
-        "uz": "📋 Ma'lumot topilmadi. Boshlash uchun /start bosing.",
-        "ru": "📋 Данные не найдены. Нажмите /start для начала."
+        "uz": "📋 Ma'lumot topilmadi. Tranzaksiyalarni yozishni boshlang!",
+        "ru": "📋 Данные не найдены. Начните записывать транзакции!"
     },
     
     "status_header": {
@@ -1384,8 +1384,8 @@ MESSAGES = {
     
     # ==================== ERRORS ====================
     "error_generic": {
-        "uz": "❌ Xatolik yuz berdi. Iltimos, /start bilan qayta boshlang.",
-        "ru": "❌ Произошла ошибка. Пожалуйста, начните заново с /start."
+        "uz": "⚠️ Kutilmagan xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+        "ru": "⚠️ Произошла непредвиденная ошибка. Пожалуйста, попробуйте ещё раз."
     },
     
     "error_contact_mismatch": {
@@ -1906,8 +1906,8 @@ MESSAGES = {
     },
     
     "debt_no_data": {
-        "uz": "💳 Qarz ma'lumotlari topilmadi.\n\n/start buyrug'ini bosing va ma'lumotlaringizni kiriting.",
-        "ru": "💳 Данные о долгах не найдены.\n\nНажмите /start и введите свои данные."
+        "uz": "💳 Qarz ma'lumotlari topilmadi.\n\nQarzlarni yozish uchun menga xabar yozing, masalan:\n• `Ahmadga 500 ming berdim`\n• `Karimdan 1 mln oldim`",
+        "ru": "💳 Данные о долгах не найдены.\n\nДля записи долгов напишите мне, например:\n• `Дал Ахмаду 500 тыс`\n• `Взял у Карима 1 млн`"
     },
     
     "debt_free_message": {
@@ -1965,8 +1965,8 @@ MESSAGES = {
     },
     
     "profile_no_data": {
-        "uz": "👤 Ma'lumotlar topilmadi.\n\n/start buyrug'ini bosing va ma'lumotlaringizni kiriting.",
-        "ru": "👤 Данные не найдены.\n\nНажмите /start и введите свои данные."
+        "uz": "👤 Ma'lumotlar topilmadi.\n\nProfilingizni to'ldirish uchun 👤 Profil tugmasini bosing.",
+        "ru": "👤 Данные не найдены.\n\nНажмите кнопку 👤 Профиль для заполнения."
     },
     
     "profile_edit_menu": {

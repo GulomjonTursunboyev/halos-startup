@@ -1092,7 +1092,7 @@ async def pay_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             f"📦 Tarif: *{plan.description_uz}*\n"
             f"💰 Narx: {price_display_uz}\n\n"
             "👇 Quyidagi tugmani bosing va Click orqali to'lang.\n\n"
-            "⚠️ To'lovdan keyin /start bosing."
+            "⚠️ To'lovdan keyin menyudan foydalaning."
         )
         pay_btn = "💳 Click orqali to'lash"
     else:
@@ -1101,7 +1101,7 @@ async def pay_link_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             f"📦 Тариф: *{plan.description_ru}*\n"
             f"💰 Цена: {price_display_ru}\n\n"
             "👇 Нажмите кнопку и оплатите через Click.\n\n"
-            "⚠️ После оплаты нажмите /start."
+            "⚠️ После оплаты используйте меню."
         )
         pay_btn = "💳 Оплатить через Click"
     

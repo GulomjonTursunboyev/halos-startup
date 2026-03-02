@@ -122,7 +122,7 @@ async def app_login_cancel_callback(update: Update, context: ContextTypes.DEFAUL
     await query.edit_message_text(
         " *Kirish bekor qilindi*\n\n"
         "Mobil ilovaga kirish bekor qilindi.\n"
-        "Istalgan vaqt /start buyrug'i bilan qaytadan urinishingiz mumkin.",
+        "Istalgan vaqt qaytadan urinishingiz mumkin.",
         parse_mode="Markdown"
     )
 

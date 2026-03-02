@@ -373,7 +373,7 @@ async def send_pro_activation_message(telegram_id: int, plan_id: str, expires: d
             "├ 📊 Batafsil statistika\n"
             "├ 🔔 Aqlli eslatmalar\n"
             "└ 📥 Excel hisobot\n\n"
-            "🚀 Boshlash uchun /start bosing!"
+            "🚀 Menyudan foydalanishni boshlang!"
         )
         
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
