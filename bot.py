@@ -36,7 +36,10 @@ from app.handlers import (
     get_main_menu_keyboard,
     # YANGI PROFESSIONAL UX MENYU HANDLERS
     menu_balance_handler,
+    menu_add_handler,
     menu_reports_handler,
+    menu_analytics_handler,
+    menu_goals_handler,
     # Yangi soddalashtirilgan menyu handler'lari
     menu_today_handler,
     menu_debts_handler,
@@ -490,38 +493,39 @@ def main() -> None:
         group=1
     )
     
-    # Main menu button handlers - YANGI PROFESSIONAL UX MENYU
-    # 💰 Balans - Primary Action (full width)
+    # Main menu button handlers - MINIMALIST FINTECH (3 tugma)
+    # 💰 Balans — asosiy dashboard + inline hub
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(💰 Balans|💰 Баланс)$"), menu_balance_handler),
         group=2
     )
-    # 📊 Hisobotlar - All reports centralized
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlar|📊 Отчёты)$"), menu_reports_handler),
-        group=2
-    )
-    # 💳 Qarzlar - Debts dashboard
-    application.add_handler(
-        MessageHandler(filters.TEXT & filters.Regex("^(💳 Qarzlar|💳 Долги|💰 Qarzlar|💰 Долги)$"), menu_debts_handler),
-        group=2
-    )
-    # 👤 Profil
+    # 👤 Profil — profil + navigatsiya hub
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(👤 Profil|👤 Профиль)$"), menu_profile_handler),
         group=2
     )
-    # 💎 PRO
+    # ➕ Qo'shish — kirim/chiqim/qarz qo'shish
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(➕ Qo'shish|➕ Добавить)$"), menu_add_handler),
+        group=2
+    )
+    # Legacy support for old menu buttons
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(📊 Hisobotlar|📊 Отчёты)$"), menu_reports_handler),
+        group=2
+    )
+    application.add_handler(
+        MessageHandler(filters.TEXT & filters.Regex("^(💳 Qarzlar|💳 Долги|💰 Qarzlar|💰 Долги)$"), menu_debts_handler),
+        group=2
+    )
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(💎 PRO)$"), menu_subscription_handler),
         group=2
     )
-    # ❓ Yordam
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(❓ Yordam|❓ Помощь)$"), menu_help_handler),
         group=2
     )
-    # Legacy support for old menu buttons
     application.add_handler(
         MessageHandler(filters.TEXT & filters.Regex("^(📊 Bugun|📊 Сегодня)$"), menu_today_handler),
         group=2

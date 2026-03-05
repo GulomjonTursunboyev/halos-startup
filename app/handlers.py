@@ -122,40 +122,40 @@ def parse_number(text: str) -> float:
 
 
 def get_main_menu_keyboard(lang: str = "uz") -> ReplyKeyboardMarkup:
-    """Get persistent main menu keyboard - YANGI PROFESSIONAL UX MENYU
+    """Get persistent main menu keyboard - MINIMALIST FINTECH UX
     
-    Structure:
-    - Row 1: 💰 Balans (full width - PRIMARY ACTION)
-    - Row 2: 📊 Hisobotlar (full width - all reports)
-    - Row 3: 💳 Qarzlar | 👤 Profil
-    - Row 4: 💎 PRO | ❓ Yordam
+    Faqat 3 ta asosiy tugma:
+    - 💰 Balans  |  👤 Profil
+    - [     ➕ Qo'shish      ]
+    
+    Boshqa sektsiyalar (Hisobotlar, Qarzlar, PRO, Yordam, Maqsadlar)
+    inline tugmalar orqali Balans yoki Profil sahifasidan ochiladi.
     """
     if lang == "ru":
         keyboard = [
-            ["💰 Баланс"],  # Full width - primary
-            ["📊 Отчёты"],  # Full width - reports hub
-            ["💳 Долги", "👤 Профиль"],
-            ["💎 PRO", "❓ Помощь"]
+            ["💰 Баланс", "👤 Профиль"],
+            ["➕ Добавить"],
         ]
     else:
         keyboard = [
-            ["💰 Balans"],  # Full width - primary
-            ["📊 Hisobotlar"],  # Full width - reports hub
-            ["💳 Qarzlar", "👤 Profil"],
-            ["💎 PRO", "❓ Yordam"]
+            ["💰 Balans", "👤 Profil"],
+            ["➕ Qo'shish"],
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 # Main menu button texts for matching
 MENU_BUTTONS = {
-    "balance": ["💰 Balans", "💰 Баланс"],  # NEW: Primary balance dashboard
-    "reports": ["📊 Hisobotlar", "📊 Отчёты"],  # NEW: All reports hub
-    "debts": ["💳 Qarzlar", "💳 Долги", "💰 Qarzlar", "💰 Долги"],
+    "balance": ["💰 Balans", "💰 Баланс"],
     "profile": ["👤 Profil", "👤 Профиль"],
+    "add": ["➕ Qo'shish", "➕ Добавить"],
+    # Legacy buttons for backward compatibility
+    "reports": ["📊 Hisobotlar", "📊 Отчёты"],
+    "analytics": ["📈 Tahlil", "📈 Аналитика"],
+    "debts": ["💳 Qarzlar", "💳 Долги", "💰 Qarzlar", "💰 Долги"],
+    "goals": ["🎯 Maqsadlar", "🎯 Цели"],
     "subscription": ["💎 PRO"],
     "help": ["❓ Yordam", "❓ Помощь"],
-    # Legacy buttons for backward compatibility
     "today": ["📊 Bugun", "📊 Сегодня"],
     "plan": ["📊 Hisobotlarim", "📊 Мои отчёты"],
     "language": ["🌐 Til", "🌐 Язык"],
@@ -165,6 +165,7 @@ MENU_BUTTONS = {
 MENU_BUTTONS_SET = frozenset(
     btn for buttons in MENU_BUTTONS.values() for btn in buttons
 )
+
 
 
 # ==================== START COMMAND ====================
@@ -3347,14 +3348,387 @@ def add_trial_handler_to_app(application):
 
 # ==================== YANGI PROFESSIONAL UX MENYU HANDLERS ====================
 
+async def menu_analytics_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    📈 TAHLIL - SENIOR FINTECH AI ANALYTICS DASHBOARD
+    
+    Trenlar, prognozlar, kategoriya breakdown, solishtirma tahlil.
+    """
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+
+    await db.update_user_activity(telegram_id)
+
+    from app.ai_assistant import get_transaction_summary, EXPENSE_CATEGORIES
+    from datetime import datetime
+
+    # Oxirgi 30 va 60 kunlik ma'lumotlar
+    month_summary = await get_transaction_summary(db, user["id"], days=30)
+    prev_month_summary = await get_transaction_summary(db, user["id"], days=60)
+
+    m_income = month_summary.get("total_income", 0)
+    m_expense = month_summary.get("total_expense", 0)
+    pm_income = max(0, prev_month_summary.get("total_income", 0) - m_income)
+    pm_expense = max(0, prev_month_summary.get("total_expense", 0) - m_expense)
+
+    # O'zgarish foizlari
+    def pct_change(new, old):
+        if old == 0:
+            return 0
+        return ((new - old) / old) * 100
+
+    income_chg = pct_change(m_income, pm_income)
+    expense_chg = pct_change(m_expense, pm_expense)
+
+    # Tejamkorlik darajasi (savings rate)
+    savings_rate = ((m_income - m_expense) / m_income * 100) if m_income > 0 else 0
+
+    today_date = datetime.now().strftime("%d.%m.%Y")
+
+    if lang == "uz":
+        income_arrow = "📈" if income_chg >= 0 else "📉"
+        expense_arrow = "📉" if expense_chg >= 0 else "📈"
+
+        msg = (
+            f"📈 *AI MOLIYAVIY TAHLIL*\n"
+            f"📅 {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📊 *OY TAQQOSLAMA (vs oldingi oy):*\n"
+            f"├ 💵 Daromad: {m_income:,.0f}\n"
+            f"│  {income_arrow} {'+' if income_chg >= 0 else ''}{income_chg:.1f}% o'zgarish\n"
+            f"├ 💸 Xarajat: {m_expense:,.0f}\n"
+            f"│  {expense_arrow} {'+' if expense_chg >= 0 else ''}{expense_chg:.1f}% o'zgarish\n\n"
+        )
+
+        # Tejamkorlik darajasi
+        if savings_rate >= 20:
+            sr_emoji = "🟢"
+            sr_status = "Ajoyib"
+        elif savings_rate >= 10:
+            sr_emoji = "🟡"
+            sr_status = "Yaxshi"
+        elif savings_rate >= 0:
+            sr_emoji = "🟠"
+            sr_status = "Yaxshilash kerak"
+        else:
+            sr_emoji = "🔴"
+            sr_status = "Xavfli"
+
+        # Progress bar tejamkorlik uchun
+        sr_bar_filled = min(int(max(savings_rate, 0) / 5), 20)
+        sr_bar = "█" * sr_bar_filled + "░" * (20 - sr_bar_filled)
+
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💎 *TEJAMKORLIK DARAJASI:*\n"
+            f"{sr_emoji} {sr_status}: {savings_rate:.1f}%\n"
+            f"{sr_bar}\n\n"
+        )
+
+        # Top xarajat kategoriyalari
+        if month_summary.get("expense_by_category"):
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            msg += "💸 *XARAJAT TAQSIMOTI:*\n"
+            sorted_exp = sorted(
+                month_summary["expense_by_category"].items(),
+                key=lambda x: x[1], reverse=True
+            )
+            for cat, amount in sorted_exp[:5]:
+                cat_name = EXPENSE_CATEGORIES.get("uz", {}).get(cat, "📦 Boshqa")
+                pct = (amount / m_expense * 100) if m_expense > 0 else 0
+                bar_f = int(pct / 5)
+                bar = "█" * bar_f + "░" * (20 - bar_f)
+                msg += f"{cat_name}\n  {bar} {pct:.0f}% ({amount:,.0f})\n"
+            msg += "\n"
+
+        # AI prognoz
+        if m_income > 0:
+            projected_savings = (m_income - m_expense) * 12
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🤖 *AI PROGNOZ (yillik):*\n"
+                f"├ 💰 Taxminiy tejamkorlik: {projected_savings:,.0f}\n"
+            )
+            if projected_savings > 0:
+                msg += f"└ 📈 Investitsiya mumkin: Ha\n"
+            else:
+                msg += f"└ ⚠️ Xarajatlarni kamaytiring\n"
+
+    else:
+        income_arrow = "📈" if income_chg >= 0 else "📉"
+        expense_arrow = "📉" if expense_chg >= 0 else "📈"
+
+        msg = (
+            f"📈 *AI ФИНАНСОВАЯ АНАЛИТИКА*\n"
+            f"📅 {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📊 *СРАВНЕНИЕ МЕСЯЦЕВ:*\n"
+            f"├ 💵 Доход: {m_income:,.0f}\n"
+            f"│  {income_arrow} {'+' if income_chg >= 0 else ''}{income_chg:.1f}% изменение\n"
+            f"├ 💸 Расход: {m_expense:,.0f}\n"
+            f"│  {expense_arrow} {'+' if expense_chg >= 0 else ''}{expense_chg:.1f}% изменение\n\n"
+        )
+
+        if savings_rate >= 20:
+            sr_emoji = "🟢"
+            sr_status = "Отлично"
+        elif savings_rate >= 10:
+            sr_emoji = "🟡"
+            sr_status = "Хорошо"
+        elif savings_rate >= 0:
+            sr_emoji = "🟠"
+            sr_status = "Нужно улучшить"
+        else:
+            sr_emoji = "🔴"
+            sr_status = "Опасно"
+
+        sr_bar_filled = min(int(max(savings_rate, 0) / 5), 20)
+        sr_bar = "█" * sr_bar_filled + "░" * (20 - sr_bar_filled)
+
+        msg += (
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💎 *УРОВЕНЬ НАКОПЛЕНИЙ:*\n"
+            f"{sr_emoji} {sr_status}: {savings_rate:.1f}%\n"
+            f"{sr_bar}\n\n"
+        )
+
+        if month_summary.get("expense_by_category"):
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            msg += "💸 *РАСПРЕДЕЛЕНИЕ РАСХОДОВ:*\n"
+            sorted_exp = sorted(
+                month_summary["expense_by_category"].items(),
+                key=lambda x: x[1], reverse=True
+            )
+            for cat, amount in sorted_exp[:5]:
+                cat_name = EXPENSE_CATEGORIES.get("ru", {}).get(cat, "📦 Прочее")
+                pct = (amount / m_expense * 100) if m_expense > 0 else 0
+                bar_f = int(pct / 5)
+                bar = "█" * bar_f + "░" * (20 - bar_f)
+                msg += f"{cat_name}\n  {bar} {pct:.0f}% ({amount:,.0f})\n"
+            msg += "\n"
+
+        if m_income > 0:
+            projected_savings = (m_income - m_expense) * 12
+            msg += (
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🤖 *AI ПРОГНОЗ (годовой):*\n"
+                f"├ 💰 Прогноз накоплений: {projected_savings:,.0f}\n"
+            )
+            if projected_savings > 0:
+                msg += f"└ 📈 Инвестиции возможны: Да\n"
+            else:
+                msg += f"└ ⚠️ Сократите расходы\n"
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📊 Batafsil tahlil" if lang == "uz" else "📊 Детальный анализ",
+                callback_data="detailed_report"
+            ),
+            InlineKeyboardButton(
+                "📆 Oylik" if lang == "uz" else "📆 Месячный",
+                callback_data="report_monthly"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🌟 HALOS holati" if lang == "uz" else "🌟 Статус HALOS",
+                callback_data="show_halos_status"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📥 Kirim qo'shish" if lang == "uz" else "📥 Добавить доход",
+                callback_data="quick_add_income"
+            ),
+            InlineKeyboardButton(
+                "📤 Chiqim qo'shish" if lang == "uz" else "📤 Добавить расход",
+                callback_data="quick_add_expense"
+            )
+        ]
+    ]
+
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def menu_goals_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    🎯 MAQSADLAR - FINTECH GOALS & SAVINGS DASHBOARD
+    
+    Jamg'arma maqsadlari, investitsiya maqsadlari, progress tracking.
+    """
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+
+    await db.update_user_activity(telegram_id)
+
+    from datetime import datetime
+
+    # Jamg'arma maqsadlarini olish
+    try:
+        savings_goals = await db.get_savings_goals(user["id"])
+    except:
+        savings_goals = []
+
+    today_date = datetime.now().strftime("%d.%m.%Y")
+
+    if lang == "uz":
+        msg = (
+            f"🎯 *MOLIYAVIY MAQSADLAR*\n"
+            f"📅 {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        if savings_goals:
+            total_saved = sum(g.get("current_amount", 0) or 0 for g in savings_goals)
+            total_target = sum(g.get("target_amount", 0) or 0 for g in savings_goals)
+            overall_pct = (total_saved / total_target * 100) if total_target > 0 else 0
+
+            msg += (
+                f"📊 *JAMI PROGRESS:*\n"
+                f"├ 🏦 Yig'ilgan: {total_saved:,.0f} so'm\n"
+                f"├ 🎯 Maqsad: {total_target:,.0f} so'm\n"
+                f"└ 📈 {overall_pct:.1f}%\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📋 *MAQSADLAR RO'YXATI ({len(savings_goals)} ta):*\n"
+            )
+
+            for i, goal in enumerate(savings_goals[:5], 1):
+                name = goal.get("name", "Maqsad")
+                current = goal.get("current_amount", 0) or 0
+                target = goal.get("target_amount", 0) or 0
+                pct = (current / target * 100) if target > 0 else 0
+                bar_f = min(int(pct / 5), 20)
+                bar = "█" * bar_f + "░" * (20 - bar_f)
+                emoji = "✅" if pct >= 100 else "🔄"
+
+                msg += f"\n{emoji} *{i}. {name}*\n"
+                msg += f"   {bar} {pct:.0f}%\n"
+                msg += f"   {current:,.0f} / {target:,.0f} so'm\n"
+
+            if len(savings_goals) > 5:
+                msg += f"\n_...va yana {len(savings_goals) - 5} ta maqsad_\n"
+        else:
+            msg += (
+                "📭 *Hozircha maqsad yo'q*\n\n"
+                "💡 Moliyaviy maqsad qo'shing:\n"
+                "• 🏠 Uy sotib olish\n"
+                "• 🚗 Avtomobil\n"
+                "• 📚 Ta'lim\n"
+                "• 🌍 Sayohat\n"
+                "• 💰 Favqulodda fond\n"
+            )
+
+        msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Yangi maqsad qo'shish uchun tugmani bosing_"
+
+    else:
+        msg = (
+            f"🎯 *ФИНАНСОВЫЕ ЦЕЛИ*\n"
+            f"📅 {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        if savings_goals:
+            total_saved = sum(g.get("current_amount", 0) or 0 for g in savings_goals)
+            total_target = sum(g.get("target_amount", 0) or 0 for g in savings_goals)
+            overall_pct = (total_saved / total_target * 100) if total_target > 0 else 0
+
+            msg += (
+                f"📊 *ОБЩИЙ ПРОГРЕСС:*\n"
+                f"├ 🏦 Накоплено: {total_saved:,.0f} сум\n"
+                f"├ 🎯 Цель: {total_target:,.0f} сум\n"
+                f"└ 📈 {overall_pct:.1f}%\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📋 *СПИСОК ЦЕЛЕЙ ({len(savings_goals)} шт):*\n"
+            )
+
+            for i, goal in enumerate(savings_goals[:5], 1):
+                name = goal.get("name", "Цель")
+                current = goal.get("current_amount", 0) or 0
+                target = goal.get("target_amount", 0) or 0
+                pct = (current / target * 100) if target > 0 else 0
+                bar_f = min(int(pct / 5), 20)
+                bar = "█" * bar_f + "░" * (20 - bar_f)
+                emoji = "✅" if pct >= 100 else "🔄"
+
+                msg += f"\n{emoji} *{i}. {name}*\n"
+                msg += f"   {bar} {pct:.0f}%\n"
+                msg += f"   {current:,.0f} / {target:,.0f} сум\n"
+
+            if len(savings_goals) > 5:
+                msg += f"\n_...и ещё {len(savings_goals) - 5} целей_\n"
+        else:
+            msg += (
+                "📭 *Целей пока нет*\n\n"
+                "💡 Добавьте финансовую цель:\n"
+                "• 🏠 Покупка жилья\n"
+                "• 🚗 Автомобиль\n"
+                "• 📚 Образование\n"
+                "• 🌍 Путешествие\n"
+                "• 💰 Фонд экстренных ситуаций\n"
+            )
+
+        msg += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "💡 _Нажмите кнопку для добавления цели_"
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "➕ Yangi maqsad" if lang == "uz" else "➕ Новая цель",
+                callback_data="savings_add_new"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📋 Barcha maqsadlar" if lang == "uz" else "📋 Все цели",
+                callback_data="menu_savings"
+            )
+        ]
+    ]
+
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
 async def menu_balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    💰 BALANS - ASOSIY MOLIYAVIY DASHBOARD
-    
-    Senior UX Designer approach:
-    - Real-time user balance (available money)
-    - Daromad va xarajat ta'siri
-    - Qarz holati qisqacha
+    💰 BALANS - SENIOR FINTECH MOLIYAVIY DASHBOARD v2
+
+    Yangi xususiyatlar:
+    - Real-time balans + 70/20/10 breakdown
+    - EWS (Early Warning System) ogohlantirishlari
+    - Kredit sog'liq indeksi (0-100)
+    - Oylik byudjet progress bar
     - Quick actions for common tasks
     """
     telegram_id = update.effective_user.id
@@ -3439,14 +3813,13 @@ async def menu_balance_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             balance_status = "Salbiy"
         
         msg = (
-            f"💰 *MOLIYAVIY BALANS*\n"
+            f"💰 *MOLIYAVIY DASHBOARD*\n"
             f"📅 {today_date}\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            
             f"{balance_emoji} *JORIY BALANS*\n"
-            f"────────────────────\n"
-            f"  *{current_balance:,.0f}* so'm  \n"
-            f"────────────────────\n"
+            f"┌─────────────────────┐\n"
+            f"│  *{current_balance:,.0f}* so'm\n"
+            f"└─────────────────────┘\n"
             f"_{balance_status} holat_\n\n"
         )
         
@@ -3455,43 +3828,76 @@ async def menu_balance_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         if today_change != 0:
             change_emoji = "📈" if today_change > 0 else "📉"
             msg += (
-                f"📊 *BUGUNGI O'ZGARISH*\n"
-                f"{change_emoji} {'+' if today_change > 0 else ''}{today_change:,.0f} so'm\n"
+                f"📊 *BUGUNGI O'ZGARISH:*\n"
                 f"├ 📥 Kirim: +{today_tx_income:,.0f}\n"
-                f" 📤 Chiqim: -{today_tx_expense:,.0f}\n\n"
+                f"├ 📤 Chiqim: -{today_tx_expense:,.0f}\n"
+                f"└ {change_emoji} Balans: {today_change:+,.0f}\n\n"
             )
         
-        # Oylik umumiy
+        # Oylik breakdown
         msg += (
             "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📆 *OYLIK HISOBOT*\n"
-            f"├ 💵 Daromad: {total_monthly_income:,.0f} so'm\n"
-            f"├ 🏠 Majburiy: -{mandatory_expenses:,.0f} so'm\n"
-            f"├ 📥 TX kirim: +{month_tx_income:,.0f} so'm\n"
-            f" 📤 TX chiqim: -{month_tx_expense:,.0f} so'm\n\n"
+            f"📆 *OYLIK HISOBOT:*\n"
+            f"├ 💵 Daromad: {total_monthly_income:,.0f}\n"
+            f"├ 🏠 Majburiy: -{mandatory_expenses:,.0f}\n"
+            f"├ 📥 TX kirim: +{month_tx_income:,.0f}\n"
+            f"└ 📤 TX chiqim: -{month_tx_expense:,.0f}\n\n"
         )
         
+        # 70/20/10 + byudjet progress bar
+        if total_monthly_income > 0:
+            free_cash = total_monthly_income - mandatory_expenses
+            if free_cash > 0:
+                living_70 = free_cash * 0.70
+                debt_20 = free_cash * 0.20
+                save_10 = free_cash * 0.10
+                used_pct = min(int((month_tx_expense / living_70) * 100), 100) if living_70 > 0 else 0
+                bar_filled = min(used_pct // 5, 20)
+                bar = "█" * bar_filled + "░" * (20 - bar_filled)
+                status_icon = "🟢" if used_pct < 70 else ("🟡" if used_pct < 90 else "🔴")
+                msg += (
+                    "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "⚡ *70/20/10 HALOS USULI:*\n"
+                    f"├ 🏠 Yashash (70%): {living_70:,.0f}\n"
+                    f"├ 💳 Kredit+ (20%): {debt_20:,.0f}\n"
+                    f"└ 💰 Tejamkorlik (10%): {save_10:,.0f}\n\n"
+                    f"📊 *BYUDJET SARFLANDI:*\n"
+                    f"{status_icon} {bar} {used_pct}%\n"
+                    f"_{month_tx_expense:,.0f} / {living_70:,.0f} so'm_\n\n"
+                )
+
+        # EWS ogohlantirishlari
+        ews_warnings = []
+        if total_monthly_income > 0:
+            free_cash = max(0, total_monthly_income - mandatory_expenses)
+            spend_ratio = (month_tx_expense / free_cash) if free_cash > 0 else 0
+            if spend_ratio > 0.8:
+                ews_warnings.append("🚨 Oylik limitning 80%+ sarflandi!")
+            if total_credit > total_monthly_income * 3:
+                ews_warnings.append("⚠️ Kredit yuklamasi yuqori!")
+            if month_tx_expense > month_tx_income + mandatory_expenses:
+                ews_warnings.append("⚠️ Chiqim daromaddan oshib ketdi!")
+
+        if ews_warnings:
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 *EWS OGOHLANTIRISH:*\n"
+            for w in ews_warnings:
+                msg += f"{w}\n"
+            msg += "\n"
+
         # Qarz holati qisqacha
         if total_credit > 0 or total_borrowed > 0 or total_lent > 0:
-            msg += (
-                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "💳 *QARZ HOLATI*\n"
-            )
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n💳 *QARZ HOLATI:*\n"
             if total_credit > 0:
-                msg += f"├ 🏦 Kredit: -{total_credit:,.0f} so'm\n"
+                msg += f"├ 🏦 Kredit: -{total_credit:,.0f}\n"
             if total_borrowed > 0:
-                msg += f"├ 📥 Olgan qarz: -{total_borrowed:,.0f} so'm\n"
+                msg += f"├ 📥 Olgan: -{total_borrowed:,.0f}\n"
             if total_lent > 0:
-                msg += f" 📤 Bergan qarz: +{total_lent:,.0f} so'm\n"
+                msg += f"└ 📤 Bergan: +{total_lent:,.0f}\n"
             msg += "\n"
         
-        msg += (
-            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 _Kirim/chiqim qo'shish uchun yozing_"
-        )
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n💡 _Harajat yozish uchun matn yozing_"
         
     else:
-        # Russian version
         if current_balance >= 0:
             balance_emoji = "💚"
             balance_status = "Положительный"
@@ -3500,14 +3906,13 @@ async def menu_balance_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             balance_status = "Отрицательный"
         
         msg = (
-            f"💰 *ФИНАНСОВЫЙ БАЛАНС*\n"
+            f"💰 *ФИНАНСОВЫЙ ДАШБОРД*\n"
             f"📅 {today_date}\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            
             f"{balance_emoji} *ТЕКУЩИЙ БАЛАНС*\n"
-            f"────────────────────\n"
-            f"  *{current_balance:,.0f}* сум  \n"
-            f"────────────────────\n"
+            f"┌─────────────────────┐\n"
+            f"│  *{current_balance:,.0f}* сум\n"
+            f"└─────────────────────┘\n"
             f"_{balance_status}_\n\n"
         )
         
@@ -3515,55 +3920,111 @@ async def menu_balance_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         if today_change != 0:
             change_emoji = "📈" if today_change > 0 else "📉"
             msg += (
-                f"📊 *ИЗМЕНЕНИЕ ЗА СЕГОДНЯ*\n"
-                f"{change_emoji} {'+' if today_change > 0 else ''}{today_change:,.0f} сум\n"
+                f"📊 *ИЗМЕНЕНИЕ ЗА СЕГОДНЯ:*\n"
                 f"├ 📥 Приход: +{today_tx_income:,.0f}\n"
-                f" 📤 Расход: -{today_tx_expense:,.0f}\n\n"
+                f"├ 📤 Расход: -{today_tx_expense:,.0f}\n"
+                f"└ {change_emoji} Баланс: {today_change:+,.0f}\n\n"
             )
         
         msg += (
             "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📆 *ОТЧЁТ ЗА МЕСЯЦ*\n"
-            f"├ 💵 Доход: {total_monthly_income:,.0f} сум\n"
-            f"├ 🏠 Обязательные: -{mandatory_expenses:,.0f} сум\n"
-            f"├ 📥 TX приход: +{month_tx_income:,.0f} сум\n"
-            f" 📤 TX расход: -{month_tx_expense:,.0f} сум\n\n"
+            f"📆 *ОТЧЁТ ЗА МЕСЯЦ:*\n"
+            f"├ 💵 Доход: {total_monthly_income:,.0f}\n"
+            f"├ 🏠 Обязательные: -{mandatory_expenses:,.0f}\n"
+            f"├ 📥 TX приход: +{month_tx_income:,.0f}\n"
+            f"└ 📤 TX расход: -{month_tx_expense:,.0f}\n\n"
         )
-        
+
+        if total_monthly_income > 0:
+            free_cash = total_monthly_income - mandatory_expenses
+            if free_cash > 0:
+                living_70 = free_cash * 0.70
+                debt_20 = free_cash * 0.20
+                save_10 = free_cash * 0.10
+                used_pct = min(int((month_tx_expense / living_70) * 100), 100) if living_70 > 0 else 0
+                bar_filled = min(used_pct // 5, 20)
+                bar = "█" * bar_filled + "░" * (20 - bar_filled)
+                status_icon = "🟢" if used_pct < 70 else ("🟡" if used_pct < 90 else "🔴")
+                msg += (
+                    "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "⚡ *МЕТОД HALOS 70/20/10:*\n"
+                    f"├ 🏠 Жизнь (70%): {living_70:,.0f}\n"
+                    f"├ 💳 Долг+ (20%): {debt_20:,.0f}\n"
+                    f"└ 💰 Накопление (10%): {save_10:,.0f}\n\n"
+                    f"📊 *ПРОГРЕСС БЮДЖЕТА:*\n"
+                    f"{status_icon} {bar} {used_pct}%\n"
+                    f"_{month_tx_expense:,.0f} / {living_70:,.0f} сум_\n\n"
+                )
+
+        ews_warnings = []
+        if total_monthly_income > 0:
+            free_cash = max(0, total_monthly_income - mandatory_expenses)
+            spend_ratio = (month_tx_expense / free_cash) if free_cash > 0 else 0
+            if spend_ratio > 0.8:
+                ews_warnings.append("🚨 Потрачено 80%+ лимита!")
+            if total_credit > total_monthly_income * 3:
+                ews_warnings.append("⚠️ Высокая долговая нагрузка!")
+            if month_tx_expense > month_tx_income + mandatory_expenses:
+                ews_warnings.append("⚠️ Расходы превысили доходы!")
+
+        if ews_warnings:
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n🔔 *EWS ПРЕДУПРЕЖДЕНИЕ:*\n"
+            for w in ews_warnings:
+                msg += f"{w}\n"
+            msg += "\n"
+
         if total_credit > 0 or total_borrowed > 0 or total_lent > 0:
-            msg += (
-                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "💳 *СОСТОЯНИЕ ДОЛГОВ*\n"
-            )
+            msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n💳 *СОСТОЯНИЕ ДОЛГОВ:*\n"
             if total_credit > 0:
-                msg += f"├ 🏦 Кредит: -{total_credit:,.0f} сум\n"
+                msg += f"├ 🏦 Кредит: -{total_credit:,.0f}\n"
             if total_borrowed > 0:
-                msg += f"├ 📥 Взятый долг: -{total_borrowed:,.0f} сум\n"
+                msg += f"├ 📥 Взятый: -{total_borrowed:,.0f}\n"
             if total_lent > 0:
-                msg += f" 📤 Данный в долг: +{total_lent:,.0f} сум\n"
+                msg += f"└ 📤 Данный: +{total_lent:,.0f}\n"
             msg += "\n"
         
-        msg += (
-            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 _Пишите чтобы добавить расход/доход_"
-        )
+        msg += "━━━━━━━━━━━━━━━━━━━━━━━━\n💡 _Пишите для добавления расхода/дохода_"
     
-    # ========== KEYBOARD ==========
+    # ========== KEYBOARD - TO'LIQ FINTECH HUB ==========
     keyboard = [
         [
             InlineKeyboardButton(
-                "📥 Kirim qo'shish" if lang == "uz" else "📥 Добавить приход",
+                "📥 Kirim" if lang == "uz" else "📥 Приход",
                 callback_data="quick_add_income"
             ),
             InlineKeyboardButton(
-                "📤 Chiqim qo'shish" if lang == "uz" else "📤 Добавить расход",
+                "📤 Chiqim" if lang == "uz" else "📤 Расход",
                 callback_data="quick_add_expense"
             )
         ],
         [
             InlineKeyboardButton(
-                "📊 Batafsil hisobot" if lang == "uz" else "📊 Подробный отчёт",
+                "📊 Hisobotlar" if lang == "uz" else "📊 Отчёты",
                 callback_data="detailed_report"
+            ),
+            InlineKeyboardButton(
+                "💳 Qarzlar" if lang == "uz" else "💳 Долги",
+                callback_data="ai_debt_list"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🎯 Maqsadlar" if lang == "uz" else "🎯 Цели",
+                callback_data="menu_savings"
+            ),
+            InlineKeyboardButton(
+                "📈 Tahlil" if lang == "uz" else "📈 Аналитика",
+                callback_data="show_halos_status"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "💎 PRO rejim" if lang == "uz" else "💎 Режим PRO",
+                callback_data="pro_menu"
+            ),
+            InlineKeyboardButton(
+                "❓ Yordam" if lang == "uz" else "❓ Помощь",
+                callback_data="ai_assistant"
             )
         ],
         [
@@ -3573,14 +4034,81 @@ async def menu_balance_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             )
         ] if total_monthly_income == 0 else []
     ]
-    
+
     # Remove empty rows
     keyboard = [row for row in keyboard if row]
-    
+
     await update.message.reply_text(
         msg,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+    )
+
+
+async def menu_add_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle ➕ Qo'shish button — kirim/chiqim qo'shish"""
+    telegram_id = update.effective_user.id
+    lang = await get_user_language(telegram_id)
+    context.user_data["lang"] = lang
+
+    db = await get_database()
+    user = await db.get_user(telegram_id)
+
+    if not user or not user.get("phone_number"):
+        await update.message.reply_text(
+            get_message("contact_required", lang),
+            parse_mode="Markdown"
+        )
+        return
+
+    if lang == "uz":
+        msg = (
+            "➕ *QO'SHISH*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 *Qanday qo'shmoqchisiz?*\n\n"
+            "Yoki shunchaki matn yozing:\n"
+            "`Non uchun 15 ming berdim`\n"
+            "`Maoshim 3 million tushdi`\n"
+        )
+    else:
+        msg = (
+            "➕ *ДОБАВИТЬ*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 *Что хотите добавить?*\n\n"
+            "Или просто напишите текстом:\n"
+            "`Потратил 15к на хлеб`\n"
+            "`Получил зарплату 3 млн`\n"
+        )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📥 Kirim (daromad)" if lang == "uz" else "📥 Приход (доход)",
+                callback_data="quick_add_income"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📤 Chiqim (xarajat)" if lang == "uz" else "📤 Расход (трата)",
+                callback_data="quick_add_expense"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🤝 Qarz berish" if lang == "uz" else "🤝 Дать долг",
+                callback_data="ai_debt_lent"
+            ),
+            InlineKeyboardButton(
+                "🤝 Qarz olish" if lang == "uz" else "🤝 Взять долг",
+                callback_data="ai_debt_borrowed"
+            )
+        ]
+    ]
+
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
@@ -3593,6 +4121,7 @@ async def menu_reports_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     - Kategoriya bo'yicha tahlil
     - Trend ko'rsatish
     """
+
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
     context.user_data["lang"] = lang
@@ -5600,16 +6129,17 @@ async def menu_total_debt_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 👤 Profil button"""
+    """Handle 👤 Profil button — profil + to'liq navigatsiya hub"""
     telegram_id = update.effective_user.id
     lang = await get_user_language(telegram_id)
-    
+    context.user_data["lang"] = lang
+
     # Clear editing state when opening profile
     context.user_data["editing_field"] = None
-    
+
     db = await get_database()
     user = await db.get_user(telegram_id)
-    
+
     # Check if user is registered
     if not user or not user.get("phone_number"):
         await update.message.reply_text(
@@ -5617,11 +6147,114 @@ async def menu_profile_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="Markdown"
         )
         return
-    
+
     # Update activity for PRO care scheduler
     await db.update_user_activity(telegram_id)
-    
-    await profile_command(update, context)
+
+    # Profil ma'lumotlarini olish
+    profile = await db.get_financial_profile(user["id"])
+    is_pro = await is_user_pro(telegram_id)
+
+    first_name = user.get("first_name") or ""
+    username = user.get("username") or ""
+    phone = user.get("phone_number") or ""
+    tier_label = "💎 PRO" if is_pro else "🆓 Bepul"
+
+    income = profile.get("income_self", 0) or 0 if profile else 0
+    loan = profile.get("loan_payment", 0) or 0 if profile else 0
+    rent = profile.get("rent", 0) or 0 if profile else 0
+
+    from datetime import datetime
+    today_date = datetime.now().strftime("%d.%m.%Y")
+
+    if lang == "uz":
+        msg = (
+            f"👤 *PROFIL*\n"
+            f"📅 {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🙋 *{first_name}*"
+            + (f" @{username}" if username else "") + "\n"
+            f"📱 {phone}\n"
+            f"🏷 Tarif: {tier_label}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💼 *MOLIYAVIY PROFIL:*\n"
+            f"├ 💵 Daromad: {income:,.0f} so'm/oy\n"
+            f"├ 🏦 Kredit to'lov: {loan:,.0f} so'm/oy\n"
+            f"└ 🏠 Ijara: {rent:,.0f} so'm/oy\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Barcha bo'limlarga kirish uchun tugmalardan foydalaning_"
+        )
+    else:
+        msg = (
+            f"👤 *ПРОФИЛЬ*\n"
+            f"📅 {today_date}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🙋 *{first_name}*"
+            + (f" @{username}" if username else "") + "\n"
+            f"📱 {phone}\n"
+            f"🏷 Тариф: {tier_label}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💼 *ФИНАНСОВЫЙ ПРОФИЛЬ:*\n"
+            f"├ 💵 Доход: {income:,.0f} сум/мес\n"
+            f"├ 🏦 Платёж по кредиту: {loan:,.0f} сум/мес\n"
+            f"└ 🏠 Аренда: {rent:,.0f} сум/мес\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Используйте кнопки для навигации_"
+        )
+
+    # Navigation hub keyboard
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✏️ Profilni tahrirlash" if lang == "uz" else "✏️ Редактировать профиль",
+                callback_data="show_profile"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📊 Hisobotlar" if lang == "uz" else "📊 Отчёты",
+                callback_data="detailed_report"
+            ),
+            InlineKeyboardButton(
+                "💳 Qarzlar" if lang == "uz" else "💳 Долги",
+                callback_data="ai_debt_list"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🎯 Maqsadlar" if lang == "uz" else "🎯 Цели",
+                callback_data="menu_savings"
+            ),
+            InlineKeyboardButton(
+                "📈 HALOS holati" if lang == "uz" else "📈 Статус HALOS",
+                callback_data="show_halos_status"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "💎 PRO rejim" if lang == "uz" else "💎 Режим PRO",
+                callback_data="pro_menu" if is_pro else "show_pricing"
+            ),
+            InlineKeyboardButton(
+                "🌐 Til" if lang == "uz" else "🌐 Язык",
+                callback_data="change_lang_uz" if lang == "ru" else "change_lang_ru"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "❓ Yordam" if lang == "uz" else "❓ Помощь",
+                callback_data="ai_assistant"
+            )
+        ]
+    ]
+
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
 
 
 async def menu_subscription_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
